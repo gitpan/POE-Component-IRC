@@ -25,7 +25,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.3';
+$VERSION = '1.4';
 my $debug;
 
 
@@ -261,7 +261,8 @@ sub _sock_up {
   $heap->{'socket'} = new POE::Wheel::ReadWrite
     ( Handle     => $socket,
       Driver     => POE::Driver::SysRW->new(),
-      Filter     => POE::Filter::Line->new( InputRegexp => '\015?\012' ),
+      Filter     => POE::Filter::Line->new( InputRegexp => '\015?\012',
+					    OutputLiteral => "\015\012" ),
       InputState => '_parseline',
       ErrorState => '_sock_down',
     );
@@ -768,7 +769,7 @@ sub sl {
   die "Not enough arguments" unless defined $arg;
 
   warn ">>> $arg\n" if $heap->{'debug'};
-  $heap->{'socket'}->put( "$arg\r\n" );
+  $heap->{'socket'}->put( "$arg" );
 }
 
 

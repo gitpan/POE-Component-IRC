@@ -1,4 +1,4 @@
-POE::Component::IRC 1.1 README                   Fri Mar  2 03:07:01 PST 2001
+POE::Component::IRC 1.4 README                   Mon Jul  2 17:10:59 PDT 2001
 =============================================================================
 
 Table of Contents
@@ -37,7 +37,7 @@ http://www.funkplanet.com/POE/ .
 3. PREREQUISITES
 ----------------
 
-	POE. (Duh. :-)  Specifically, version 0.06_07 or better. It also
+	POE. (Duh. :-)  Specifically, version 0.12 or better. It also
 requires Carp and Socket, but if you find yourself lacking either of
 those, you're in more trouble than we can help with anyways...
 
