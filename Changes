@@ -1,0 +1,58 @@
+$Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
+Revision history for Perl extension POE::Component::IRC.
+
+1.0b  Sat Jan 13 14:49:22 PST 2001
+    - This is a beta release. It may not entirely work, and DCC receive
+      is still unimplemented. I'll list the bugs I remember fixing below.
+      1.0 final will have DCC receive capability, I promise!
+    - CTCP event names are now in the form of "irc_ctcp_ping" or
+      whatever. See the POD documentation.
+    - CTCP events now actually include the sender and recipient names.
+    - The infamous "Not an ARRAY reference" bug should now go away. Make
+      sure you're using a recent version of POE! Turned out it was a bug
+      in POE::Filter::Line.
+
+0.15  Tue Aug 10 19:21:58 EDT 1999
+    - Well, it sucked for the first revision, at least. In my eager haste,
+      I released the CTCP code with numerous debugging prints scattered
+      throughout the source, some serious brokenness in mixed-mode
+      messages, and a totally unimplemented put() method. All fixed! You
+      can now actually send CTCP messages with the 'ctcp' and 'ctcpreply'
+      events. Now to hack on DCC...
+
+0.14  Sun Aug  8 18:29:46 EDT 1999
+    - Wrote documentation for POE::Filter::IRC.
+    - Moved Filter.pm to Filter-IRC.pm, in preparation for adding a
+      CTCP filter.
+    - Addi <amh@mbl.is> fixed a nasty bug with public/msg handling in
+      the Filter-IRC module. I am SUCH a neen.
+    - Finally sat down and wrote the bloody CTCP filter, at long last.
+      Don't be surprised if it sucks for the first few revisions... the
+      last one I wrote did, too. On the other hand, this uses big chunks
+      of the working code from that effort, so maybe I'll get lucky this
+      time.
+
+0.13  Fri Jun  4 03:56:13 EDT 1999
+    - Split the parser off into a separate POE::Filter::IRC module.
+      The surgery was surprisingly easy, but I had to do an ugly
+      Makefile.PL hack to get it to install correctly.
+
+0.12  Fri Jun  4 01:16:55 EDT 1999
+    - Wrote a nice README, finally.
+    - Fixed a bug in the test.pl script where I accidentally referred
+      to the 'irc_disconnected' event as 'irc_disconnect'. No wonder it
+      wasn't shutting down properly.
+
+0.11  Thu Jun  3 18:41:51 EDT 1999
+    - Spruced up the parser's regexps with a lot of " +"'s.
+    - Turned off all the massively verbose debugging code.
+    - Realized that I need to write a README.
+
+0.1   Thu Jun  3 16:55:24 EDT 1999
+    - Completely functional, minus CTCP and DCC.
+
+0.1a  Mon May 17 09:11:48 EDT 1999
+    - Released for a little private QA to oznoid and dngor. Moderately
+      functional. Can send every command (I think), and has a
+      half-written parser that handles the most common IRC events, and
+      a few which it wasn't meant to handle.

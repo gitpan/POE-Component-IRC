@@ -1,0 +1,121 @@
+POE::Component::IRC 1.0b README                  Sat Jan 13 16:53:08 PST 2001
+=============================================================================
+
+Table of Contents
+------------------------
+
+1.  Introduction
+2.  Availability
+3.  Prerequisites
+4.  Installation
+5.  Bugs and Wish List
+6.  Disclaimer
+7.  Copyright
+8.  Developer Information
+
+
+
+1. INTRODUCTION
+---------------
+
+	POE::Component::IRC is a POE (Perl Object Environment) component
+which provides a convenient way for POE applications to create a tiny
+IRC client session and send and receive IRC events through it. If that
+first sentence was a bit too much, go read the POE documentation over
+and over until it makes some sense.
+
+
+2. AVAILABILITY
+---------------
+
+The latest stable version of POE::Component::IRC will be available on
+CPAN, in the directory /authors/id/FIMM/ . A more complete mirror,
+wihch includes recent alpha or beta releases, can be found at
+http://www.funkplanet.com/POE/ .
+
+
+3. PREREQUISITES
+----------------
+
+	POE. (Duh. :-)  Specifically, version 0.06_07 or better. It also
+requires Carp and Socket, but if you find yourself lacking either of
+those, you're in more trouble than we can help with anyways...
+
+
+4. INSTALLATION
+---------------
+
+	Same as any other Perl module, right? Unpack the tarfile, cd into
+the resulting POE-Component-IRC-whatever directory, and do this:
+
+	perl Makefile.PL
+	make
+	make install
+
+	Right now, 'make test' runs a script which pretty much just sits
+there and runs forever, looking for parser bugs; don't make test unless
+you don't mind sitting and waiting for a really long time. The eventual
+plan for the test script is to have it start up two IRC sessions which
+talk to each other, CTCP each other, send DCCs to each other, et cetera,
+to make sure that everything actually works. For the moment, I'd settle
+for even having two-directional DCC support at all. (Right now, you can
+send DCCs but not receive them.)
+
+	There's another test program in the distribution called
+'dicebot.pl', which is a simple dice-rolling IRC program which I wrote
+one day for the hell of it. It's a good example of a simple, complete
+bot. Just put it in a channel and say "roll 1d12 + 2" or what have you.
+Feel free to use it as a framework for writing your own bot.
+
+
+5. BUGS AND WISH LIST
+---------------------
+
+	- Needs complete DCC support.
+	- Needs a better test script, as described above.
+
+	To report bugs, email the maintainer at dennis@funkplanet.com,
+or just bug the hell out of him on irc.rhizomatic.net, channel #tempura.
+His nick is "fimmtiu". Be gentle.
+
+
+6. DISCLAIMER
+-------------
+
+	This module is provided "as is". If it makes your computer
+explode, your hair fall out, your cat develop rabies, your house burn
+down, whatever -- it's not our fault. Period. Ha ha, so there! :-)
+
+	Furthermore, note that this module is still under active
+development. The author reserves the right to gratuitously break old
+code for the good of the rest of mankind, although it's unlikely that
+that sort of thing will happen often.
+
+
+7. COPYRIGHT
+------------
+
+	The copyright for POE::Component::IRC belongs to Dennis Taylor,
+the poor bastard who wrote this thing up in the first place. It's
+distributed under the same terms as Perl itself (that is, either the
+Artistic License or GPL as you prefer). Please see the license that
+came with your Perl distribution for details.
+
+
+8. DEVELOPER INFORMATION
+------------------------
+
+	POE::Component::IRC was conceived and written by Dennis "fimmtiu"
+Taylor, with piles of ideas and advice donated by Rocco "dngor"
+Caputo, of POE fame, and Kevin "oznoid" Lenzo. Further testing,
+support and encouragement were provided by the exceedingly tolerant
+members of the EFnet channel #perl, especially including but not
+limited to:
+
+	Addi, for testing and bug-hunting
+	cherem, for constant motivational needling and prodding
+	obvious, for spleen assistance
+	stimps, for an excellent chili recipie
+	and last but not least, my spleen! ("purl, spleen cheer!")
+
+

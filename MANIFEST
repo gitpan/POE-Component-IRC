@@ -1,0 +1,9 @@
+Changes
+IRC.pm
+Filter-IRC.pm
+Filter-CTCP.pm
+MANIFEST
+Makefile.PL
+test.pl
+README
+dicebot.pl
