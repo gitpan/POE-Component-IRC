@@ -1,4 +1,4 @@
-# $Id: IRC-State.pm,v 3.11 2005/03/19 13:47:54 chris Exp $
+# $Id: IRC-State.pm,v 3.13 2005/04/04 10:55:03 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -37,7 +37,7 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '1.1';
+$VERSION = '1.2';
 
 sub _create {
   my ($package) = shift;
@@ -55,6 +55,16 @@ sub _create {
 
   if ( $self->{HAS_CLIENT_DNS} ) {
     POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
+  }
+
+  BEGIN {
+    my $has_ssl = 0;
+    eval {
+      require POE::Component::SSLify;
+      import POE::Component::SSLify qw( Client_SSLify );
+      $has_ssl = 1;
+    };
+    $self->{HAS_SSL} = $has_ssl;
   }
 
   # Plugin 'irc_whois' and 'irc_whowas' support
@@ -826,7 +836,7 @@ sub ban_mask {
   $mask =~ s/\\\?/[\x01-\xFF]{1,1}/g;
 
   foreach my $nick ( $self->channel_list($channel) ) {
-	if ( $self->nick_long_form($nick) =~ /^$mask$/ ) {
+	if ( u_irc ( $self->nick_long_form($nick) ) =~ /^$mask$/ ) {
 		push ( @result, $nick );
 	}
   }

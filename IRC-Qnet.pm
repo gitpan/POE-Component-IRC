@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet.pm,v 3.6 2005/03/14 10:16:24 chris Exp $
+# $Id: IRC-Qnet.pm,v 3.7 2005/03/31 14:22:12 chris Exp $
 #
 # POE::Component::IRC::Qnet, by Chris Williams
 #
@@ -57,6 +57,16 @@ sub _create {
 
   if ( $self->{HAS_CLIENT_DNS} ) {
     POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
+  }
+
+  BEGIN {
+    my $has_ssl = 0;
+    eval {
+      require POE::Component::SSLify;
+      import POE::Component::SSLify qw( Client_SSLify );
+      $has_ssl = 1;
+    };
+    $self->{HAS_SSL} = $has_ssl;
   }
 
   # Plugin 'irc_whois' and 'irc_whowas' support

@@ -1,5 +1,22 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.0   Tue Apr 05 10:39:42 BST 2005
+    - Fixed a minor bug in Filter-IRC.pm, where it wasn't
+      decoloning the mode line before splitting it. 
+      Thanks to webfox for pointing it out.
+    - Used eval's to make plugins system safe from rogue
+      plugins. *tssk* *tssk*
+    - Plugins system will now try to send events to a plugin
+      method _default() if the call to S_* or U_* fails.
+    - Applied a patch from webfox to enable SSL 
+      connections. \o/
+    - Ported SSL patch to all dependent sub-classes.
+    - Teased and fixed a bug in IRC-State.pm. ban_mask() 
+      should work properly now.
+    - paulv @ MAGnet pointed out that spawn() and connect()
+      arguments are case-sensitive. Adapted his patch. Args
+      can be in any case now.
+
 3.9   Mon Mar 21 09:17:05 GMT 2005
     - Applied patches from webfox @ MAGnet for UnrealIRCd
       support in IRC-State.pm and Plugin-State.pm.

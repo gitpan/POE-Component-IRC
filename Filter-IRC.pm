@@ -1,4 +1,4 @@
-# $Id: Filter-IRC.pm,v 3.5 2005/02/19 13:26:44 chris Exp $
+# $Id: Filter-IRC.pm,v 3.6 2005/03/28 18:24:11 chris Exp $
 #
 # POE::Filter::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -66,7 +66,7 @@ sub get {
 
       # MODE... just split the args and pass them wholesale.
     } elsif ($line =~ /^:(\S+) +MODE +(\S+) +(.+)$/) {
-      push @$events, { name => 'mode', args => [$1, $2, split(/\s+/, $3)] };
+      push @$events, { name => 'mode', args => [$1, $2, split( /\s+/, _decolon( $3 ) )] };
 
     } elsif ($line =~ /^:(\S+) +KICK +(\S+) +(\S+) +(.+)$/) {
       push @$events, { name => 'kick', args => [$1, $2, $3, _decolon( $4 )] };

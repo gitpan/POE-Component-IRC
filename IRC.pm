@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 3.14 2005/03/21 09:17:50 chris Exp $
+# $Id: IRC.pm,v 3.18 2005/04/05 09:42:11 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -50,8 +50,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '3.9';
-$REVISION = do {my@r=(q$Revision: 3.14 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '4.0';
+$REVISION = do {my@r=(q$Revision: 3.18 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -80,6 +80,16 @@ sub _create {
 
   if ( $self->{HAS_CLIENT_DNS} ) {
     POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
+  }
+
+  BEGIN {
+    my $has_ssl = 0;
+    eval {
+      require POE::Component::SSLify;
+      import POE::Component::SSLify qw( Client_SSLify );
+      $has_ssl = 1;
+    };
+    $self->{HAS_SSL} = $has_ssl;
   }
 
   # Plugin 'irc_whois' and 'irc_whowas' support
@@ -184,61 +194,42 @@ sub _configure {
   if ( defined ( $args ) and ref $args eq 'HASH' ) {
     my (%arg) = %$args;
 
-    if (exists $arg{'Flood'} and $arg{'Flood'}) {
+    if (exists $arg{'flood'} and $arg{'flood'}) {
       $self->{'dont_flood'} = 0;
     } else {
       $self->{'dont_flood'} = 1;
     }
 
 
-    if (exists $arg{'PartFix'} and ( not $arg{'PartFix'} ) ) {
+    if (exists $arg{'partfix'} and ( not $arg{'partfix'} ) ) {
       $self->{'dont_partfix'} = 1;
     } else {
       $self->{'dont_partfix'} = 0;
     }
 
-    $self->{'password'} = $arg{'Password'} if exists $arg{'Password'};
-    $self->{'localaddr'} = $arg{'LocalAddr'} if exists $arg{'LocalAddr'};
-    $self->{'localport'} = $arg{'LocalPort'} if exists $arg{'LocalPort'};
-    $self->{'nick'} = $arg{'Nick'} if exists $arg{'Nick'};
-    $self->{'port'} = $arg{'Port'} if exists $arg{'Port'};
-    $self->{'server'} = $arg{'Server'} if exists $arg{'Server'};
-    $self->{'proxy'} = $arg{'Proxy'} if exists $arg{'Proxy'};
-    $self->{'proxyport'} = $arg{'ProxyPort'} if exists $arg{'ProxyPort'};
-    $self->{'ircname'} = $arg{'Ircname'} if exists $arg{'Ircname'};
-    $self->{'username'} = $arg{'Username'} if exists $arg{'Username'};
-    $self->{'NoDNS'} = $arg{'NoDNS'} if exists $arg{'NoDNS'};
-    $self->{'nat_addr'} = $arg{'NATAddr'} if exists $arg{'NATAddr'};
-    $self->{'user_bitmode'} = $arg{'BitMode'} if exists $arg{'BitMode'};
-    if (exists $arg{'Debug'}) {
-      $self->{'debug'} = $arg{'Debug'};
-      $self->{irc_filter}->debug( $arg{'Debug'} );
-      $self->{ctcp_filter}->debug( $arg{'Debug'} );
+    $self->{'password'} = $arg{'password'} if exists $arg{'password'};
+    $self->{'localaddr'} = $arg{'localaddr'} if exists $arg{'localaddr'};
+    $self->{'localport'} = $arg{'localport'} if exists $arg{'localport'};
+    $self->{'nick'} = $arg{'nick'} if exists $arg{'nick'};
+    $self->{'port'} = $arg{'port'} if exists $arg{'port'};
+    $self->{'server'} = $arg{'server'} if exists $arg{'server'};
+    $self->{'proxy'} = $arg{'proxy'} if exists $arg{'proxy'};
+    $self->{'proxyport'} = $arg{'proxyport'} if exists $arg{'proxyport'};
+    $self->{'ircname'} = $arg{'ircname'} if exists $arg{'ircname'};
+    $self->{'username'} = $arg{'username'} if exists $arg{'username'};
+    $self->{'NoDNS'} = $arg{'nodns'} if exists $arg{'nodns'};
+    $self->{'nat_addr'} = $arg{'nataddr'} if exists $arg{'nataddr'};
+    $self->{'user_bitmode'} = $arg{'bitmode'} if exists $arg{'bitmode'};
+    if (exists $arg{'debug'}) {
+      $self->{'debug'} = $arg{'debug'};
+      $self->{irc_filter}->debug( $arg{'debug'} );
+      $self->{ctcp_filter}->debug( $arg{'debug'} );
     }
-    my ($dccport) = delete ( $arg{'DCCPorts'} );
-
-    if ( defined ( $dccport ) ) {
-	my (@values) = split(/,/,$dccport);
-	my (@ports);
-
-	if ( ref $dccport eq 'SCALAR' ) {
-	 foreach ( @values ) {
-  	  next if ( $_ !~ /[0-9\-]+/ );
-  	  SWITCH: {
-        	if ( /\-/ ) {
-          	  my (@range) = split(/\-/);
-                  push(@ports,$range[0] .. $range[1]);
-          	  last SWITCH;
-        	}
-        	push(@ports,$_);
-  	  }
-	 }
-	} elsif ( ref $dccport eq 'ARRAY' ) {
-		@ports = @{ $dccport };
-	}
-	if ( scalar @ports > 0 ) {
-	  $self->{dcc_bind_port} = \@ports;
-	}
+    my ($dccport) = delete ( $arg{'dccports'} );
+    $self->{'UseSSL'} = $arg{'usessl'} if exists $arg{'usessl'};
+    
+    if ( defined ( $dccport ) and ref ( $dccport ) eq 'ARRAY' ) {
+	  $self->{dcc_bind_port} = $dccport;
     }
 
     # This is a hack to make sure that the component doesn't die if no IRCServer is
@@ -623,6 +614,19 @@ sub _sock_up {
   # Remember what IP address we're connected through, for multihomed boxes.
   $self->{'localaddr'} = (unpack_sockaddr_in( getsockname $socket ))[1];
 
+  #ssl!
+  if ($self->{HAS_SSL} and $self->{'UseSSL'}) {
+    eval {
+      $socket = Client_SSLify( $socket );
+    };
+    if ($@) {
+      #something didn't work
+      warn "Couldn't use an SSL socket: $@ \n";
+      $self->{'UseSSL'} = 0;
+    }
+  }
+
+
   # Create a new ReadWrite wheel for the connected socket.
   $self->{'socket'} = new POE::Wheel::ReadWrite
     ( Handle     => $socket,
@@ -731,6 +735,11 @@ sub connect {
       }
     }
   }
+
+  foreach my $key ( keys %arg ) {
+	$arg{ lc $key } = delete $arg{$key};
+  }
+
   $self->_configure( \%arg );
 
   # try and use non-blocking resolver if needed
@@ -1010,7 +1019,7 @@ sub dcc_close {
   my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
 
   # Let the plugin system process this
-  if ( $self->_plugin_process( 'OUTPUT', 'DCC_CLOSE', \$id ) == PCI_EAT_ALL ) {
+  if ( $self->_plugin_process( 'USER', 'DCC_CLOSE', \$id ) == PCI_EAT_ALL ) {
   	return 1;
   }
 
@@ -1095,10 +1104,13 @@ sub spawn {
 
   my %parms = @_;
 
+  foreach my $key ( keys %parms ) {
+	$parms{ lc $key } = delete $parms{$key};
+  }
+
   delete ( $parms{'options'} ) unless ( ref ( $parms{'options'} ) eq 'HASH' );
 
   my ($self) = $package->_create();
-
 
   my ($alias) = delete ( $parms{'alias'} );
 
@@ -1579,7 +1591,13 @@ sub plugin_add {
 	}
 
 	# Tell the plugin to register itself
-	if ( $plugin->PCI_register( $self ) ) {
+	my ($return);
+
+	eval {
+	   $return = $plugin->PCI_register( $self );
+	};
+
+	if ( $return ) {
 		$self->{PLUGINS}->{OBJECTS}->{ $name } = $plugin;
 
 		# Okay, send an event to let others know this plugin is loaded
@@ -1631,7 +1649,9 @@ sub plugin_del {
 		}
 
 		# Tell the plugin to unregister
-		$plugin->PCI_unregister( $self );
+		eval {
+			$plugin->PCI_unregister( $self );
+		};
 
 		# Okay, send an event to let others know this plugin is deleted
 		$self->yield( '__send_event', 'irc_plugin_del', $name, $plugin );
@@ -1806,7 +1826,7 @@ sub _plugin_process {
 	}
 
 	# Check if any plugins are interested in this event
-	if ( ! exists $self->{PLUGINS}->{ $type }->{ $event } ) {
+	if ( not ( exists $self->{PLUGINS}->{ $type }->{ $event } or exists $self->{PLUGINS}->{ $type }->{ 'all' } ) ) {
 		return PCI_EAT_NONE;
 	}
 
@@ -1822,9 +1842,20 @@ sub _plugin_process {
 	}
 
 	# Okay, have the plugins process this event!
-	foreach my $plugin ( @{ $self->{PLUGINS}->{ $type }->{ $event } } ) {
+	foreach my $plugin ( @{ $self->{PLUGINS}->{ $type }->{ $event } }, @{ $self->{PLUGINS}->{ $type }->{ 'all' } } ) {
 		# What does the plugin return?
-		my $ret = $plugin->$sub( $self, @args );
+		my ($ret) = PCI_EAT_NONE;
+		# Added eval cos we can't trust plugin authors to play by the rules *sigh*
+		eval {
+			$ret = $plugin->$sub( $self, @args );
+		};
+
+		if ( $@ ) {
+		   # Okay, no method of that name fallback on _default() method.
+		   eval {
+			$ret = $plugin->_default( $self, $sub, @args );
+		   };
+		}
 
 		if ( $ret == PCI_EAT_PLUGIN ) {
 			return $return;
@@ -1890,7 +1921,8 @@ POE::Component::IRC - a fully event-driven IRC client module.
                   Server   => 'irc-w.primenet.com',
                   Port     => 6669,
                   Username => 'quetzal',
-                  Ircname  => 'Ask me about my colon!', } );
+                  Ircname  => 'Ask me about my colon!',
+                  UseSSL   => 1, } );
 
 =head1 DESCRIPTION
 
@@ -2040,6 +2072,7 @@ connection are:
 "Nick", your client's IRC nickname;
 "Username", your client's username;
 "Ircname", some cute comment or something.
+"UseSSL", set to some true value if you want to connect using SSL. 
 
 =back
 
@@ -2073,6 +2106,10 @@ to use when initiating DCC, using dcc() or a scalar with the following format,
 "<port>,<port>-<port>", eg. "1024,1050-1060,1080", would represent ports 1024 and 1080 and all
 the ports from 1050 to 1060, simple, huh?; "NATAddr", is the NAT'ed IP address that your bot is
 hidden behind, this is sent whenever you do DCC.
+
+SSL support requires POE::Component::SSLify, as well as an IRC server that supports 
+SSL connections. If you're missing POE::Component::SSLify, specifing 'UseSSL' will do
+nothing. The default is to not try to use SSL.
 
 =item ctcp and ctcpreply
 

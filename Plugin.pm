@@ -32,6 +32,14 @@ POE::Component::IRC::Plugin - Provides plugin documentation for PoCo-IRC
 
 =head1 CHANGES
 
+=head2 0.06
+
+	Updated _plugin_process so that it runs plugin method calls in an 'eval'. Rogue plugins shouldn't be
+	able to crash the component now.
+
+	If a plugin doesn't have a event handler method defined now, the component will try to call a 
+	_default() handler instead.
+
 =head2 0.05
 
 	Realized that there would be collision between USER/SERVER methods, so made it distinct by using S_* and U_*
@@ -175,6 +183,16 @@ limited only by imagination and the IRC RFC's ;)
 		return PCI_EAT_NONE;
 	}
 
+	# Default handler for events that do not have a corresponding plugin method defined.
+	sub _default {
+		my( $self, $irc, $event ) = splice @_, 0, 3;
+
+		print "Default called for $event\n";
+
+		# Return an exit code
+		return PCI_EAT_NONE;
+	}
+
 =head1 Available methods to use on the $irc object
 
 =head2 plugin_add
@@ -224,6 +242,8 @@ limited only by imagination and the IRC RFC's ;)
 	to the irc_* events listed in PoCo-IRC, and naturally, arbitrary events too.
 
 	You do not need to supply events with irc_ in front of them, just the names.
+
+	It is possible to register for all events by specifying 'all' as an event.
 
 	Returns 1 if everything checked out fine, undef if something's seriously wrong
 
@@ -317,6 +337,20 @@ are not given a raw line, they are:
 	dcc_resume	-	$cookie
 	dcc_chat	-	$cookie, @lines
 	dcc_close	-	$cookie
+
+=head2 _default
+
+If a plugin doesn't have a specific hook method defined for an event, the component will attempt to call
+a plugin's _default() method. The first parameter after the plugin and irc objects will be the handler name.
+
+	sub _default {
+	  my ($self,$irc,$event) = splice @_, 0, 3;
+
+	  # $event will be something like S_public or U_dcc, etc.
+	  return PCI_EAT_NONE;
+	}
+
+The _default() handler is expected to return one of the exit codes so PoCo-IRC will know what to do.
 
 =head1 Exit Codes
 
