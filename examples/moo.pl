@@ -26,11 +26,10 @@ sub _start {
   my ($kernel, $session) = @_[KERNEL, SESSION];
 
   # $session->option( trace => 1 );
-  $kernel->alias_set( 'smileyninja' );
   $kernel->post( 'irc', 'register', 'all');
   $kernel->post( 'irc', 'connect', { Debug    => 0,
 				     Nick     => $mynick,
-				     Server   => $ARGV[0] || 'binky',
+				     Server   => $ARGV[0] || 'phreeow.net',
 				     Port     => $ARGV[1] || 6667,
 				     Username => 'neenio',
 				     Ircname  => 'Ask me about my colon!', }

@@ -21,27 +21,14 @@ use File::Basename ();
 use Symbol;
 use vars qw($VERSION);
 
+# The name of the reference count P::C::I keeps in client sessions.
+use constant PCI_REFCOUNT_TAG => "P::C::I registered";
+
 use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-# MESSAGES / SECONDS is the maximum send rate.  Please, please, for
-# everyone's sake, REDUCE THE FRACTION!  MESSAGES must be an integer,
-# but SECONDS can be fractional if Time::HiRes is installed.  Overly
-# long SECONDS just makes the algorithm chunkier.
-
-use constant MESSAGES => 1;  # number of messages per time window
-use constant SECONDS  => 3;  # number of seconds per time window
-
-# TODO: Prioritize sl messages so, say, channel modes are shoved ahead
-# of idle chatter in the send_queue.  Wouldn't that be neat?
-
-# TODO: Burst send.  It seems ok to flush a few messages all at once
-# before nasty ircd code starts prejudicing with extreme prejudice.
-# Advantage could be taken of that.  Too bad hybrid's guts are so
-# incomprehensible.
-
-$VERSION = '1.9';
+$VERSION = '2.0';
 
 
 # What happens when an attempted DCC connection fails.
@@ -251,7 +238,7 @@ sub _sock_down {
 
   # Stop any delayed sends.
   $heap->{send_queue} = [ ];
-  $heap->{send_count} = 0;
+  $heap->{send_time}  = 0;
   $kernel->delay( sl_delayed => undef );
 
   # post a 'irc_disconnected' to each session that cares
@@ -324,7 +311,7 @@ sub _start {
   # Send queue is used to hold pending lines so we don't flood off.
   # The count is used to track the number of lines sent at any time.
   $heap->{send_queue} = [ ];
-  $heap->{send_count} = 0;
+  $heap->{send_time}  = 0;
 
   $session->option( @options ) if @options;
   $kernel->alias_set($alias);
@@ -774,7 +761,8 @@ sub privandnotice {
 
 # Ask P::C::IRC to send you certain events, listed in @events.
 sub register {
-  my ($heap, $sender, @events) = @_[HEAP, SENDER, ARG0 .. $#_];
+  my ($kernel, $heap, $sender, @events) =
+    @_[KERNEL,  HEAP,  SENDER, ARG0 .. $#_];
 
   die "Not enough arguments" unless @events;
 
@@ -784,52 +772,51 @@ sub register {
     $_ = "irc_" . $_ unless /^_/;
     $heap->{events}->{$_}->{$sender} = $sender;
     $heap->{sessions}->{$sender}->{'ref'} = $sender;
-    $heap->{sessions}->{$sender}->{refcnt}++;
+    unless ($heap->{sessions}->{$sender}->{refcnt}++) {
+      $kernel->refcount_increment($sender->ID(), PCI_REFCOUNT_TAG);
+    }
   }
 }
 
 
-# Send a line of IRC output to the server.
+# Send a line of IRC output to the server.  Thanks to Raistlin for
+# explaining how ircd throttles messages.
 sub sl {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my $arg = join '', @_[ARG0 .. $#_];
 
   die "Not enough arguments" unless defined $arg;
 
-  # If there are lines buffered or the number of lines sent during the
-  # time window is at the limit, then buffer this line.  Otherwise
-  # we're clear to just send it.
+  my $now = time();
+  $heap->{send_time} = $now if $now > $heap->{send_time};
 
-  if (@{$heap->{send_queue}} or $heap->{send_count} >= MESSAGES
-      or not $heap->{socket}) {
+  if (@{$heap->{send_queue}}) {
     push @{$heap->{send_queue}}, $arg;
-  } else {
-    $kernel->delay_add( sl_delayed => SECONDS );
-    $heap->{send_count}++;
+  }
+  elsif ($heap->{send_time} - $now >= 10) {
+    push @{$heap->{send_queue}}, $arg;
+    $kernel->delay( sl_delayed => 1 );
+  }
+  else {
     warn ">>> $arg\n" if $heap->{'debug'};
+    $heap->{send_time} += 2 + length($arg) / 120;
     $heap->{'socket'}->put( "$arg" );
   }
 }
 
-# Whenever a line is sent, we increment the send count and set a delay
-# for the time window's length in seconds.  After the time window, the
-# line stops counting, and we decrement the counter.  Oh, and if there
-# are messages queued, we send one of them and set another timer.
-# This way only MESSAGES lines can be sent per SECONDS.
-
+# Send delayed lines to the ircd.
 sub sl_delayed {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  $heap->{send_count}--;
-  die "internal error: send_count went negative" if $heap->{send_count} < 0;
-
-  while ( @{$heap->{send_queue}} and $heap->{send_count} < MESSAGES ) {
-    $kernel->delay_add( sl_delayed => SECONDS );
-    $heap->{send_count}++;
+  my $now = time();
+  while (@{$heap->{send_queue}} and ($heap->{since} - $now < 10)) {
     my $arg = shift @{$heap->{send_queue}};
     warn ">>> $arg\n" if $heap->{'debug'};
+    $heap->{since} += 2 + length($arg) / 120;
     $heap->{'socket'}->put( "$arg" );
   }
+
+  $kernel->delay( sl_delayed => 1 ) if @{$heap->{send_queue}};
 }
 
 # The handler for commands which have N arguments, separated by spaces.
@@ -855,15 +842,17 @@ sub topic {
 
 # Ask P::C::IRC to stop sending you certain events, listed in $evref.
 sub unregister {
-  my ($heap, $sender, @events) = @_[HEAP, SENDER, ARG0 .. $#_];
+  my ($kernel, $heap, $sender, @events) =
+    @_[KERNEL,  HEAP,  SENDER,  ARG0 .. $#_];
 
   die "Not enough arguments" unless @events;
 
   foreach (@events) {
     delete $heap->{events}->{$_}->{$sender};
-    $heap->{sessions}->{$sender}->{refcnt}--;
-    delete $heap->{sessions}->{$sender}
-    if $heap->{sessions}->{$sender}->{refcnt} <= 0;
+    if (--$heap->{sessions}->{$sender}->{refcnt} <= 0) {
+      delete $heap->{sessions}->{$sender};
+      $kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
+    }
   }
 }
 

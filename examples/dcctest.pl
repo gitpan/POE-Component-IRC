@@ -18,9 +18,6 @@ my $nick = "spleen" . ($$ % 1000);
 sub _start {
   my ($kernel, $session) = @_[KERNEL, SESSION];
 
-  # Make an alias for our session, to keep it from getting GC'ed.
-  $kernel->alias_set( 'smileyninja' );
-
   # Ask the IRC component to send us all IRC events it receives. This
   # is the easy, indiscriminate way to do it.
   $kernel->post( 'test', 'register', 'all');
@@ -30,7 +27,7 @@ sub _start {
   $kernel->post( 'test', 'connect', { Debug    => 1,
 				      Nick     => $nick,
                                       Server   => $ARGV[0] ||
-				                  'binky.phreeow.net',
+				                  'scissorman.phreeow.net',
 				      Port     => $ARGV[1] || 6667,
 				      Username => 'neenio',
 				      Ircname  => 'Ask me about my colon!', }

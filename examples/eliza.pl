@@ -27,9 +27,6 @@ sub _start {
   # Uncomment this to turn on more verbose POE debugging information.
   # $session->option( trace => 1 );
 
-  # Make an alias for our session, to keep it from getting GC'ed.
-  $kernel->alias_set( 'smileyninja' );
-
   # Ask the IRC component to send us all IRC events it receives. This
   # is the easy, indiscriminate way to do it.
   $kernel->post( 'test', 'register', 'all');

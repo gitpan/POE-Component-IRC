@@ -21,7 +21,7 @@ sub _start {
   $kernel->post( 'dicebot', 'connect', { Debug    => 1,
 					 Nick     => $nick,
 					 Server   => $ARGV[0] ||
-					             'binky.phreeow.net',
+					             'scissorman.phreeow.net',
 					 Port     => $ARGV[1] || 6667,
 					 Username => 'neenio',
 					 Ircname  => "HELP I'M A ROCK", }
