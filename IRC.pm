@@ -24,7 +24,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.0';
+$VERSION = '1.1';
 my $debug;
 
 
@@ -50,7 +50,7 @@ sub _dcc_failed {
     close $heap->{dcc}->{$id}->{fh};
     delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
     delete $heap->{dcc}->{$id};
-    
+
   } else {
     # In this case, something went wrong.
     _send_event( $kernel, $heap, 'irc_dcc_error', $id, $errstr,
@@ -85,7 +85,7 @@ sub _dcc_read {
     # Are we done yet?
 
   } elsif ($heap->{dcc}->{$id}->{type} eq "SEND") {
-
+ 
     # Record the client's download progress.
     $heap->{dcc}->{$id}->{done} = unpack "N", substr( $data, -4 );
     _send_event( $kernel, $heap, 'irc_dcc_send', $id,
@@ -152,7 +152,7 @@ sub _dcc_up {
       return;
     }
     binmode FILE;
-    
+
     # Store the filehandle with the rest of this connection's state.
     $heap->{dcc}->{$id}->{'fh'} = \*FILE;
 
@@ -165,11 +165,11 @@ sub _dcc_up {
     binmode FILE;
     read FILE, $buf, $heap->{dcc}->{$id}->{'blocksize'};
     $heap->{dcc}->{$id}->{wheel}->put( $buf );
-    
+
     # Store the filehandle with the rest of this connection's state.
     $heap->{dcc}->{$id}->{'fh'} = \*FILE;
   }
-  
+
   # Tell any listening sessions that the connection is up.
   _send_event( $kernel, $heap, 'irc_dcc_start',
 	       $id, @{$heap->{dcc}->{$id}}{'nick', 'type', 'port'},
@@ -183,15 +183,15 @@ sub _dcc_up {
 sub _parseline {
   my ($kernel, $session, $heap, $line) = @_[KERNEL, SESSION, HEAP, ARG0];
   my (@events, @cooked);
-  
+
   # Feed the proper Filter object the raw IRC text and get the
   # "cooked" events back for sending, then deliver each event. We
   # handle CTCPs separately from normal IRC messages here, to avoid
   # silly module dependencies later.
-  
+
   @cooked = ($line =~ tr/\001// ? @{$heap->{ctcp_filter}->get( [$line] )}
 	     : @{$heap->{irc_filter}->get( [$line] )} );
-  
+
   foreach my $ev (@cooked) {
     $ev->{name} = 'irc_' . $ev->{name};
     _send_event( $kernel, $heap, $ev->{name}, @{$ev->{args}} );
@@ -205,7 +205,7 @@ sub _parseline {
 sub _send_event  {
   my ($kernel, $heap, $event, @args) = @_;
   my %sessions;
-  
+
   foreach (values %{$heap->{events}->{'irc_all'}},
 	   values %{$heap->{events}->{$event}}) {
     $sessions{$_} = $_;
@@ -219,11 +219,11 @@ sub _send_event  {
 # Internal function called when a socket is closed.
 sub _sock_down {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  
+
   # Destroy the RW wheel for the socket.
   delete $heap->{'socket'};
   $heap->{connected} = 0;
-  
+
   # post a 'irc_disconnected' to each session that cares
   foreach (keys %{$heap->{sessions}}) {
     $kernel->post( $heap->{sessions}->{$_}->{'ref'},
@@ -235,7 +235,7 @@ sub _sock_down {
 # Internal function called when a socket fails to be properly opened.
 sub _sock_failed {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  
+
   _send_event( $kernel, $heap, 'irc_socketerr', $! );
 }
 
@@ -243,10 +243,10 @@ sub _sock_failed {
 # Internal function called when a connection is established.
 sub _sock_up {
   my ($kernel, $heap, $session, $socket) = @_[KERNEL, HEAP, SESSION, ARG0];
-  
+
   # We no longer need the SocketFactory wheel. Scrap it.
   delete $heap->{'socketfactory'};
-  
+
   # Create a new ReadWrite wheel for the connected socket.
   $heap->{'socket'} = new POE::Wheel::ReadWrite
     ( Handle     => $socket,
@@ -255,20 +255,20 @@ sub _sock_up {
       InputState => '_parseline',
       ErrorState => '_sock_down',
     );
-  
+
   if ($heap->{'socket'}) {
     $heap->{connected} = 1;
   } else {
     _send_event( $kernel, $heap, 'irc_socketerr',
 		 "Couldn't create ReadWrite wheel for IRC socket" );
   }
-  
+
   # Post a 'irc_connected' event to each session that cares
   foreach (keys %{$heap->{sessions}}) {
     $kernel->post( $heap->{sessions}->{$_}->{'ref'},
 		   'irc_connected', $heap->{server} );
   }
-  
+
   # Now that we're connected, attempt to log into the server.
   if ($heap->{password}) {
     $kernel->call( $session, 'sl', "PASS " . $heap->{password} );
@@ -298,7 +298,7 @@ sub _start {
 # Destroy ourselves when asked politely.
 sub _stop {
   my ($kernel, $heap, $quitmsg) = @_[KERNEL, HEAP, ARG0];
-  
+
   if ($heap->{connected}) {
     $kernel->yield( 'quit', $quitmsg );
   }
@@ -309,7 +309,7 @@ sub _stop {
 sub commasep {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $args = join ',', @_[ARG0 .. $#_];
-  
+
   $state = uc $state;
   $state .= " $args" if defined $args;
   $kernel->yield( 'sl', $state );
@@ -319,7 +319,7 @@ sub commasep {
 # Attempt to connect this component to an IRC server.
 sub connect {
   my ($kernel, $heap, $session, $args) = @_[KERNEL, HEAP, SESSION, ARG0];
-  
+
   if ($args) {
     my %arg;
     if (ref $args eq 'ARRAY') {
@@ -329,7 +329,7 @@ sub connect {
     } else {
       die "First argument to connect() should be a hash or array reference";
     }
-    
+
     $heap->{'password'} = $arg{'Password'} if exists $arg{'Password'};
     $heap->{'localaddr'} = $arg{'LocalAddr'} if exists $arg{'LocalAddr'};
     $heap->{'localport'} = $arg{'LocalPort'} if exists $arg{'LocalPort'};
@@ -344,7 +344,7 @@ sub connect {
       $heap->{ctcp_filter}->debug( $arg{'Debug'} );
     }
   }
-  
+
   # Make sure that we have reasonable defaults for all the attributes.
   # The "IRC*" variables are ircII environment variables.
   $heap->{'nick'} = $ENV{IRCNICK} || eval { scalar getpwuid($>) } ||
@@ -364,12 +364,12 @@ sub connect {
   if ($heap->{localaddr} and $heap->{localport}) {
     $heap->{localaddr} .= ":" . $heap->{localport};
   }
-  
+
   # Disconnect if we're already logged into a server.
   if ($heap->{'sock'}) {
     $kernel->call( $session, 'quit' );
   }
-  
+
   $heap->{'socketfactory'} =
     POE::Wheel::SocketFactory->new( SocketDomain   => AF_INET,
 				    SocketType     => SOCK_STREAM,
@@ -387,18 +387,18 @@ sub connect {
 # Send a CTCP query or reply, with the same syntax as a PRIVMSG event.
 sub ctcp {
   my ($kernel, $state, $heap, $to) = @_[KERNEL, STATE, HEAP, ARG0];
-  my $message = join '', @_[ARG1 .. $#_];
-  
+  my $message = join ' ', @_[ARG1 .. $#_];
+
   unless (defined $to and defined $message) {
     die "The POE::Component::IRC event \"$state\" requires two arguments";
   }
-  
+
   # CTCP-quote the message text.
   ($message) = @{$heap->{ctcp_filter}->put([ $message ])};
-  
+
   # Should we send this as a CTCP request or reply?
   $state = $state eq 'ctcpreply' ? 'notice' : 'privmsg';
-  
+
   $kernel->yield( $state, $to, $message );
 }
 
@@ -408,15 +408,15 @@ sub dcc {
   my ($kernel, $heap, $nick, $type, $file, $blocksize) =
     @_[KERNEL, HEAP, ARG0 .. ARG3];
   my ($factory, $port, $myaddr, $size);
-  
+
   unless ($type) {
     die "The POE::Component::IRC event \"dcc\" requires at least two arguments";
   }
-  
+
   $type = uc $type;
   if ($type eq 'CHAT') {
     $file = 'chat';		# As per the semi-specification
-    
+
   } elsif ($type eq 'SEND') {
     unless ($file) {
       die "The POE::Component::IRC event \"dcc\" requires three arguments for a SEND";
@@ -447,7 +447,7 @@ sub dcc {
   # Tell the other end that we're waiting for them to connect.
   $kernel->yield( 'ctcp', $nick, "DCC $type $file $myaddr $port"
 		  . ($size ? " $size" : "") );
-  
+
   # Store the state for this connection.
   $heap->{dcc}->{$factory->ID} = { open => undef,
 				   nick => $nick,
@@ -516,7 +516,7 @@ sub dcc_close {
 # much later on the technological timeline.
 sub irc_ping {
   my ($kernel, $arg) = @_[KERNEL, ARG0];
-  
+
   $kernel->yield( 'sl', "PONG $arg" );
 }
 
@@ -525,9 +525,9 @@ sub irc_ping {
 sub ison {
   my ($kernel, @nicks) = @_[KERNEL, ARG0 .. $#_];
   my $tmp = "ISON";
-  
+
   die "No nicknames passed to POE::Component::IRC::ison" unless @nicks;
-  
+
   # We can pass as many nicks as we want, as long as it's shorter than
   # the maximum command length (510). If the list we get is too long,
   # w'll break it into multiple ISON commands.
@@ -546,12 +546,12 @@ sub ison {
 # Tell the IRC server to forcibly remove a user from a channel.
 sub kick {
   my ($kernel, $chan, $nick) = @_[KERNEL, ARG0, ARG1];
-  my $message = join '', @_[ARG1 .. $#_];
-  
+  my $message = join '', @_[ARG2 .. $#_];
+
   unless (defined $chan and defined $nick) {
     die "The POE::Component::IRC event \"kick\" requires at least two arguments";
   }
-  
+
   $nick .= " :$message" if defined $message;
   $kernel->yield( 'sl', "KICK $chan $nick" );
 }
@@ -627,7 +627,7 @@ sub new {
 # The handler for all IRC commands that take no arguments.
 sub noargs {
   my ($kernel, $state, $arg) = @_[KERNEL, STATE, ARG0];
-  
+
   if (defined $arg) {
     die "The POE::Component::IRC event \"$state\" takes no arguments";
   }
@@ -639,7 +639,7 @@ sub noargs {
 sub oneandtwoopt {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $arg = join '', @_[ARG0 .. $#_];
-  
+
   $state = uc $state;
   if (defined $arg) {
     $arg = ':' . $arg if $arg =~ /\s/;
@@ -653,7 +653,7 @@ sub oneandtwoopt {
 sub oneoptarg {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $arg = join '', @_[ARG0 .. $#_];
-  
+
   $state = uc $state;
   if (defined $arg) {
     $arg = ':' . $arg if $arg =~ /\s/;
@@ -667,11 +667,11 @@ sub oneoptarg {
 sub oneortwo {
   my ($kernel, $state, $one) = @_[KERNEL, STATE, ARG0];
   my $two = join '', @_[ARG1 .. $#_];
-  
+
   unless (defined $one) {
     die "The POE::Component::IRC event \"$state\" requires at least one argument";
   }
-  
+
   $state = uc( $state ) . " $one";
   $state .= " $two" if defined $two;
   $kernel->yield( 'sl', $state );
@@ -682,11 +682,11 @@ sub oneortwo {
 sub onlyonearg {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $arg = join '', @_[ARG0 .. $#_];
-  
+
   unless (defined $arg) {
     die "The POE::Component::IRC event \"$state\" requires one argument";
   }
-  
+
   $state = uc $state;
   $arg = ':' . $arg if $arg =~ /\s/;
   $state .= " $arg";
@@ -698,11 +698,11 @@ sub onlyonearg {
 sub onlytwoargs {
   my ($kernel, $state, $one) = @_[KERNEL, STATE, ARG0];
   my ($two) = join '', @_[ARG1 .. $#_];
-  
+
   unless (defined $one and defined $two) {
     die "The POE::Component::IRC event \"$state\" requires two arguments";
   }
-  
+
   $state = uc $state;
   $two = ':' . $two if $two =~ /\s/;
   $state .= " $one $two";
@@ -713,16 +713,16 @@ sub onlytwoargs {
 # Handler for privmsg or notice events.
 sub privandnotice {
   my ($kernel, $state, $to) = @_[KERNEL, STATE, ARG0];
-  my $message = join '', @_[ARG1 .. $#_];
-  
+  my $message = join ' ', @_[ARG1 .. $#_];
+
   unless (defined $to and defined $message) {
     die "The POE::Component::IRC event \"$state\" requires two arguments";
   }
-  
+
   if (ref $to eq 'ARRAY') {
     $to = join ',', @$to;
   }
-  
+
   $state = uc $state;
   $state .= " $to :$message";
   $kernel->yield( 'sl', $state );
@@ -732,9 +732,9 @@ sub privandnotice {
 # Ask P::C::IRC to send you certain events, listed in $evref.
 sub register {
   my ($heap, $sender, @events) = @_[HEAP, SENDER, ARG0 .. $#_];
-  
+
   die "Not enough arguments" unless @events;
-  
+
   # FIXME: What "special" event names go here? (ie, "errors")
   # basic, dcc (implies ctcp), ctcp, oper ...what other categories?
   foreach (@events) {
@@ -750,10 +750,10 @@ sub register {
 sub sl {
   my $heap = $_[HEAP];
   my $arg = join '', @_[ARG0 .. $#_];
-  
+
   return unless $heap->{'socket'};
   die "Not enough arguments" unless defined $arg;
-  
+
   warn ">>> $arg\n" if $heap->{'debug'};
   $heap->{'socket'}->put( "$arg\n" );
 }
@@ -763,7 +763,7 @@ sub sl {
 sub spacesep {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $args = join ' ', @_[ARG0 .. $#_];
-  
+
   $state = uc $state;
   $state .= " $args" if defined $args;
   $kernel->yield( 'sl', $state );
@@ -774,7 +774,7 @@ sub spacesep {
 sub topic {
   my ($kernel, $chan) = @_[KERNEL, ARG0];
   my $topic = join '', @_[ARG1 .. $#_];
-  
+
   $chan .= " :$topic" if defined $topic;
   $kernel->yield( 'sl', "TOPIC $chan" );
 }
@@ -783,9 +783,9 @@ sub topic {
 # Ask P::C::IRC to stop sending you certain events, listed in $evref.
 sub unregister {
   my ($heap, $sender, @events) = @_[HEAP, SENDER, ARG0 .. $#_];
-  
+
   die "Not enough arguments" unless @events;
-  
+
   foreach (@events) {
     delete $heap->{events}->{$_}->{$sender};
     $heap->{sessions}->{$sender}->{refcnt}--;
@@ -799,9 +799,9 @@ sub unregister {
 sub userhost {
   my ($kernel, @nicks) = @_[KERNEL, ARG0 .. $#_];
   my @five;
-  
+
   die "No nicknames passed to POE::Component::IRC::userhost" unless @nicks;
-  
+
   # According to the RFC, you can only send 5 nicks at a time.
   while (@nicks) {
     $kernel->yield( 'sl', "USERHOST " . join(' ', splice(@nicks, 0, 5)) );

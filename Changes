@@ -1,6 +1,12 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+1.1   Fri Mar  2 03:07:01 PST 2001
+    - A couple patches from Jonathan Steinert: 'ctcp', 'privmsg', and
+      'notice' will join() their arguments together with spaces, and
+      'kick' will no longer accidentally concatenate the nick onto the
+      kick message. Thanks, Jon!
+
 1.0   Wed Feb 21 15:09:56 PST 2001
     - Split 'irc_ctcp' messages into 'irc_ctcp' and 'irc_ctcpreply'.
       My thanks to Jonathan Steinert.

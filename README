@@ -1,4 +1,4 @@
-POE::Component::IRC 1.0b README                  Mon Jan 29 20:56:43 PST 2001
+POE::Component::IRC 1.1 README                   Fri Mar  2 03:07:01 PST 2001
 =============================================================================
 
 Table of Contents
@@ -61,7 +61,8 @@ good template for your own bots, if you need one.
 5. BUGS AND WISH LIST
 ---------------------
 
-	- Needs a better test script, as described above.
+	- Needs a better test script. I'd settle for anything that did
+	  something more exhaustive than "use POE::Component::IRC; exit;".
 
 	To report bugs, email the maintainer at dennis@funkplanet.com,
 or just bug the hell out of him on irc.rhizomatic.net, channel #tempura.
