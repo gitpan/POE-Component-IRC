@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet.pm,v 1.2 2005/01/21 12:05:48 chris Exp $
+# $Id: IRC-Qnet.pm,v 1.4 2005/02/02 14:11:43 chris Exp $
 #
 # POE::Component::IRC::Qnet, by Chris Williams
 #
@@ -140,7 +140,9 @@ my @lbot_commands = qw(
 	requestowner
 	);
 
-$VERSION = '1.0';
+my (@irc_events) = qw(ping 311 312 313 317 319 318 314 369 330);
+
+$VERSION = '1.1';
 
 BEGIN {
   my $has_client_dns = 0;
@@ -166,6 +168,7 @@ sub new {
   my @event_map = map {($_, $irc_commands{$_}->[CMD_SUB])} keys %irc_commands;
   my @qbot_map = map {('qbot_' . $_, 'qnet_bot_commands')} @qbot_commands;
   my @lbot_map = map {('lbot_' . $_, 'qnet_bot_commands')} @lbot_commands;
+  my @irc_event_map = map {( 'irc_' . $_ )} @irc_events;
 
   my $self = bless ( { }, $package );
 
@@ -192,7 +195,6 @@ sub new {
 				      dcc_close
 				      do_connect
 				      got_dns_response
-				      irc_ping
 				      ison
 				      kick
 				      register
@@ -205,7 +207,8 @@ sub new {
 				      topic
 				      unregister
 				      userhost )], 
-		     $self => { @lbot_map, @qbot_map } ],
+		     $self => { @lbot_map, @qbot_map },
+		     $self => [ @irc_event_map ], ],
 		     args => [ $alias, @_ ] );
 
   # Set up defaults
@@ -248,6 +251,13 @@ sub service_bots {
 	}
   }
   return 1;
+}
+
+sub irc_330 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick,$account) = ( split / /, $_[ARG1] )[0..1];
+
+  $self->{WHOIS}->{ $nick }->{account} = $account;
 }
 
 1;
@@ -326,6 +336,16 @@ $kernel->post ( 'my client' => lbot_chanlev => $channel );
 =head1 OUTPUT
 
 All output from the Quakenet service bots is sent as NOTICEs. Use 'irc_notice' to trap these.
+
+=over
+
+=item irc_whois
+
+Has all the same hash keys in ARG1 as L<POE::Component::IRC|POE::Component::IRC>, with the
+addition of 'account', which contains the name of their Q auth account, if they have authed, or 
+undef if they haven't.
+
+=back
 
 =head1 BUGS
 

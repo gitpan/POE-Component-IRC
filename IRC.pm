@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.9 2005/02/02 10:19:37 chris Exp $
+# $Id: IRC.pm,v 1.11 2005/02/02 14:07:28 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -89,7 +89,7 @@ my %irc_commands =
 
 my (@irc_events) = qw(ping 311 312 313 317 319 318 314 369);
 
-$VERSION = '3.2';
+$VERSION = '3.3';
 
 BEGIN {
   my $has_client_dns = 0;
