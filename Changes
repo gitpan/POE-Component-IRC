@@ -1,6 +1,12 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+1.6   date
+    - Fixed bugs in my initial implementation of the irc_invite event.
+      Sigh. You ever have one of those days where you can't do anything
+      right? Thanks again to the exceedingly patient Rasmus Hansen for
+      pointing out that my updated version still didn't work right.
+
 1.5   Thu Jul  5 15:24:31 PDT 2001
     - Added an irc_invite event -- I knew I'd forgotten something!
       Thanks to Rasmus Hansen for the bug report.

@@ -77,9 +77,12 @@ sub get {
     } elsif ($line =~ /^:(\S+) +TOPIC +(\S+) +(.+)$/) {
       push @$events, { name => 'topic', args => [$1, $2, _decolon( $3 )] };
 
-      # NICK, QUIT, JOIN, PART, INVITE, possibly more?
+    } elsif ($line =~ /^:(\S+) +INVITE +\S+ +(.+)$/) {
+      push @$events, { name => 'invite', args => [$1, _decolon( $2 )] };
+
+      # NICK, QUIT, JOIN, PART, possibly more?
     } elsif ($line =~ /^:(\S+) +(\S+) +(.+)$/) {
-      unless (grep {$_ eq lc $2} qw(nick join quit part pong invite)) {
+      unless (grep {$_ eq lc $2} qw(nick join quit part pong)) {
 	warn "*** ACCIDENTAL MATCH: $2\n";
 	warn "*** Accident line: $line\n";
       }
