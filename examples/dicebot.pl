@@ -71,7 +71,7 @@ sub irc_public {
 
   my ($num, $die, $plus) =
     ($msg =~ /^\s*(?:$nick,?\s*)?roll (?:a )?(\d+)d(\d+)\s*([+-]\s*(\d+))?/i);
-  return unless $num and $die and $num < 100 and $die < 10000;
+  return unless $num and $die and $num < 1000 and $die < 10000;
   $plus =~ tr/+ //d if $plus;
 
   my @rolls;

@@ -64,6 +64,8 @@ my %irc_commands =
     'squit'     => [ PRI_HIGH,   \&onlytwoargs,   ],
     'kill'      => [ PRI_HIGH,   \&onlytwoargs,   ],
     'privmsg'   => [ PRI_NORMAL, \&privandnotice, ],
+    'privmsglo' => [ PRI_NORMAL+1, \&privandnotice, ],
+    'privmsghi' => [ PRI_NORMAL-1, \&privandnotice, ],
     'notice'    => [ PRI_NORMAL, \&privandnotice, ],
     'join'      => [ PRI_HIGH,   \&oneortwo,      ],
     'summon'    => [ PRI_HIGH,   \&oneortwo,      ],
@@ -80,7 +82,7 @@ my %irc_commands =
     'ctcpreply' => [ PRI_HIGH,   \&ctcp,          ],
   );
 
-$VERSION = '2.7';
+$VERSION = '2.8';
 
 
 # What happens when an attempted DCC connection fails.
@@ -111,6 +113,9 @@ sub _dcc_failed {
     # In this case, something went wrong.
     if ($errnum == 0 and $heap->{dcc}->{$id}->{type} eq "GET") {
       $errstr = "Aborted by sender";
+    }
+    else {
+      $errstr = "$operation error $errnum: $errstr";
     }
     _send_event( $kernel, $heap, 'irc_dcc_error', $id, $errstr,
 		 @{$heap->{dcc}->{$id}}{qw(nick type port file size done)} );
@@ -305,9 +310,9 @@ sub _sock_down {
 
 # Internal function called when a socket fails to be properly opened.
 sub _sock_failed {
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($kernel, $heap, $op, $errno, $errstr) = @_[KERNEL, HEAP, ARG0..ARG2];
 
-  _send_event( $kernel, $heap, 'irc_socketerr', $! );
+  _send_event( $kernel, $heap, 'irc_socketerr', "$op error $errno: $errstr" );
 }
 
 
@@ -354,6 +359,10 @@ sub _sock_up {
 		       "foo.bar.com",
 		       $heap->{server},
 		       ':' . $heap->{ircname} ));
+
+  # If we have queued data waiting, its flush loop has stopped
+  # while we were disconnected.  Start that up again.
+  $kernel->delay(sl_delayed => 0);
 }
 
 
@@ -410,6 +419,12 @@ sub connect {
       %arg = %$args;
     } else {
       die "First argument to connect() should be a hash or array reference";
+    }
+
+    if (exists $arg{'Flood'} and $arg{'Flood'}) {
+      $heap->{'dont_flood'} = 0;
+    } else {
+      $heap->{'dont_flood'} = 1;
     }
 
     $heap->{'password'} = $arg{'Password'} if exists $arg{'Password'};
@@ -876,7 +891,7 @@ sub sl {
 sub sl_prioritized {
   my ($kernel, $heap, $priority, $msg) = @_[KERNEL, HEAP, ARG0, ARG1];
   my $now = time();
-  $heap->{send_time} = $now if $now > $heap->{send_time};
+  $heap->{send_time} = $now if $heap->{send_time} < $now;
 
   if (@{$heap->{send_queue}}) {
     my $i = @{$heap->{send_queue}};
@@ -886,13 +901,15 @@ sub sl_prioritized {
               $msg,       # MSG_TEXT
             ]
           );
-  } elsif ($heap->{send_time} - $now >= 10 or not defined $heap->{socket}) {
+  } elsif ( $heap->{dont_flood} and
+            $heap->{send_time} - $now >= 10 or not defined $heap->{socket}
+          ) {
     push( @{$heap->{send_queue}},
           [ $priority,  # MSG_PRI
             $msg,       # MSG_TEXT
 	   ]
 	 );
-    $kernel->delay( sl_delayed => 1 );
+    $kernel->delay( sl_delayed => $heap->{send_time} - $now - 10 );
   } else {
     warn ">>> $msg\n" if $heap->{debug};
     $heap->{send_time} += 2 + length($msg) / 120;
@@ -900,21 +917,27 @@ sub sl_prioritized {
   }
 }
 
-# Send delayed lines to the ircd.
+# Send delayed lines to the ircd.  We manage a virtual "send time"
+# that progresses into the future based on hybrid ircd's rules every
+# time a message is sent.  Once we find it ten or more seconds into
+# the future, we wait for the realtime clock to catch up.
 sub sl_delayed {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  if (defined $heap->{'socket'}) {
-    my $now = time();
-    while (@{$heap->{send_queue}} and ($heap->{send_time} - $now < 10)) {
-      my $arg = (shift @{$heap->{send_queue}})->[MSG_TEXT];
-      warn ">>> $arg\n" if $heap->{'debug'};
-      $heap->{send_time} += 2 + length($arg) / 120;
-      $heap->{'socket'}->put( "$arg" );
-    }
+  return unless defined $heap->{'socket'};
+
+  my $now = time();
+  $heap->{send_time} = $now if $heap->{send_time} < $now;
+
+  while (@{$heap->{send_queue}} and ($heap->{send_time} - $now < 10)) {
+    my $arg = (shift @{$heap->{send_queue}})->[MSG_TEXT];
+    warn ">>> $arg\n" if $heap->{'debug'};
+    $heap->{send_time} += 2 + length($arg) / 120;
+    $heap->{'socket'}->put( "$arg" );
   }
 
-  $kernel->delay( sl_delayed => 1 ) if @{$heap->{send_queue}};
+  $kernel->delay( sl_delayed => $heap->{send_time} - $now - 10 )
+    if @{$heap->{send_queue}};
 }
 
 
@@ -1550,9 +1573,6 @@ register for '376', and listen for 'irc_376' events. Simple, no? ARG0
 is the name of the server which sent the message. ARG1 is the text of
 the message.
 
-For an excellent list of the various numeric codes and what they mean,
-try this page: http://www.pairc.com/raw/
-
 =back
 
 =head2 Somewhat Less Important Events
@@ -1649,11 +1669,9 @@ suck: Abys <abys@web1-2-3.com>, Addi <addi@umich.edu>, ResDev
 
 =head1 SEE ALSO
 
-Net::IRC, RFC 1459, http://www.irchelp.org/,
-http://www.newts.org/~troc/poe.html, http://www.cs.cmu.edu/~lenzo/perl/,
+RFC 1459, http://www.irchelp.org/, http://poe.perl.org/,
 http://www.infobot.org/,
-http://newyork.citysearch.com/profile?fid=2&id=7104760,
-http://www.pobox.com/~schwern/img/fishpants.jpg
+http://newyork.citysearch.com/profile?fid=2&id=7104760
 
 
 =cut

@@ -1,7 +1,12 @@
-$Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
-2.7   date
+2.8   Sat Jun  7 16:13:25 PDT 2003
+    - Applied dngor's mega-patch, which fixes (among other things): a
+      fix for a nasty lockup, improved error reporting, and better flood
+      control.
+    - Fixed some broken URLs and a couple mistakes in the documentation.
+
+2.7   Sun Feb  2 15:05:28 PST 2003
     - Fixed up the example scripts to play nicer with POE's new signal
       handling. Thanks to dngor for bringing this up.
     - Added a patch by lunartear to properly handle spaces in DCC filenames.
