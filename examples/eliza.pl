@@ -68,8 +68,7 @@ sub _stop {
   my ($kernel) = $_[KERNEL];
 
   print "Control session stopped.\n";
-  $kernel->post( 'test', 'quit', 'Neenios on ice!' );
-  $kernel->alias_remove( 'smileyninja' );
+  $kernel->call( 'test', 'quit', 'Neenios on ice!' );
 }
 
 

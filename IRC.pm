@@ -28,7 +28,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '2.1';
+$VERSION = '2.2';
 
 
 # What happens when an attempted DCC connection fails.
@@ -149,8 +149,8 @@ sub _dcc_up {
       Filter => ($heap->{dcc}->{$id}->{type} eq "CHAT" ?
                      POE::Filter::Line->new( Literal => "\012" ) :
 		     POE::Filter::Stream->new() ),
-      InputState => '_dcc_read',
-      ErrorState => '_dcc_failed',
+      InputEvent => '_dcc_read',
+      ErrorEvent => '_dcc_failed',
   );
   $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID} = $id;
 
@@ -273,8 +273,8 @@ sub _sock_up {
       Driver     => POE::Driver::SysRW->new(),
       Filter     => POE::Filter::Line->new( InputRegexp => '\015?\012',
 					    OutputLiteral => "\015\012" ),
-      InputState => '_parseline',
-      ErrorState => '_sock_down',
+      InputEvent => '_parseline',
+      ErrorEvent => '_sock_down',
     );
 
   if ($heap->{'socket'}) {
@@ -326,7 +326,7 @@ sub _stop {
   my ($kernel, $heap, $quitmsg) = @_[KERNEL, HEAP, ARG0];
 
   if ($heap->{connected}) {
-    $kernel->yield( 'quit', $quitmsg );
+    $kernel->call( $_[SESSION], 'quit', $quitmsg );
   }
 }
 
@@ -402,8 +402,8 @@ sub connect {
 				    SocketProtocol => 'tcp',
 				    RemoteAddress  => $heap->{'server'},
 				    RemotePort     => $heap->{'port'},
-				    SuccessState   => '_sock_up',
-				    FailureState   => '_sock_failed',
+				    SuccessEvent   => '_sock_up',
+				    FailureEvent   => '_sock_failed',
 				    ($heap->{localaddr} ?
 				     (BindAddress => $heap->{localaddr}) : ()),
 				  );
@@ -461,8 +461,8 @@ sub dcc {
   $factory = POE::Wheel::SocketFactory->new(
       BindAddress  => $heap->{localaddr} || INADDR_ANY,
       BindPort     => 0,
-      SuccessState => '_dcc_up',
-      FailureState => '_dcc_failed',
+      SuccessEvent => '_dcc_up',
+      FailureEvent => '_dcc_failed',
       Reuse        => 'yes',
   );
   ($port, $myaddr) = unpack_sockaddr_in( $factory->getsockname() );
@@ -504,8 +504,8 @@ sub dcc_accept {
   my $factory = POE::Wheel::SocketFactory->new(
       RemoteAddress => $cookie->{addr},
       RemotePort    => $cookie->{port},
-      SuccessState  => '_dcc_up',
-      FailureState  => '_dcc_failed',
+      SuccessEvent  => '_dcc_up',
+      FailureEvent  => '_dcc_failed',
   );
   $heap->{dcc}->{$factory->ID} = $cookie;
   $heap->{dcc}->{$factory->ID}->{factory} = $factory;
@@ -797,7 +797,9 @@ sub sl {
     push @{$heap->{send_queue}}, $arg;
     $kernel->delay( sl_delayed => 1 );
   }
-  else {
+  elsif (not defined $heap->{'socket'}) {
+    warn "*** sl(): Can't send line, no such socket";
+  } else {
     warn ">>> $arg\n" if $heap->{'debug'};
     $heap->{send_time} += 2 + length($arg) / 120;
     $heap->{'socket'}->put( "$arg" );
@@ -808,12 +810,14 @@ sub sl {
 sub sl_delayed {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  my $now = time();
-  while (@{$heap->{send_queue}} and ($heap->{since} - $now < 10)) {
-    my $arg = shift @{$heap->{send_queue}};
-    warn ">>> $arg\n" if $heap->{'debug'};
-    $heap->{since} += 2 + length($arg) / 120;
-    $heap->{'socket'}->put( "$arg" );
+  if (defined $heap->{'socket'}) {
+    my $now = time();
+    while (@{$heap->{send_queue}} and ($heap->{send_time} - $now < 10)) {
+      my $arg = shift @{$heap->{send_queue}};
+      warn ">>> $arg\n" if $heap->{'debug'};
+      $heap->{send_time} += 2 + length($arg) / 120;
+      $heap->{'socket'}->put( "$arg" );
+    }
   }
 
   $kernel->delay( sl_delayed => 1 ) if @{$heap->{send_queue}};
@@ -1430,6 +1434,9 @@ lists. Ack!) As an example, say you wanted to handle event 376
 register for '376', and listen for 'irc_376' events. Simple, no? ARG0
 is the name of the server which sent the message. ARG1 is the text of
 the message.
+
+For an excellent list of the various numeric codes and what they mean,
+try this page: E<lt>http://www.pairc.com/raw/E<gt>.
 
 =back
 

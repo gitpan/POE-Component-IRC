@@ -26,8 +26,7 @@ sub _start {
   # sent to and received from the IRC server. Very useful for debugging.
   $kernel->post( 'test', 'connect', { Debug    => 1,
 				      Nick     => $nick,
-                                      Server   => $ARGV[0] ||
-				                  'scissorman.phreeow.net',
+                                      Server   => $ARGV[0] || 'irc.phreeow.net',
 				      Port     => $ARGV[1] || 6667,
 				      Username => 'neenio',
 				      Ircname  => 'Ask me about my colon!', }
@@ -69,8 +68,7 @@ sub _stop {
   my ($kernel) = $_[KERNEL];
 
   print "Control session stopped.\n";
-  $kernel->post( 'test', 'quit', 'Neenios on ice!' );
-  $kernel->alias_remove( 'smileyninja' );
+  $kernel->call( 'test', 'quit', 'Neenios on ice!' );
 }
 
 

@@ -29,7 +29,7 @@ sub _start {
   $kernel->post( 'irc', 'register', 'all');
   $kernel->post( 'irc', 'connect', { Debug    => 0,
 				     Nick     => $mynick,
-				     Server   => $ARGV[0] || 'phreeow.net',
+				     Server   => $ARGV[0] || 'irc.phreeow.net',
 				     Port     => $ARGV[1] || 6667,
 				     Username => 'neenio',
 				     Ircname  => 'Ask me about my colon!', }
@@ -184,7 +184,7 @@ sub _stop {
   my ($kernel) = $_[KERNEL];
 
   print "Control session stopped.\n";
-  $kernel->post( 'irc', 'quit', 'Control session stopped.' );
+  $kernel->call( 'irc', 'quit', 'Control session stopped.' );
 }
 
 

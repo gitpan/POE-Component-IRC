@@ -56,8 +56,7 @@ sub _stop {
   my ($kernel) = $_[KERNEL];
 
   print "Control session stopped.\n";
-  $kernel->post( 'dicebot', 'quit', 'Neenios on ice!' );
-  $kernel->alias_remove( 'smileyninja' );
+  $kernel->call( 'dicebot', 'quit', 'Neenios on ice!' );
 }
 
 sub irc_public {

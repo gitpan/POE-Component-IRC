@@ -1,6 +1,13 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+2.2   Fri May 24 13:00:44 PDT 2002
+    - dngor found an excellent page about IRC server numeric codes,
+      which I added a link to in the documentation.
+    - dngor also gave me two more patches: one to avoid some deprecation
+      warnings introduced in the latest version of POE, and another
+      which fixed a bug in one of his earlier patches. He's such a stud.
+
 2.1   Mon Mar  4 17:06:03 PST 2002
     - Added a long-buried patch from thefly to fix IRCnet channel name
       parsing. Sorry about the long turnaround on that one.
