@@ -67,6 +67,8 @@ my %irc_commands =
     'privmsglo' => [ PRI_NORMAL+1, \&privandnotice, ],
     'privmsghi' => [ PRI_NORMAL-1, \&privandnotice, ],
     'notice'    => [ PRI_NORMAL, \&privandnotice, ],
+    'noticelo'  => [ PRI_NORMAL+1, \&privandnotice, ],   
+    'noticehi'  => [ PRI_NORMAL-1, \&privandnotice, ],   
     'join'      => [ PRI_HIGH,   \&oneortwo,      ],
     'summon'    => [ PRI_HIGH,   \&oneortwo,      ],
     'sconnect'  => [ PRI_HIGH,   \&oneandtwoopt,  ],
@@ -82,7 +84,7 @@ my %irc_commands =
     'ctcpreply' => [ PRI_HIGH,   \&ctcp,          ],
   );
 
-$VERSION = '2.8';
+$VERSION = '2.9';
 
 
 # What happens when an attempted DCC connection fails.
@@ -805,6 +807,11 @@ sub privandnotice {
   my ($kernel, $state, $to) = @_[KERNEL, STATE, ARG0];
   my $message = join ' ', @_[ARG1 .. $#_];
   my $pri = $irc_commands{$state}->[CMD_PRI];
+
+  $state =~ s/privmsglo/privmsg/;
+  $state =~ s/privmsghi/privmsg/;
+  $state =~ s/noticelo/notice/;
+  $state =~ s/noticehi/notice/;
 
   unless (defined $to and defined $message) {
     die "The POE::Component::IRC event \"$state\" requires two arguments";

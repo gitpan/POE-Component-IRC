@@ -1,5 +1,9 @@
 Revision history for Perl extension POE::Component::IRC.
 
+2.9   Sat Jul 19 13:32:45 PDT 2003
+    - Only one change this time: Adam Foxson's patch to add prioritized
+      notices.
+
 2.8   Sat Jun  7 16:13:25 PDT 2003
     - Applied dngor's mega-patch, which fixes (among other things): a
       fix for a nasty lockup, improved error reporting, and better flood
