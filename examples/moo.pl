@@ -34,6 +34,7 @@ sub _start {
 				     Username => 'neenio',
 				     Ircname  => 'Ask me about my colon!', }
 	       );
+  $kernel->sig( INT => "sigint" );
 }
 
 
@@ -142,7 +143,6 @@ sub irc_dcc_chat {
     $kernel->yield( 'irc_dcc_start', $chatsession, '', $peer, 0 );
 
   } elsif ($line eq "***quit") {
-    $kernel->alias_remove( 'smileyninja' );
     delete $heap->{factory};
     delete $heap->{wheel};
 
@@ -171,12 +171,11 @@ sub irc_dcc_error {
 }
 
 
-sub _signal {
+sub sigint {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-
-  $kernel->alias_remove( 'smileyninja' );
   delete $heap->{factory};
   delete $heap->{wheel};
+  $kernel->sig_handled();
 }
 
 
@@ -208,7 +207,7 @@ sub irc_socketerr {
 
 POE::Component::IRC->new( 'irc', trace => undef ) or
   die "Can't instantiate new IRC component!\n";
-POE::Session->new( 'main' => [qw( _start _stop _connected _signal
+POE::Session->new( 'main' => [qw( _start _stop _connected sigint
 				  _connect_failed _conn_data _conn_error
 				  irc_001 irc_error irc_disconnected
 				  irc_socketerr irc_dcc_start irc_dcc_done

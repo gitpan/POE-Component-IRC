@@ -16,7 +16,6 @@ my $nick = 'dicebot';
 sub _start {
   my ($kernel) = $_[KERNEL];
 
-  $kernel->alias_set( 'smileyninja' );
   $kernel->post( 'dicebot', 'register', 'all');
   $kernel->post( 'dicebot', 'connect', { Debug    => 1,
 					 Nick     => $nick,
@@ -26,6 +25,8 @@ sub _start {
 					 Username => 'neenio',
 					 Ircname  => "HELP I'M A ROCK", }
 	       );
+
+  $kernel->sig( INT => "sigint" );
 }
 
 sub irc_001 {
@@ -40,6 +41,7 @@ sub irc_001 {
 sub irc_disconnected {
   my ($server) = $_[ARG0];
   print "Lost connection to server $server.\n";
+  $_[KERNEL]->post( "dicebot", "unregister", "all" );
 }
 
 sub irc_error {
@@ -52,11 +54,15 @@ sub irc_socketerr {
   print "Couldn't connect to server: $err\n";
 }
 
+sub sigint {
+  my $kernel = $_[KERNEL];
+  $kernel->post( 'dicebot', 'quit', 'Neenios on ice!' );
+  $kernel->sig_handled();
+}
+
 sub _stop {
   my ($kernel) = $_[KERNEL];
-
   print "Control session stopped.\n";
-  $kernel->call( 'dicebot', 'quit', 'Neenios on ice!' );
 }
 
 sub irc_public {
@@ -89,7 +95,7 @@ sub irc_public {
 
 POE::Component::IRC->new( 'dicebot' ) or
   die "Can't instantiate new IRC component!\n";
-POE::Session->new( 'main' => [qw(_start _stop irc_001 irc_disconnected
+POE::Session->new( 'main' => [qw(_start _stop irc_001 irc_disconnected sigint
                                  irc_socketerr irc_error irc_public)] );
 $poe_kernel->run();
 

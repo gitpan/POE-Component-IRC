@@ -31,7 +31,6 @@ sub _start {
   my ($kernel) = $_[KERNEL];
 
   $ua->agent( 'Mozilla/5.0 (X11; U; Linux i386; en-US; rv:1.0.0) Gecko/20020529' );
-  $kernel->alias_set( 'smileyninja' );
   $kernel->post( 'urlbot', 'register', 'all');
   $kernel->post( 'urlbot', 'connect', { Debug    => 1,
 					 Nick     => $nick,

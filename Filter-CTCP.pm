@@ -140,7 +140,7 @@ sub _ctcp_quote {
   my $line = shift;
 
   $line = _low_quote( $line );
-  $line =~ s/\\/\\\\/g;
+#  $line =~ s/\\/\\\\/g;
   $line =~ s/\001/\\a/g;
 
   return "\001" . $line . "\001";

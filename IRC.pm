@@ -80,7 +80,7 @@ my %irc_commands =
     'ctcpreply' => [ PRI_HIGH,   \&ctcp,          ],
   );
 
-$VERSION = '2.6';
+$VERSION = '2.7';
 
 
 # What happens when an attempted DCC connection fails.
@@ -528,6 +528,8 @@ sub dcc {
 
   # Tell the other end that we're waiting for them to connect.
   my $basename = File::Basename::basename( $file );
+  $basename =~ s/\s/_/g;
+
   $kernel->yield( 'ctcp', $nick, "DCC $type $basename $myaddr $port"
 		  . ($size ? " $size" : "") );
 

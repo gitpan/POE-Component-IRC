@@ -1,7 +1,14 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
-2.6   date
+2.7   date
+    - Fixed up the example scripts to play nicer with POE's new signal
+      handling. Thanks to dngor for bringing this up.
+    - Added a patch by lunartear to properly handle spaces in DCC filenames.
+    - Fixed a bug reported by Robert Rendler regarding CTCP quoting
+      accidentally duplicating backslashes.
+
+2.6   Wed Dec 11 20:27:51 PST 2002
     - Brian Kelly thoughtfully pointed out an URL in the documentation
       that was being mangled by pod2html. Should look better now.
     - Added a note about handling CTCP actions to the POD documentation,
