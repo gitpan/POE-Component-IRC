@@ -25,8 +25,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.4';
-my $debug;
+$VERSION = '1.5';
 
 
 # What happens when an attempted DCC connection fails.
@@ -789,7 +788,7 @@ sub topic {
   my ($kernel, $chan) = @_[KERNEL, ARG0];
   my $topic = join '', @_[ARG1 .. $#_];
 
-  $chan .= " :$topic" if defined $topic;
+  $chan .= " :$topic" if length $topic;
   $kernel->yield( 'sl', "TOPIC $chan" );
 }
 
@@ -1293,6 +1292,12 @@ connection. ARG0 is the server's explanation of the error.
 
 Sent whenever someone joins a channel that you're on. ARG0 is the
 person's nick!hostmask. ARG1 is the channel name.
+
+=item irc_invite
+
+Sent whenever someone offers you an invitation to another channel. ARG0
+is the person's nick!hostmask. ARG1 is the name of the channel they want
+you to join.
 
 =item irc_kick
 

@@ -27,7 +27,7 @@ sub debug {
   my $self = shift;
 
   if (@_) {
-	$self->{'debug'} = $_[0];
+    $self->{'debug'} = $_[0];
   }
 
   return( $self->{'debug'} );
@@ -41,64 +41,64 @@ sub get {
   my $events = [];
 
   foreach my $line (@$raw) {
-	warn "<<< $line\n" if $self->{'debug'};
-	return unless $line =~ /\S/;
-	
-	if ($line =~ /^PING (.+)$/) {
-	  push @$events, { name => 'ping', args => [$1] };
+    warn "<<< $line\n" if $self->{'debug'};
+    return unless $line =~ /\S/;
 
-	# PRIVMSG and NOTICE
-	} elsif ($line =~ /^:(\S+) +(PRIVMSG|NOTICE) +(\S+) +(.+)$/) {
-	  if ($2 eq 'NOTICE') {
-		push @$events, { name => 'notice',
-						 args => [$1, [split /,/, $3], _decolon( $4 )] },
+    if ($line =~ /^PING (.+)$/) {
+      push @$events, { name => 'ping', args => [$1] };
 
-	  # Using tr/// to count characters here tickles a bug in 5.004. Suck.
-	  } elsif (index( $3, '#' ) >= 0 or index( $3, '&' ) >= 0) {
-		push @$events, { name => 'public',
-						 args => [$1, [split /,/, $3], _decolon( $4 )] },
+      # PRIVMSG and NOTICE
+    } elsif ($line =~ /^:(\S+) +(PRIVMSG|NOTICE) +(\S+) +(.+)$/) {
+      if ($2 eq 'NOTICE') {
+	push @$events, { name => 'notice',
+			 args => [$1, [split /,/, $3], _decolon( $4 )] };
 
-	  } else {
-		push @$events, { name => 'msg',
-						 args => [$1, [split /,/, $3], _decolon( $4 )] },
-	}
+	# Using tr/// to count characters here tickles a bug in 5.004. Suck.
+      } elsif (index( $3, '#' ) >= 0 or index( $3, '&' ) >= 0) {
+	push @$events, { name => 'public',
+			 args => [$1, [split /,/, $3], _decolon( $4 )] };
 
-	# Numeric events
- 	} elsif ($line =~ /^:(\S+) +(\d+) +(\S+) +(.+)$/) {
-	  push @$events, { name => $2, args => [$1, _decolon( $4 )] };
+      } else {
+	push @$events, { name => 'msg',
+			 args => [$1, [split /,/, $3], _decolon( $4 )] };
+      }
 
-	# MODE... just split the args and pass them wholesale.
-	} elsif ($line =~ /^:(\S+) +MODE +(\S+) +(.+)$/) {
-	  push @$events, { name => 'mode', args => [$1, $2, split(/\s+/, $3)] };
+      # Numeric events
+    } elsif ($line =~ /^:(\S+) +(\d+) +(\S+) +(.+)$/) {
+      push @$events, { name => $2, args => [$1, _decolon( $4 )] };
 
-	} elsif ($line =~ /^:(\S+) +KICK +(\S+) +(\S+) +(.+)$/) {
-	  push @$events, { name => 'kick', args => [$1, $2, $3, _decolon( $4 )] };
+      # MODE... just split the args and pass them wholesale.
+    } elsif ($line =~ /^:(\S+) +MODE +(\S+) +(.+)$/) {
+      push @$events, { name => 'mode', args => [$1, $2, split(/\s+/, $3)] };
 
-	} elsif ($line =~ /^:(\S+) +TOPIC +(\S+) +(.+)$/) {
-	  push @$events, { name => 'topic', args => [$1, $2, _decolon( $3 )] };
+    } elsif ($line =~ /^:(\S+) +KICK +(\S+) +(\S+) +(.+)$/) {
+      push @$events, { name => 'kick', args => [$1, $2, $3, _decolon( $4 )] };
 
-	# NICK, QUIT, JOIN, PART, possibly more?
-	} elsif ($line =~ /^:(\S+) +(\S+) +(.+)$/) {
-	  unless (grep {$_ eq lc $2} qw(nick join quit part pong)) {
-		warn "*** ACCIDENTAL MATCH: $2\n";
-		warn "*** Accident line: $line\n";
-	  }
-	  push @$events, { name => lc $2, args => [$1, _decolon( $3 )] };
+    } elsif ($line =~ /^:(\S+) +TOPIC +(\S+) +(.+)$/) {
+      push @$events, { name => 'topic', args => [$1, $2, _decolon( $3 )] };
 
-	# We'll call this 'snotice' (server notice), for lack of a better name.
-	} elsif ($line =~ /^NOTICE +\S+ +(.+)$/) {
-	  push @$events, { name => 'snotice', args => [_decolon( $1 )] };
+      # NICK, QUIT, JOIN, PART, INVITE, possibly more?
+    } elsif ($line =~ /^:(\S+) +(\S+) +(.+)$/) {
+      unless (grep {$_ eq lc $2} qw(nick join quit part pong invite)) {
+	warn "*** ACCIDENTAL MATCH: $2\n";
+	warn "*** Accident line: $line\n";
+      }
+      push @$events, { name => lc $2, args => [$1, _decolon( $3 )] };
 
-	# Eeek.
-	} elsif ($line =~ /^ERROR +(.+)$/) {
-	  push @$events, { name => 'error', args => [_decolon( $1 )] };
+      # We'll call this 'snotice' (server notice), for lack of a better name.
+    } elsif ($line =~ /^NOTICE +\S+ +(.+)$/) {
+      push @$events, { name => 'snotice', args => [_decolon( $1 )] };
 
-	# If nothing matches, barf and keep reading. Seems reasonable.
-	# I'll reuse the famous "Funky parse case!" error from Net::IRC,
-	# just for a sense of historical continuity.
-	} else {
-	  warn "*** Funky parse case!\nFunky line: \"$line\"\n";
-	}
+      # Eeek.
+    } elsif ($line =~ /^ERROR +(.+)$/) {
+      push @$events, { name => 'error', args => [_decolon( $1 )] };
+
+      # If nothing matches, barf and keep reading. Seems reasonable.
+      # I'll reuse the famous "Funky parse case!" error from Net::IRC,
+      # just for a sense of historical continuity.
+    } else {
+      warn "*** Funky parse case!\nFunky line: \"$line\"\n";
+    }
   }
 
   return $events;

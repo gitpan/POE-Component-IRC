@@ -18,7 +18,7 @@ sub _start {
 
   $kernel->alias_set( 'smileyninja' );
   $kernel->post( 'dicebot', 'register', 'all');
-  $kernel->post( 'dicebot', 'connect', { Debug    => 0,
+  $kernel->post( 'dicebot', 'connect', { Debug    => 1,
 					 Nick     => $nick,
 					 Server   => $ARGV[0] ||
 					             'binky.phreeow.net',
@@ -34,6 +34,7 @@ sub irc_001 {
   $kernel->post( 'dicebot', 'mode', $nick, '+i' );
   $kernel->post( 'dicebot', 'join', '#dice' );
   $kernel->post( 'dicebot', 'privmsg', '#dice', 'I am a dice-rolling bot.' );
+  $kernel->post( 'dicebot', 'topic', '#dice' );
 }
 
 sub irc_disconnected {
