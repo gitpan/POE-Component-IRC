@@ -30,7 +30,7 @@ use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 # but SECONDS can be fractional if Time::HiRes is installed.  Overly
 # long SECONDS just makes the algorithm chunkier.
 
-use constant MESSAGES => 2;  # number of messages per time window
+use constant MESSAGES => 1;  # number of messages per time window
 use constant SECONDS  => 3;  # number of seconds per time window
 
 # TODO: Prioritize sl messages so, say, channel modes are shoved ahead
@@ -41,7 +41,7 @@ use constant SECONDS  => 3;  # number of seconds per time window
 # Advantage could be taken of that.  Too bad hybrid's guts are so
 # incomprehensible.
 
-$VERSION = '1.8';
+$VERSION = '1.9';
 
 
 # What happens when an attempted DCC connection fails.
@@ -276,6 +276,9 @@ sub _sock_up {
 
   # We no longer need the SocketFactory wheel. Scrap it.
   delete $heap->{'socketfactory'};
+
+  # Remember what IP address we're connected through, for multihomed boxes.
+  $heap->{'localaddr'} = (unpack_sockaddr_in( getsockname $socket ))[1];
 
   # Create a new ReadWrite wheel for the connected socket.
   $heap->{'socket'} = new POE::Wheel::ReadWrite

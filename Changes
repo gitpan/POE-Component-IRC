@@ -1,9 +1,11 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+1.9   Wed Dec 12 22:44:13 PST 2001
+    - David Dollar pointed out a bug with DCC using the wrong interface
+      on multihomed hosts. Easy fix.
+
 1.8   Mon Dec 10 16:04:06 PST 2001
-    - Fixed the moo.pl example script to accept multiple simultaneous
-      connections.
     - Applied dngor's studly patch to throttle line output.
     - Fixed a bug that would cause events to get thrown away if they
       came in while the connection to the IRC server was down.
