@@ -11,3 +11,4 @@ examples/moo.pl
 examples/dcctest.pl
 examples/eliza.pl
 examples/tinyurl.pl
+examples/aimproxy.pl

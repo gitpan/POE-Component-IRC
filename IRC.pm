@@ -28,7 +28,58 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '2.4';
+# Message priorities.
+use constant PRI_LOGIN  => 10; # PASS/NICK/USER messages must go first.
+use constant PRI_HIGH   => 20; # KICK/MODE etc. is more important than chatter.
+use constant PRI_NORMAL => 30; # Random chatter.
+
+use constant MSG_PRI  => 0; # Queued message priority.
+use constant MSG_TEXT => 1; # Queued message text.
+
+# RCC: Since most of the commands are data driven, I have moved their
+# event/handler maps here and added priorities for each data driven
+# command.  The priorities determine message importance when messages
+# are queued up.  Lower ones get sent first.
+
+use constant CMD_PRI => 0; # Command priority.
+use constant CMD_SUB => 1; # Command handler.
+
+my %irc_commands =
+  ( 'rehash'    => [ PRI_HIGH,   \&noargs,        ],
+    'restart'   => [ PRI_HIGH,   \&noargs,        ],
+    'quit'      => [ PRI_NORMAL, \&oneoptarg,     ],
+    'version'   => [ PRI_HIGH,   \&oneoptarg,     ],
+    'time'      => [ PRI_HIGH,   \&oneoptarg,     ],
+    'trace'     => [ PRI_HIGH,   \&oneoptarg,     ],
+    'admin'     => [ PRI_HIGH,   \&oneoptarg,     ],
+    'info'      => [ PRI_HIGH,   \&oneoptarg,     ],
+    'away'      => [ PRI_HIGH,   \&oneoptarg,     ],
+    'users'     => [ PRI_HIGH,   \&oneoptarg,     ],
+    'wallops'   => [ PRI_HIGH,   \&oneoptarg,     ],
+    'motd'      => [ PRI_HIGH,   \&oneoptarg,     ],
+    'who'       => [ PRI_HIGH,   \&oneoptarg,     ],
+    'nick'      => [ PRI_HIGH,   \&onlyonearg,    ],
+    'oper'      => [ PRI_HIGH,   \&onlytwoargs,   ],
+    'invite'    => [ PRI_HIGH,   \&onlytwoargs,   ],
+    'squit'     => [ PRI_HIGH,   \&onlytwoargs,   ],
+    'kill'      => [ PRI_HIGH,   \&onlytwoargs,   ],
+    'privmsg'   => [ PRI_NORMAL, \&privandnotice, ],
+    'notice'    => [ PRI_NORMAL, \&privandnotice, ],
+    'join'      => [ PRI_HIGH,   \&oneortwo,      ],
+    'summon'    => [ PRI_HIGH,   \&oneortwo,      ],
+    'sconnect'  => [ PRI_HIGH,   \&oneandtwoopt,  ],
+    'whowas'    => [ PRI_HIGH,   \&oneandtwoopt,  ],
+    'stats'     => [ PRI_HIGH,   \&spacesep,      ],
+    'links'     => [ PRI_HIGH,   \&spacesep,      ],
+    'mode'      => [ PRI_HIGH,   \&spacesep,      ],
+    'part'      => [ PRI_HIGH,   \&commasep,      ],
+    'names'     => [ PRI_HIGH,   \&commasep,      ],
+    'whois'     => [ PRI_HIGH,   \&commasep,      ],
+    'ctcp'      => [ PRI_HIGH,   \&ctcp,          ],
+    'ctcpreply' => [ PRI_HIGH,   \&ctcp,          ],
+  );
+
+$VERSION = '2.5';
 
 
 # What happens when an attempted DCC connection fails.
@@ -294,10 +345,10 @@ sub _sock_up {
 
   # Now that we're connected, attempt to log into the server.
   if ($heap->{password}) {
-    $kernel->call( $session, 'sl', "PASS " . $heap->{password} );
+    $kernel->call( $session, 'sl_login', "PASS " . $heap->{password} );
   }
-  $kernel->call( $session, 'sl', "NICK " . $heap->{nick} );
-  $kernel->call( $session, 'sl', "USER " .
+  $kernel->call( $session, 'sl_login', "NICK " . $heap->{nick} );
+  $kernel->call( $session, 'sl_login', "USER " .
 		 join( ' ', $heap->{username},
 		       "foo.bar.com",
 		       $heap->{server},
@@ -329,6 +380,7 @@ sub _stop {
 
   if ($heap->{connected}) {
     $kernel->call( $_[SESSION], 'quit', $quitmsg );
+    $kernel->call( $_[SESSION], 'shutdown', $quitmsg );
   }
 }
 
@@ -337,10 +389,11 @@ sub _stop {
 sub commasep {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $args = join ',', @_[ARG0 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   $state = uc $state;
   $state .= " $args" if defined $args;
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -553,7 +606,7 @@ sub dcc_close {
 sub irc_ping {
   my ($kernel, $arg) = @_[KERNEL, ARG0];
 
-  $kernel->yield( 'sl', "PONG $arg" );
+  $kernel->yield( 'sl_login', "PONG $arg" );
 }
 
 
@@ -570,12 +623,12 @@ sub ison {
   while (@nicks) {
     my $nick = shift @nicks;
     if (length($tmp) + length($nick) >= 509) {
-      $kernel->yield( 'sl', $tmp );
+      $kernel->yield( 'sl_high', $tmp );
       $tmp = "ISON";
     }
     $tmp .= " $nick";
   }
-  $kernel->yield( 'sl', $tmp );
+  $kernel->yield( 'sl_high', $tmp );
 }
 
 
@@ -589,7 +642,7 @@ sub kick {
   }
 
   $nick .= " :$message" if defined $message;
-  $kernel->yield( 'sl', "KICK $chan $nick" );
+  $kernel->yield( 'sl_high', "KICK $chan $nick" );
 }
 
 
@@ -601,38 +654,9 @@ sub new {
     croak "Not enough arguments to POE::Component::IRC::new()";
   }
 
-  POE::Session->new( 'rehash'    => \&noargs,
-		     'restart'   => \&noargs,
-		     'quit'      => \&oneoptarg,
-		     'version'   => \&oneoptarg,
-		     'time'      => \&oneoptarg,
-		     'trace'     => \&oneoptarg,
-		     'admin'     => \&oneoptarg,
-		     'info'      => \&oneoptarg,
-		     'away'      => \&oneoptarg,
-		     'users'     => \&oneoptarg,
-		     'wallops'   => \&oneoptarg,
-		     'motd'      => \&oneoptarg,
-		     'who'       => \&oneoptarg,
-		     'nick'      => \&onlyonearg,
-		     'oper'      => \&onlytwoargs,
-		     'invite'    => \&onlytwoargs,
-		     'squit'     => \&onlytwoargs,
-		     'kill'      => \&onlytwoargs,
-		     'privmsg'   => \&privandnotice,
-		     'notice'    => \&privandnotice,
-		     'join'      => \&oneortwo,
-		     'summon'    => \&oneortwo,
-		     'sconnect'  => \&oneandtwoopt,
-		     'whowas'    => \&oneandtwoopt,
-		     'stats'     => \&spacesep,
-		     'links'     => \&spacesep,
-		     'mode'      => \&spacesep,
-		     'part'      => \&commasep,
-		     'names'     => \&commasep,
-		     'whois'     => \&commasep,
-		     'ctcp'      => \&ctcp,
-		     'ctcpreply' => \&ctcp,
+  my @event_map = map {($_, $irc_commands{$_}->[CMD_SUB])} keys %irc_commands;
+
+  POE::Session->new( @event_map,
 		     '_tryclose' => \&dcc_close,
 		     $package => [qw( _dcc_failed
 				      _dcc_read
@@ -653,8 +677,12 @@ sub new {
 				      ison
 				      kick
 				      register
+				      shutdown
 				      sl
+				      sl_login
+				      sl_high
                                       sl_delayed
+				      sl_prioritized
 				      topic
 				      unregister
 				      userhost )],
@@ -665,11 +693,12 @@ sub new {
 # The handler for all IRC commands that take no arguments.
 sub noargs {
   my ($kernel, $state, $arg) = @_[KERNEL, STATE, ARG0];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   if (defined $arg) {
     die "The POE::Component::IRC event \"$state\" takes no arguments";
   }
-  $kernel->yield( 'sl', uc $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -677,13 +706,14 @@ sub noargs {
 sub oneandtwoopt {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $arg = join '', @_[ARG0 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   $state = uc $state;
   if (defined $arg) {
     $arg = ':' . $arg if $arg =~ /\s/;
     $state .= " $arg";
   }
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -691,13 +721,14 @@ sub oneandtwoopt {
 sub oneoptarg {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $arg = join '', @_[ARG0 .. $#_] if defined $_[ARG0];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   $state = uc $state;
   if (defined $arg) {
     $arg = ':' . $arg if $arg =~ /\s/;
     $state .= " $arg";
   }
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -705,6 +736,7 @@ sub oneoptarg {
 sub oneortwo {
   my ($kernel, $state, $one) = @_[KERNEL, STATE, ARG0];
   my $two = join '', @_[ARG1 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   unless (defined $one) {
     die "The POE::Component::IRC event \"$state\" requires at least one argument";
@@ -712,7 +744,7 @@ sub oneortwo {
 
   $state = uc( $state ) . " $one";
   $state .= " $two" if defined $two;
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -720,6 +752,7 @@ sub oneortwo {
 sub onlyonearg {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $arg = join '', @_[ARG0 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   unless (defined $arg) {
     die "The POE::Component::IRC event \"$state\" requires one argument";
@@ -728,7 +761,7 @@ sub onlyonearg {
   $state = uc $state;
   $arg = ':' . $arg if $arg =~ /\s/;
   $state .= " $arg";
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -736,6 +769,7 @@ sub onlyonearg {
 sub onlytwoargs {
   my ($kernel, $state, $one) = @_[KERNEL, STATE, ARG0];
   my ($two) = join '', @_[ARG1 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   unless (defined $one and defined $two) {
     die "The POE::Component::IRC event \"$state\" requires two arguments";
@@ -744,7 +778,7 @@ sub onlytwoargs {
   $state = uc $state;
   $two = ':' . $two if $two =~ /\s/;
   $state .= " $one $two";
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -752,6 +786,7 @@ sub onlytwoargs {
 sub privandnotice {
   my ($kernel, $state, $to) = @_[KERNEL, STATE, ARG0];
   my $message = join ' ', @_[ARG1 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   unless (defined $to and defined $message) {
     die "The POE::Component::IRC event \"$state\" requires two arguments";
@@ -763,7 +798,7 @@ sub privandnotice {
 
   $state = uc $state;
   $state .= " $to :$message";
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -787,30 +822,78 @@ sub register {
 }
 
 
-# Send a line of IRC output to the server.  Thanks to Raistlin for
-# explaining how ircd throttles messages.
+# Tell the IRC session to go away.
+sub shutdown {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+
+  foreach ($kernel->alias_list( $_[SESSION] )) {
+    $kernel->alias_remove( $_ );
+  }
+
+  foreach (qw(socket sock socketfactory dcc wheelmap)) {
+    delete $heap->{$_};
+  }
+}
+
+
+# Send a line of login-priority IRC output.  These are things which
+# must go first.
+sub sl_login {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my $arg = join '', @_[ARG0 .. $#_];
+  $kernel->yield( 'sl_prioritized', PRI_LOGIN, $arg );
+}
+
+
+# Send a line of high-priority IRC output.  Things like channel/user
+# modes, kick messages, and whatever.
+sub sl_high {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my $arg = join '', @_[ARG0 .. $#_];
+  $kernel->yield( 'sl_prioritized', PRI_HIGH, $arg );
+}
+
+
+# Send a line of normal-priority IRC output to the server.  PRIVMSG
+# and other random chatter.  Uses sl() for compatibility with existing
+# code.
 sub sl {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my $arg = join '', @_[ARG0 .. $#_];
 
-  die "Not enough arguments" unless defined $arg;
+  $kernel->yield( 'sl_prioritized', PRI_NORMAL, $arg );
+}
 
+
+# Prioritized sl().  This keeps the queue ordered by priority, low to
+# high in the UNIX tradition.  It also throttles transmission
+# following the hybrid ircd's algorithm, so you can't accidentally
+# flood yourself off.  Thanks to Raistlin for explaining how ircd
+# throttles messages.
+sub sl_prioritized {
+  my ($kernel, $heap, $priority, $msg) = @_[KERNEL, HEAP, ARG0, ARG1];
   my $now = time();
   $heap->{send_time} = $now if $now > $heap->{send_time};
 
   if (@{$heap->{send_queue}}) {
-    push @{$heap->{send_queue}}, $arg;
-  }
-  elsif ($heap->{send_time} - $now >= 10) {
-    push @{$heap->{send_queue}}, $arg;
+    my $i = @{$heap->{send_queue}};
+    $i-- while ($i and $priority < $heap->{send_queue}->[$i-1]->[MSG_PRI]);
+    splice( @{$heap->{send_queue}}, $i, 0,
+            [ $priority,  # MSG_PRI
+              $msg,       # MSG_TEXT
+            ]
+          );
+  } elsif ($heap->{send_time} - $now >= 10 or not defined $heap->{socket}) {
+    push( @{$heap->{send_queue}},
+          [ $priority,  # MSG_PRI
+            $msg,       # MSG_TEXT
+	   ]
+	 );
     $kernel->delay( sl_delayed => 1 );
-  }
-  elsif (not defined $heap->{'socket'}) {
-    warn "*** sl(): Can't send line, no such socket";
   } else {
-    warn ">>> $arg\n" if $heap->{'debug'};
-    $heap->{send_time} += 2 + length($arg) / 120;
-    $heap->{'socket'}->put( "$arg" );
+    warn ">>> $msg\n" if $heap->{debug};
+    $heap->{send_time} += 2 + length($msg) / 120;
+    $heap->{socket}->put($msg);
   }
 }
 
@@ -821,7 +904,7 @@ sub sl_delayed {
   if (defined $heap->{'socket'}) {
     my $now = time();
     while (@{$heap->{send_queue}} and ($heap->{send_time} - $now < 10)) {
-      my $arg = shift @{$heap->{send_queue}};
+      my $arg = (shift @{$heap->{send_queue}})->[MSG_TEXT];
       warn ">>> $arg\n" if $heap->{'debug'};
       $heap->{send_time} += 2 + length($arg) / 120;
       $heap->{'socket'}->put( "$arg" );
@@ -831,14 +914,16 @@ sub sl_delayed {
   $kernel->delay( sl_delayed => 1 ) if @{$heap->{send_queue}};
 }
 
+
 # The handler for commands which have N arguments, separated by spaces.
 sub spacesep {
   my ($kernel, $state) = @_[KERNEL, STATE];
   my $args = join ' ', @_[ARG0 .. $#_];
+  my $pri = $irc_commands{$state}->[CMD_PRI];
 
   $state = uc $state;
   $state .= " $args" if defined $args;
-  $kernel->yield( 'sl', $state );
+  $kernel->yield( 'sl_prioritized', $pri, $state );
 }
 
 
@@ -848,7 +933,7 @@ sub topic {
   my $topic = join '', @_[ARG1 .. $#_];
 
   $chan .= " :$topic" if length $topic;
-  $kernel->yield( 'sl', "TOPIC $chan" );
+  $kernel->yield( 'sl_prioritized', PRI_NORMAL, "TOPIC $chan" );
 }
 
 
@@ -880,7 +965,8 @@ sub userhost {
 
   # According to the RFC, you can only send 5 nicks at a time.
   while (@nicks) {
-    $kernel->yield( 'sl', "USERHOST " . join(' ', splice(@nicks, 0, 5)) );
+    $kernel->yield( 'sl_prioritized', PRI_HIGH,
+		    "USERHOST " . join(' ', splice(@nicks, 0, 5)) );
   }
 }
 
@@ -972,14 +1058,6 @@ How to talk to your new IRC component... here's the events we'll accept.
 
 =over
 
-=item ctcp and ctcpreply
-
-Sends a CTCP query or response to the nick(s) or channel(s) which you
-specify. Takes 2 arguments: the nick or channel to send a message to
-(use an array reference here to specify multiple recipients), and the
-plain text of the message to send (the CTCP quoting will be handled
-for you).
-
 =item connect
 
 Takes one argument: a hash reference of attributes for the new
@@ -995,6 +1073,14 @@ client's IRC nickname; "Username", your client's username; and
 "Ircname", some cute comment or something. C<connect()> will supply
 reasonable defaults for any of these attributes which are missing, so
 don't feel obliged to write them all out.
+
+=item ctcp and ctcpreply
+
+Sends a CTCP query or response to the nick(s) or channel(s) which you
+specify. Takes 2 arguments: the nick or channel to send a message to
+(use an array reference here to specify multiple recipients), and the
+plain text of the message to send (the CTCP quoting will be handled
+for you).
 
 =item dcc
 
@@ -1104,6 +1190,15 @@ channel.
 Registering for C<'all'> will cause it to send all IRC-related events to
 you; this is the easiest way to handle it. See the test script for an
 example.
+
+=item shutdown
+
+By default, POE::Component::IRC sessions never go away. Even after
+they're disconnected, they're still sitting around in the background,
+waiting for you to call C<connect()> on them again to reconnect.
+(Whether this behavior is the Right Thing is doubtful, but I don't want
+to break backwards compatibility at this point.) You can send the IRC
+session a C<shutdown> event manually to make it delete itself.
 
 =item unregister
 

@@ -1,6 +1,19 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+2.5   Sun Oct 27 11:03:57 PST 2002
+    - Added an AIM <-> IRC proxy bot to the example scripts. Share and enjoy!
+    - I just now noticed that POE::Component::IRC sessions never get
+      garbage-collected. DOH. Now you can send them "shutdown" events to
+      make them go away. Too bad it's probably too late to be breaking
+      backwards compatibility on this... sigh.
+    - Added a bug fix from Trym Skaar (those Norwegians get the coolest
+      names!) which fixes a potential crash while closing DCC connections.
+    - Added a mega-patch from the unstoppable Rocco Caputo which prioritizes
+      messages sent to the IRC server by importance. This ensures that
+      pings and login information will always keep flowing, even if your
+      bot's inane chatter has been throttled.
+
 2.4   Thu Oct 10 14:22:04 PDT 2002
     - Added a patch from dngor to fix a crash caused by IRC servers
       sometimes inexplicably sending a blank line.
