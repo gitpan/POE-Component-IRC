@@ -17,6 +17,7 @@ use POE::Filter::CTCP;
 use Carp;
 use Socket;
 use Sys::Hostname;
+use File::Basename ();
 use Symbol;
 use vars qw($VERSION);
 
@@ -24,7 +25,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.2';
+$VERSION = '1.3';
 my $debug;
 
 
@@ -44,19 +45,26 @@ sub _dcc_failed {
   # Did the peer of a DCC GET connection close the socket after the file
   # transfer finished? If so, it's not really an error.
   if ($errnum == 0 and $heap->{dcc}->{$id}->{type} eq "GET" and
-      $heap->{dcc}->{$id}->{size} >= $heap->{dcc}->{$id}->{done}) {
+      $heap->{dcc}->{$id}->{done} >= $heap->{dcc}->{$id}->{size}) {
     _send_event( $kernel, $heap, 'irc_dcc_done', $id,
 		 @{$heap->{dcc}->{$id}}{ qw(nick type port file size done) } );
     close $heap->{dcc}->{$id}->{fh};
     delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
+    delete $heap->{dcc}->{$id}->{wheel};
     delete $heap->{dcc}->{$id};
 
   } else {
     # In this case, something went wrong.
+    if ($errnum == 0 and $heap->{dcc}->{$id}->{type} eq "GET") {
+      $errstr = "Aborted by sender";
+    }
     _send_event( $kernel, $heap, 'irc_dcc_error', $id, $errstr,
-		 @{$heap->{dcc}->{$id}}{'nick', 'type', 'port', 'file'} );
+		 @{$heap->{dcc}->{$id}}{qw(nick type port file size done)} );
+    # gotta close the file
+    close $heap->{dcc}->{$id}->{fh} if exists $heap->{dcc}->{$id}->{fh};
     if (exists $heap->{dcc}->{$id}->{wheel}) {
       delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
+      delete $heap->{dcc}->{$id}->{wheel};
     }
     delete $heap->{dcc}->{$id};
   }
@@ -71,19 +79,18 @@ sub _dcc_read {
 
   if ($heap->{dcc}->{$id}->{type} eq "GET") {
 
-    # Save and acknowledge the data.
+    # Acknowledge the received data.
     print {$heap->{dcc}->{$id}->{fh}} $data;
     $heap->{dcc}->{$id}->{done} += length $data;
     $heap->{dcc}->{$id}->{wheel}->put( pack "N", $heap->{dcc}->{$id}->{done} );
 
-    # Send an event to let people know.
+    # Send an event to let people know about the newly arrived data.
     _send_event( $kernel, $heap, 'irc_dcc_get', $id,
 		 @{$heap->{dcc}->{$id}}{ qw(nick port file size done) } );
 
-    # Are we done yet?
 
   } elsif ($heap->{dcc}->{$id}->{type} eq "SEND") {
- 
+
     # Record the client's download progress.
     $heap->{dcc}->{$id}->{done} = unpack "N", substr( $data, -4 );
     _send_event( $kernel, $heap, 'irc_dcc_send', $id,
@@ -95,6 +102,7 @@ sub _dcc_read {
 		   @{$heap->{dcc}->{$id}}{ qw(nick type port file size done) }
 		 );
       delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
+      delete $heap->{dcc}->{$id}->{wheel};
       delete $heap->{dcc}->{$id};
       return;
     }
@@ -145,27 +153,31 @@ sub _dcc_up {
   $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID} = $id;
 
   if ($heap->{dcc}->{$id}->{'type'} eq 'GET') {
-    unless (open FILE, ">" . $heap->{dcc}->{$id}->{file}) {
+    my $handle = gensym();
+    unless (open $handle, ">" . $heap->{dcc}->{$id}->{file}) {
       $kernel->yield( '_dcc_failed', 'open file', $! + 0, "$!", $id );
       return;
     }
-    binmode FILE;
+    binmode $handle;
 
     # Store the filehandle with the rest of this connection's state.
-    $heap->{dcc}->{$id}->{'fh'} = \*FILE;
+    $heap->{dcc}->{$id}->{'fh'} = $handle;
 
   } elsif ($heap->{dcc}->{$id}->{type} eq 'SEND') {
-    # Send the first packet to get the ball rolling.
-    unless (open FILE, "<" . $heap->{dcc}->{$id}->{'file'}) {
+    # Open up the file we're going to send.
+    my $handle = gensym();
+    unless (open $handle, "<" . $heap->{dcc}->{$id}->{'file'}) {
       $kernel->yield( '_dcc_failed', 'open file', $! + 0, "$!", $id );
       return;
     }
-    binmode FILE;
-    read FILE, $buf, $heap->{dcc}->{$id}->{'blocksize'};
+    binmode $handle;
+
+    # Send the first packet to get the ball rolling.
+    read $handle, $buf, $heap->{dcc}->{$id}->{'blocksize'};
     $heap->{dcc}->{$id}->{wheel}->put( $buf );
 
     # Store the filehandle with the rest of this connection's state.
-    $heap->{dcc}->{$id}->{'fh'} = \*FILE;
+    $heap->{dcc}->{$id}->{'fh'} = $handle;
   }
 
   # Tell any listening sessions that the connection is up.
@@ -443,7 +455,8 @@ sub dcc {
   $myaddr = unpack "N", $myaddr;
 
   # Tell the other end that we're waiting for them to connect.
-  $kernel->yield( 'ctcp', $nick, "DCC $type $file $myaddr $port"
+  my $basename = File::Basename::basename( $file );
+  $kernel->yield( 'ctcp', $nick, "DCC $type $basename $myaddr $port"
 		  . ($size ? " $size" : "") );
 
   # Store the state for this connection.
@@ -465,10 +478,11 @@ sub dcc {
 # Accepts a proposed DCC connection to another client. See '_dcc_up' for
 # the rest of the logic for this.
 sub dcc_accept {
-  my ($kernel, $heap, $cookie) = @_[KERNEL, HEAP, ARG0];
+  my ($kernel, $heap, $cookie, $myfile) = @_[KERNEL, HEAP, ARG0, ARG1];
 
   if ($cookie->{type} eq 'SEND') {
     $cookie->{type} = 'GET';
+    $cookie->{file} = $myfile if defined $myfile;   # filename override
   }
 
   my $factory = POE::Wheel::SocketFactory->new(
@@ -491,7 +505,7 @@ sub dcc_chat {
   die "$id isn't a DCC CHAT connection!"
     unless $heap->{dcc}->{$id}->{type} eq "CHAT";
 
-  $heap->{dcc}->{$id}->{wheel}->put( join '\n', @data );
+  $heap->{dcc}->{$id}->{wheel}->put( join "\n", @data );
 }
 
 
@@ -499,11 +513,12 @@ sub dcc_chat {
 sub dcc_close {
   my ($kernel, $heap, $id) = @_[KERNEL, HEAP, ARG0];
 
-  _send_event( $kernel, $heap, 'irc_dcc_error', $id, "Connection closed",
-	       @{$heap->{dcc}->{$id}}{'nick', 'type', 'port', 'file'} );
+  _send_event( $kernel, $heap, 'done', $id,
+	       @{$heap->{dcc}->{$id}}{qw(nick type port file)} );
 
   if (exists $heap->{dcc}->{$id}->{wheel}) {
     delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
+    delete $heap->{dcc}->{$id}->{wheel};
   }
   delete $heap->{dcc}->{$id};
 }
@@ -753,7 +768,7 @@ sub sl {
   die "Not enough arguments" unless defined $arg;
 
   warn ">>> $arg\n" if $heap->{'debug'};
-  $heap->{'socket'}->put( "$arg\n" );
+  $heap->{'socket'}->put( "$arg\r\n" );
 }
 
 
@@ -819,22 +834,22 @@ POE::Component::IRC - a fully event-driven IRC client module.
 
   use POE::Component::IRC;
 
-# Do this when you create your sessions. 'my client' is just a
-# kernel alias to christen the new IRC connection with. (Returns
-# only a true or false success flag, not an object.)
-POE::Component::IRC->new('my client') or die "Oh noooo! $!";
+  # Do this when you create your sessions. 'my client' is just a
+  # kernel alias to christen the new IRC connection with. (Returns
+  # only a true or false success flag, not an object.)
+  POE::Component::IRC->new('my client') or die "Oh noooo! $!";
 
-# Do stuff like this from within your sessions. This line tells the
-# connection named "my client" to send your session the following
-# events when they happen.
-$kernel->post('my client', 'register', qw(connected msg public cdcc cping));
-# You can guess what this line does.
-$kernel->post('my client', 'connect',
-	      { Nick     => 'Boolahman',
-		Server   => 'irc-w.primenet.com',
-		Port     => 6669,
-		Username => 'quetzal',
-		Ircname  => 'Ask me about my colon!', } );
+  # Do stuff like this from within your sessions. This line tells the
+  # connection named "my client" to send your session the following
+  # events when they happen.
+  $kernel->post('my client', 'register', qw(connected msg public cdcc cping));
+  # You can guess what this line does.
+  $kernel->post('my client', 'connect',
+	        { Nick     => 'Boolahman',
+		  Server   => 'irc-w.primenet.com',
+		  Port     => 6669,
+		  Username => 'quetzal',
+		  Ircname  => 'Ask me about my colon!', } );
 
 =head1 DESCRIPTION
 
@@ -934,9 +949,11 @@ on its DCC connection.
 
 =item dcc_accept
 
-Accepts an incoming DCC connection from another host. Takes one
-argument: the magic cookie from an 'irc_dcc_request' event. (See the
-'irc_dcc_request' section below for more details.)
+Accepts an incoming DCC connection from another host. First argument:
+the magic cookie from an 'irc_dcc_request' event. In the case of a DCC
+GET, the second argument can optionally specify a new name for the
+destination file of the DCC transfer, instead of using the sender's name
+for it. (See the 'irc_dcc_request' section below for more details.)
 
 =item dcc_chat
 
@@ -1388,15 +1405,15 @@ connection's magic cookie, ARG1 will be a string describing the error.
 ARG2 will be the nick of the person on the other end of the connection.
 ARG3 is the DCC type (SEND, GET, CHAT, etc.). ARG4 is the port number of
 the DCC connection, if any. For SEND and GET connections, ARG5 is the
-filename.
+filename, ARG6 is the expected file size, and ARG7 is the transfered size.
 
 =item irc_dcc_get
 
-Notifies you that another block of data has been successfully received
-from to the client on the other end of a DCC SEND connection. ARG0 is
-the connection's magic cookie, ARG1 is the nick of the person on the
-other end, ARG2 is the port number, ARG3 is the filename, ARG4 is the
-total file size, and ARG5 is the number of bytes successfully
+Notifies you that another block of data has been successfully
+transferred from the client on the other end of your DCC GET connection.
+ARG0 is the connection's magic cookie, ARG1 is the nick of the person on
+the other end, ARG2 is the port number, ARG3 is the filename, ARG4 is
+the total file size, and ARG5 is the number of bytes successfully
 transferred so far.
 
 =item irc_dcc_request

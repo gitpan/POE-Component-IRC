@@ -11,6 +11,7 @@ package POE::Filter::CTCP;
 
 use strict;
 use Carp;
+use File::Basename ();
 use POE::Filter::IRC;
 
 
@@ -18,7 +19,7 @@ use POE::Filter::IRC;
 sub new {
   my $class = shift;
   my %args = @_;
-  
+
   my $self = { 'irc_filter' => POE::Filter::IRC->new() };
   bless $self, $class;
 }
@@ -27,11 +28,11 @@ sub new {
 # Set/clear the 'debug' flag.
 sub debug {
   my $self = shift;
-  
+
   if (@_) {
     $self->{'debug'} = $_[0];
   }
-  
+
   return( $self->{'debug'} );
 }
 
@@ -42,26 +43,28 @@ sub get {
   my ($self, $lineref) = @_;
   my ($who, $type, $where, $ctcp, $text, $name, $args);
   my $events = [];
-  
+
+ LINE:
   foreach my $line (@$lineref) {
     ($who, $type, $where, $ctcp, $text) = _ctcp_dequote( $line );
-    
+
     foreach (@$ctcp) {
       ($name, $args) = $_ =~ /^(\w+)(?: (.*))?/
-	or die "Badly formed CTCP message: \"$_\"";
+	or do { warn "Received malformed CTCP message: \"$_\""; next LINE; };
       if (lc $name eq 'dcc') {
 	$args =~ /^(\w+) (\S+) (\d+) (\d+)(?: (\d+))?$/
-	  or die "Badly formed DCC request: \"$_\"";
+	  or do { warn "Received malformed DCC request: \"$_\""; next LINE; };
+	my $basename = File::Basename::basename( $2 );
 	push @$events, { name => 'dcc_request',
 			 args => [ $who, uc $1, $4, { open => undef,
 						      nick => $who,
 						      type => uc $1,
-						      file => $2,
+						      file => $basename,
 						      size => $5,
 						      done => 0,
 						      addr => $3,
 						      port => $4,
-						    }, $2, $5 ]
+						    }, $basename, $5 ]
 		       };
 
       } else {
@@ -71,16 +74,16 @@ sub get {
 		       };
       }
     }
-    
+
     if ($text and @$text > 0) {
-      $line =~ /^(:\S+ +\w+ +\S+ +)/ or die "What the heck? \"$line\"";
+      $line =~ /^(:\S+ +\w+ +\S+ +)/ or warn "What the heck? \"$line\"";
       $text = $1 . ':' . join '', @$text;
       $text =~ s/\cP/^P/g;
       warn "CTCP: $text\n" if $self->{'debug'};
       push @$events, @{$self->{irc_filter}->get( [$text] )};
     }
   }
-  
+
   return $events;
 }
 
@@ -90,11 +93,11 @@ sub get {
 sub put {
   my ($self, $lineref) = @_;
   my $quoted = [];
-  
+
   foreach my $line (@$lineref) {
     push @$quoted, _ctcp_quote( $line );
   }
-  
+
   return $quoted;
 }
 
@@ -104,15 +107,15 @@ sub put {
 sub _low_quote {
   my $line = shift;
   my %enquote = ("\012" => 'n', "\015" => 'r', "\0" => '0', "\cP" => "\cP");
-  
+
   unless (defined $line) {
     die "Not enough arguments to POE::Filter::CTCP->_low_quote";
   }
-  
+
   if ($line =~ tr/[\012\015\0\cP]//) { # quote \n, \r, ^P, and \0.
     $line =~ s/([\012\015\0\cP])/\cP$enquote{$1}/g;
   }
-  
+
   return $line;
 }
 
@@ -122,16 +125,16 @@ sub _low_quote {
 sub _low_dequote {
   my $line = shift;
   my %dequote = (n => "\012", r => "\015", 0 => "\0", "\cP" => "\cP");
-  
+
   unless (defined $line) {
     die "Not enough arguments to POE::Filter::CTCP->_low_dequote";
   }
-  
+
   # Thanks to Abigail (abigail@foad.org) for this clever bit.
   if ($line =~ tr/\cP//) {	# dequote \n, \r, ^P, and \0.
     $line =~ s/\cP([nr0\cP])/$dequote{$1}/g;
   }
-  
+
   return $line;
 }
 
@@ -139,11 +142,11 @@ sub _low_dequote {
 # Properly CTCP-quotes a message. Whoop.
 sub _ctcp_quote {
   my $line = shift;
-  
+
   $line = _low_quote( $line );
   $line =~ s/\\/\\\\/g;
   $line =~ s/\001/\\a/g;
-  
+
   return "\001" . $line . "\001";
 }
 
@@ -160,36 +163,36 @@ sub _ctcp_dequote {
   unless (defined $line) {
     die "Not enough arguments to POE::Filter::CTCP->_ctcp_dequote";
   }
-  
+
   # Strip out any low-level quoting in the text.
   $line = _low_dequote( $line );
 
   # Filter misplaced \001s before processing... (Thanks, tchrist!)
   substr($line, rindex($line, "\001"), 1) = '\\a'
     unless ($line =~ tr/\001//) % 2 == 0;
-  
+
   return unless $line =~ tr/\001//;
-  
+
   ($who, $type, $where, $msg) = ($line =~ /^:(\S+) +(\w+) +(\S+) +:?(.*)$/)
     or return;
   @chunks = split /\001/, $msg;
   shift @chunks unless length $chunks[0]; # FIXME: Is this safe?
-  
+
   foreach (@chunks) {
     # Dequote unnecessarily quoted chars, and convert escaped \'s and ^A's.
     s/\\([^\\a])/$1/g;
     s/\\\\/\\/g;
     s/\\a/\001/g;
   }
-  
+
   # If the line begins with a control-A, the first chunk is a CTCP
   # message. Otherwise, it starts with text and alternates with CTCP
   # messages. Really stupid protocol.
-  
+
   if ($msg =~ /^\001/) {
     push @$ctcp, shift @chunks;
   }
-  
+
   while (@chunks) {
     push @$text, shift @chunks;
     push @$ctcp, shift @chunks if @chunks;
@@ -201,7 +204,7 @@ sub _ctcp_dequote {
   } else {
     $type = 'ctcpreply';
   }
-  
+
   return ($who, $type, $where, $ctcp, $text);
 }
 
@@ -217,8 +220,8 @@ POE::Filter::CTCP -- A POE-based parser for the IRC protocol.
 =head1 SYNOPSIS
 
   my $filter = POE::Filter::IRC->new();
-my @events = @{$filter->get( [ @lines ] )};
-my @msgs = @{$filter->put( [ @messages ] )};
+  my @events = @{$filter->get( [ @lines ] )};
+  my @msgs = @{$filter->put( [ @messages ] )};
 
 =head1 DESCRIPTION
 
@@ -233,7 +236,8 @@ http://cs-pub.bu.edu/pub/irc/support/ctcp.spec and you'll hopefully see
 what I mean. Quote this, quote that, quote this again, all in different
 and weird ways... and who the hell needs to send mixed CTCP and text
 messages? WTF? It looks like it's practically complexity for
-complexity's sake. Anyhow, enough ranting. Onto the rest of the docs...
+complexity's sake -- and don't even get me started on the design of the
+DCC protocol! Anyhow, enough ranting. Onto the rest of the docs...
 
 =head1 METHODS
 

@@ -7,8 +7,6 @@
 # -- dennis taylor, <dennis@funkplanet.com>
 
 use strict;
-#sub POE::Kernel::ASSERT_DEFAULT () { 1 }
-#sub POE::Kernel::TRACE_DEFAULT () { 1 }
 use POE::Kernel;
 use POE::Session;
 use POE::Component::IRC;
@@ -19,9 +17,6 @@ my $nick = "spleen" . ($$ % 1000);
 # This gets executed as soon as the kernel sets up this session.
 sub _start {
   my ($kernel, $session) = @_[KERNEL, SESSION];
-
-  # Uncomment this to turn on more verbose POE debugging information.
-  # $session->option( trace => 1 );
 
   # Make an alias for our session, to keep it from getting GC'ed.
   $kernel->alias_set( 'smileyninja' );
@@ -34,8 +29,9 @@ sub _start {
   # sent to and received from the IRC server. Very useful for debugging.
   $kernel->post( 'test', 'connect', { Debug    => 1,
 				      Nick     => $nick,
-                                      Server   => 'binky.phreeow.net',
-				      Port     => 6667,
+                                      Server   => $ARGV[0] ||
+				                  'binky.phreeow.net',
+				      Port     => $ARGV[1] || 6667,
 				      Username => 'neenio',
 				      Ircname  => 'Ask me about my colon!', }
 	       );
@@ -53,7 +49,7 @@ sub irc_001 {
 
 
 sub irc_dcc_done {
-  my ($nick, $type, $file, $size, $done) = @_[ARG0, ARG1, ARG3 .. ARG5];
+  my ($magic, $nick, $type, $port, $file, $size, $done) = @_[ARG0 .. ARG6];
   print "DCC $type to $nick ($file) done: $done bytes transferred.\n",
 }
 
@@ -126,14 +122,15 @@ sub irc_dcc_request {
     @_[KERNEL, ARG0 .. ARG5];
 
   print "DCC $type request from $nick on port $port\n";
-  $kernel->post( 'test', 'dcc_accept', $magic );
+  $nick = ($nick =~ /^([^!]+)/);
+  $nick =~ s/\W//;
+  $kernel->post( 'test', 'dcc_accept', $magic, "$1.$filename" );
 }
 
 
 # here's where execution starts.
 
-# Set 'trace' to 1 to get some more debugging information.
-POE::Component::IRC->new( 'test', trace => 1 ) or
+POE::Component::IRC->new( 'test' ) or
   die "Can't instantiate new IRC component!\n";
 POE::Session->new( 'main' => [qw(_start _stop _default irc_001 irc_kick
 				 irc_disconnected irc_error irc_socketerr

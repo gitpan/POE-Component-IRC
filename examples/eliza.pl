@@ -11,8 +11,8 @@ use strict;
 use POE::Kernel;
 use POE::Session;
 use POE::Component::IRC;
-
 use Chatbot::Eliza;
+
 
 my $pid = $$; substr($pid, 0, 1) = '' while length($pid) > 3;
 my $nick = 'eliza' . $pid;
@@ -38,8 +38,9 @@ sub _start {
   # sent to and received from the IRC server. Very useful for debugging.
   $kernel->post( 'test', 'connect', { Debug    => 1,
 				      Nick     => $nick,
-				      Server   => 'irc.rhizomatic.net',
-				      Port     => 6667,
+				      Server   => $ARGV[0] ||
+				                  'irc.rhizomatic.net',
+				      Port     => $ARGV[1] || 6667,
 				      Username => $name,
 				      Ircname  => 'Ask me about my colon!',
                                     }

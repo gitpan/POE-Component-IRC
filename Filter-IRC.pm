@@ -123,7 +123,7 @@ sub _decolon ($) {
 
 # This sub is so useless to implement that I won't even bother.
 sub put {
-  carp "Call to unimplemented subroutine POE::Filter::IRC->put()";
+  croak "Call to unimplemented subroutine POE::Filter::IRC->put()";
 }
 
 

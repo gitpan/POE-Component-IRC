@@ -1,6 +1,23 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+1.3   date
+    - The Indomitable Mark-Jason "Ominous" Dominus sent me so many
+      patches and bug reports I'm almost at a loss to list them all.
+      Among others, DCC SENDs no longer report the local pathname to the
+      client on the other end, multiple concurrent DCC connections work,
+      and some documentation errors have been fixed.
+    - Many thanks to the infinitely studly Kees Cook, who, in addition
+      to having a really cool name, sent me a big patch for lots of DCC
+      bugs. DCC connections will now report errors and close their
+      sockets properly! Woohoo! Also, 'irc_dcc_error' events give you
+      more information about the connection that failed, and the
+      'dcc_accept' event now lets you rename incoming DCC files.
+    - Fixed a silly bug; sl() was sending \n instead of \r\n as a line
+      terminator.
+    - Changed lots of Filter::CTCP die()s to warn()s, on the advice of
+      Peter Barabas. Thanks, Peter!
+
 1.2   Thu May 24 02:36:40 PDT 2001
     - I have learned a valuable lesson about not including debugging
       prints in released code. Especially when the debugging code in

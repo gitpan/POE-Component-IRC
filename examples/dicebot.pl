@@ -7,7 +7,6 @@
 # -- dennis taylor, <dennis@funkplanet.com>
 
 use strict;
-use Tk;
 use POE;
 use POE::Component::IRC;
 
@@ -22,7 +21,7 @@ sub _start {
   $kernel->post( 'dicebot', 'connect', { Debug    => 0,
 					 Nick     => $nick,
 					 Server   => $ARGV[0] ||
-					             'binky.rhizomatic.net',
+					             'binky.phreeow.net',
 					 Port     => $ARGV[1] || 6667,
 					 Username => 'neenio',
 					 Ircname  => "HELP I'M A ROCK", }
@@ -67,7 +66,7 @@ sub irc_public {
   my ($num, $die, $plus) =
     ($msg =~ /^\s*(?:$nick,?\s*)?roll (?:a )?(\d+)d(\d+)\s*([+-]\s*(\d+))?/i);
   return unless $num and $die and $num < 100 and $die < 10000;
-  $plus =~ tr/+ //d if $plus;  # yes, this is what I meant!
+  $plus =~ tr/+ //d if $plus;
 
   my @rolls;
   my $sum = $plus || 0;

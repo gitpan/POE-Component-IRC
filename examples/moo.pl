@@ -16,8 +16,9 @@ use POE::Component::IRC;
 
 my $mynick = "moo";
 my $user = "(fimm(tiu)?|(Half|Semi)jack|stimps)";
-my $telnethost = "lambda.moo.mud.org";
-my $telnetport = 8888;
+my $telnethost = "binky";
+my $telnetport = 7788;
+my $verbose = 0;       # turn this on to enable lots of garbage.
 
 my $chatsession = undef;
 
@@ -29,8 +30,8 @@ sub _start {
   $kernel->post( 'irc', 'register', 'all');
   $kernel->post( 'irc', 'connect', { Debug    => 0,
 				     Nick     => $mynick,
-				     Server   => 'binky',
-				     Port     => 6667,
+				     Server   => $ARGV[0] || 'binky',
+				     Port     => $ARGV[1] || 6667,
 				     Username => 'neenio',
 				     Ircname  => 'Ask me about my colon!', }
 	       );
@@ -49,7 +50,7 @@ sub _connected {
   );
 
   $kernel->post( 'irc', 'dcc_chat', $chatsession, "*** Connected." );
-  print "Connected.\n";
+  print "Connected.\n" if $verbose;
 }
 
 
@@ -68,7 +69,7 @@ sub _conn_data {
 
   $line = " " unless length $line;
   $kernel->post( 'irc', 'dcc_chat', $chatsession, $line );
-  print "<== $line\n";
+  print "<== $line\n" if $verbose;
 }
 
 
@@ -113,7 +114,8 @@ sub irc_dcc_start {
 
   unless ($chatsession) {
     die "Who the hell is \"$nick\"?" unless $nick =~ /^$user!.*$/o;
-    print "DCC CHAT connection established with $nick on port $port.\n";
+    print "DCC CHAT connection established with $nick on port $port.\n"
+      if $verbose;
   }
 
   $chatsession = $cookie;   # save the magic cookie
@@ -146,21 +148,21 @@ sub irc_dcc_chat {
     }
 
     $heap->{wheel}->put( $line ) if exists $heap->{wheel};
-    print "==> $line\n";
+    print "==> $line\n" if $verbose;
   }
 }
 
 
 sub irc_dcc_done {
   my ($nick, $type) = @_[ARG0, ARG1];
-  print "DCC $type to $nick closed.\n",
+  print "DCC $type to $nick closed.\n" if $verbose;
   $chatsession = undef;
 }
 
 
 sub irc_dcc_error {
   my ($err, $nick, $type) = @_[ARG1 .. ARG3];
-  print "DCC $type to $nick failed: $err.\n",
+  print "DCC $type to $nick failed: $err.\n" if $verbose;
   $chatsession = undef;
 }
 
