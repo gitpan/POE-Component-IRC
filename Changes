@@ -1,6 +1,13 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+1.8   Mon Dec 10 16:04:06 PST 2001
+    - Fixed the moo.pl example script to accept multiple simultaneous
+      connections.
+    - Applied dngor's studly patch to throttle line output.
+    - Fixed a bug that would cause events to get thrown away if they
+      came in while the connection to the IRC server was down.
+
 1.7   Sat Jul 21 00:46:06 PDT 2001
     - Fixed bugs in my initial implementations of the irc_invite event.
       Sigh. You ever have one of those days where you can't do anything

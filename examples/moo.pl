@@ -104,6 +104,11 @@ sub irc_dcc_request {
     return;
   }
 
+  if (defined $chatsession) {
+    $kernel->post( 'irc', 'notice', $nick, "There's already a user on." );
+    return;
+  }
+
   $kernel->post( 'irc', 'dcc_accept', $cookie );
 }
 

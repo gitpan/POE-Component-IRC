@@ -25,7 +25,23 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.7';
+# MESSAGES / SECONDS is the maximum send rate.  Please, please, for
+# everyone's sake, REDUCE THE FRACTION!  MESSAGES must be an integer,
+# but SECONDS can be fractional if Time::HiRes is installed.  Overly
+# long SECONDS just makes the algorithm chunkier.
+
+use constant MESSAGES => 2;  # number of messages per time window
+use constant SECONDS  => 3;  # number of seconds per time window
+
+# TODO: Prioritize sl messages so, say, channel modes are shoved ahead
+# of idle chatter in the send_queue.  Wouldn't that be neat?
+
+# TODO: Burst send.  It seems ok to flush a few messages all at once
+# before nasty ircd code starts prejudicing with extreme prejudice.
+# Advantage could be taken of that.  Too bad hybrid's guts are so
+# incomprehensible.
+
+$VERSION = '1.8';
 
 
 # What happens when an attempted DCC connection fails.
@@ -233,6 +249,11 @@ sub _sock_down {
   delete $heap->{'socket'};
   $heap->{connected} = 0;
 
+  # Stop any delayed sends.
+  $heap->{send_queue} = [ ];
+  $heap->{send_count} = 0;
+  $kernel->delay( sl_delayed => undef );
+
   # post a 'irc_disconnected' to each session that cares
   foreach (keys %{$heap->{sessions}}) {
     $kernel->post( $heap->{sessions}->{$_}->{'ref'},
@@ -296,6 +317,11 @@ sub _sock_up {
 sub _start {
   my ($kernel, $session, $heap, $alias) = @_[KERNEL, SESSION, HEAP, ARG0];
   my @options = @_[ARG1 .. $#_];
+
+  # Send queue is used to hold pending lines so we don't flood off.
+  # The count is used to track the number of lines sent at any time.
+  $heap->{send_queue} = [ ];
+  $heap->{send_count} = 0;
 
   $session->option( @options ) if @options;
   $kernel->alias_set($alias);
@@ -630,6 +656,7 @@ sub new {
 				      kick
 				      register
 				      sl
+                                      sl_delayed
 				      topic
 				      unregister
 				      userhost )],
@@ -742,7 +769,7 @@ sub privandnotice {
 }
 
 
-# Ask P::C::IRC to send you certain events, listed in $evref.
+# Ask P::C::IRC to send you certain events, listed in @events.
 sub register {
   my ($heap, $sender, @events) = @_[HEAP, SENDER, ARG0 .. $#_];
 
@@ -761,16 +788,46 @@ sub register {
 
 # Send a line of IRC output to the server.
 sub sl {
-  my $heap = $_[HEAP];
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
   my $arg = join '', @_[ARG0 .. $#_];
 
-  return unless $heap->{'socket'};
   die "Not enough arguments" unless defined $arg;
 
-  warn ">>> $arg\n" if $heap->{'debug'};
-  $heap->{'socket'}->put( "$arg" );
+  # If there are lines buffered or the number of lines sent during the
+  # time window is at the limit, then buffer this line.  Otherwise
+  # we're clear to just send it.
+
+  if (@{$heap->{send_queue}} or $heap->{send_count} >= MESSAGES
+      or not $heap->{socket}) {
+    push @{$heap->{send_queue}}, $arg;
+  } else {
+    $kernel->delay_add( sl_delayed => SECONDS );
+    $heap->{send_count}++;
+    warn ">>> $arg\n" if $heap->{'debug'};
+    $heap->{'socket'}->put( "$arg" );
+  }
 }
 
+# Whenever a line is sent, we increment the send count and set a delay
+# for the time window's length in seconds.  After the time window, the
+# line stops counting, and we decrement the counter.  Oh, and if there
+# are messages queued, we send one of them and set another timer.
+# This way only MESSAGES lines can be sent per SECONDS.
+
+sub sl_delayed {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+
+  $heap->{send_count}--;
+  die "internal error: send_count went negative" if $heap->{send_count} < 0;
+
+  while ( @{$heap->{send_queue}} and $heap->{send_count} < MESSAGES ) {
+    $kernel->delay_add( sl_delayed => SECONDS );
+    $heap->{send_count}++;
+    my $arg = shift @{$heap->{send_queue}};
+    warn ">>> $arg\n" if $heap->{'debug'};
+    $heap->{'socket'}->put( "$arg" );
+  }
+}
 
 # The handler for commands which have N arguments, separated by spaces.
 sub spacesep {
