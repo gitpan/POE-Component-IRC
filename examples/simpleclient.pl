@@ -98,12 +98,17 @@ sub _default {
 
     my $arg_number = 0;
     foreach (@$args) {
+	SWITCH: {
         if ( ref($_) eq 'ARRAY' ) {
             push ( @output, "[", join ( ", ", @$_ ), "]" );
+	    last SWITCH;
         }
-        else {
-            push ( @output, "'$_'" );
-        }
+	if ( ref($_) eq 'HASH' ) {
+	    push ( @output, "{", join ( ", ", keys %$_ ), "}" );
+	    last SWITCH;
+	}
+        push ( @output, "'$_'" );
+	}
         $arg_number++;
     }
     $_[HEAP]->{readline_wheel}->put("$event " . join(' ',@output) ) if ( defined ( $_[HEAP]->{readline_wheel} ) );

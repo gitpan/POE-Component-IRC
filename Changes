@@ -1,5 +1,15 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.8   Mon Mar 14 10:15:22 GMT 2005
+    - Applied ketas' DCC patch, eventually.
+    - Applied a patch from Zsolt Szalai, which adds support
+      for Freenode's 320 whois response.
+    - Added Apocalypse's port of IRC-State.pm using the plugin
+      API, Plugin-State.pm.
+    - Added my plugin for 'irc_whois' and 'irc_whowas' 
+      functionality.
+    - Fixed all the necessary modules to use Whois plugin.
+
 3.7   Fri Mar 04 17:37:34 GMT 2005
     - Applied massive patch from Apocalypse @ MAGnet that
       adds plugins. Read the docs in Plugins.pm for more info.

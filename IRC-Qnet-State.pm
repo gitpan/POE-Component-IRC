@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet-State.pm,v 3.8 2005/03/04 17:37:21 chris Exp $
+# $Id: IRC-Qnet-State.pm,v 3.10 2005/03/14 10:16:23 chris Exp $
 #
 # POE::Component::IRC::Qnet::State, by Chris Williams
 #
@@ -11,7 +11,7 @@ package POE::Component::IRC::Qnet::State;
 
 use strict;
 use Carp;
-use POE;
+use POE qw(Component::IRC::Plugin::Whois);
 use vars qw($VERSION);
 use base qw(POE::Component::IRC::Qnet POE::Component::IRC::State);
 
@@ -58,6 +58,9 @@ sub _create {
     POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
   }
 
+  # Plugin 'irc_whois' and 'irc_whowas' support
+  $self->plugin_add ( 'Whois', POE::Component::IRC::Plugin::Whois->new() );
+
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
     'restart'   => [ PRI_HIGH,   'noargs',        ],
@@ -100,7 +103,7 @@ sub _create {
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
   };
 
-  $self->{IRC_EVTS} = [ qw(ping join part kick nick mode quit 354 324 315 311 312 313 317 319 318 314 330 369) ];
+  $self->{IRC_EVTS} = [ qw(001 ping join part kick nick mode quit 354 324 315 ) ];
 
   my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
 
