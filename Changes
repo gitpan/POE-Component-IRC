@@ -1,6 +1,12 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+2.1   Mon Mar  4 17:06:03 PST 2002
+    - Added a long-buried patch from thefly to fix IRCnet channel name
+      parsing. Sorry about the long turnaround on that one.
+    - Applied Scott Beck's patch to Rocco's refcount patch. The whole
+      "sessions not being GCed" brain-damage should be fixed now.
+
 2.0   Fri Feb 22 15:23:23 PST 2002
     - Rocco Caputo gave me two patches to apply; the first was a fix to
       his earlier output throttling patch, and the second was a snippet

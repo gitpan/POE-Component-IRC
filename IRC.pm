@@ -28,7 +28,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '2.0';
+$VERSION = '2.1';
 
 
 # What happens when an attempted DCC connection fails.
@@ -761,8 +761,8 @@ sub privandnotice {
 
 # Ask P::C::IRC to send you certain events, listed in @events.
 sub register {
-  my ($kernel, $heap, $sender, @events) =
-    @_[KERNEL,  HEAP,  SENDER, ARG0 .. $#_];
+  my ($kernel, $heap, $session, $sender, @events) =
+    @_[KERNEL, HEAP, SESSION, SENDER, ARG0 .. $#_];
 
   die "Not enough arguments" unless @events;
 
@@ -772,7 +772,7 @@ sub register {
     $_ = "irc_" . $_ unless /^_/;
     $heap->{events}->{$_}->{$sender} = $sender;
     $heap->{sessions}->{$sender}->{'ref'} = $sender;
-    unless ($heap->{sessions}->{$sender}->{refcnt}++) {
+    unless ($heap->{sessions}->{$sender}->{refcnt}++ or $session == $sender) {
       $kernel->refcount_increment($sender->ID(), PCI_REFCOUNT_TAG);
     }
   }
@@ -842,8 +842,8 @@ sub topic {
 
 # Ask P::C::IRC to stop sending you certain events, listed in $evref.
 sub unregister {
-  my ($kernel, $heap, $sender, @events) =
-    @_[KERNEL,  HEAP,  SENDER,  ARG0 .. $#_];
+  my ($kernel, $heap, $session, $sender, @events) =
+    @_[KERNEL,  HEAP, SESSION,  SENDER,  ARG0 .. $#_];
 
   die "Not enough arguments" unless @events;
 
@@ -851,7 +851,9 @@ sub unregister {
     delete $heap->{events}->{$_}->{$sender};
     if (--$heap->{sessions}->{$sender}->{refcnt} <= 0) {
       delete $heap->{sessions}->{$sender};
-      $kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
+      unless ($session == $sender) {
+        $kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
+      }
     }
   }
 }

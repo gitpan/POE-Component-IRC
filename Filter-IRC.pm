@@ -50,7 +50,8 @@ sub get {
 			 args => [$1, [split /,/, $3], _decolon( $4 )] };
 
 	# Using tr/// to count characters here tickles a bug in 5.004. Suck.
-      } elsif (index( $3, '#' ) >= 0 or index( $3, '&' ) >= 0) {
+      } elsif (index( $3, '#' ) >= 0 or index( $3, '&' ) >= 0
+	       or index( $3, '+' ) >= 0) {
 	push @$events, { name => 'public',
 			 args => [$1, [split /,/, $3], _decolon( $4 )] };
 
