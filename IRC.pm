@@ -24,7 +24,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.1';
+$VERSION = '1.2';
 my $debug;
 
 
@@ -68,8 +68,6 @@ sub _dcc_read {
   my ($kernel, $heap, $data, $id) = @_[KERNEL, HEAP, ARG0, ARG1];
 
   $id = $heap->{wheelmap}->{$id};
-    use Data::Dumper;
-    warn "LIKMI: ", Dumper( $heap->{dcc}->{$id} );
 
   if ($heap->{dcc}->{$id}->{type} eq "GET") {
 

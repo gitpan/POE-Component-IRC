@@ -16,8 +16,8 @@ use POE::Component::IRC;
 
 my $mynick = "moo";
 my $user = "(fimm(tiu)?|(Half|Semi)jack|stimps)";
-my $telnethost = "binky";
-my $telnetport = 7788;
+my $telnethost = "lambda.moo.mud.org";
+my $telnetport = 8888;
 
 my $chatsession = undef;
 
