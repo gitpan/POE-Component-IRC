@@ -38,7 +38,7 @@ sub get {
 
   foreach my $line (@$raw) {
     warn "<<< $line\n" if $self->{'debug'};
-    return unless $line =~ /\S/;
+    next unless $line =~ /\S/;
 
     if ($line =~ /^PING (.+)$/) {
       push @$events, { name => 'ping', args => [$1] };

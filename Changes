@@ -1,6 +1,12 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+2.4   Thu Oct 10 14:22:04 PDT 2002
+    - Added a patch from dngor to fix a crash caused by IRC servers
+      sometimes inexplicably sending a blank line.
+    - Added a patch from Jim Westfall which speeds up DCC file transfers
+      by a couple orders of magnitude. Yay, Jim!
+
 2.3   Fri Sep  6 07:59:50 PDT 2002
     - Fixed a rare "uninitialized value" warning in oneoptarg().
     - Added a patch from Trym Skaar which makes sure that DCC buffers

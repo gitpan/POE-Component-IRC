@@ -44,8 +44,8 @@ sub _connected {
       Handle => $sock,
       Filter => POE::Filter::Line->new(),
       Driver => POE::Driver::SysRW->new(),
-      InputState => '_conn_data',
-      ErrorState => '_conn_error',
+      InputEvent => '_conn_data',
+      ErrorEvent => '_conn_error',
   );
 
   $kernel->post( 'irc', 'dcc_chat', $chatsession, "*** Connected." );
@@ -129,8 +129,8 @@ sub irc_dcc_start {
   $heap->{factory} = POE::Wheel::SocketFactory->new(
       RemoteAddress => $telnethost,
       RemotePort    => $telnetport,
-      SuccessState  => '_connected',
-      FailureState  => '_connect_failed',
+      SuccessEvent  => '_connected',
+      FailureEvent  => '_connect_failed',
   );
 }
 

@@ -28,7 +28,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '2.3';
+$VERSION = '2.4';
 
 
 # What happens when an attempted DCC connection fails.
@@ -145,7 +145,9 @@ sub _dcc_up {
   $heap->{dcc}->{$id}->{open} = 1;
   $heap->{dcc}->{$id}->{wheel} = POE::Wheel::ReadWrite->new(
       Handle => $sock,
-      Driver => POE::Driver::SysRW->new(),
+      Driver => ($heap->{dcc}->{$id}->{type} eq "GET" ?
+		   POE::Driver::SysRW->new( BlockSize => INCOMING_BLOCKSIZE ) :
+		   POE::Driver::SysRW->new() ),
       Filter => ($heap->{dcc}->{$id}->{type} eq "CHAT" ?
                      POE::Filter::Line->new( Literal => "\012" ) :
 		     POE::Filter::Stream->new() ),
