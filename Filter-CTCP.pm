@@ -1,4 +1,4 @@
-# $Id: Filter-CTCP.pm,v 1.3 1999/12/12 11:48:07 dennis Exp $
+# $Id: Filter-CTCP.pm,v 1.1.1.1 2004/12/22 19:10:57 chris Exp $
 #
 # POE::Filter::CTCP, by Dennis Taylor <dennis@funkplanet.com>
 #

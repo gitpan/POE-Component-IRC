@@ -1,4 +1,4 @@
-POE::Component::IRC 2.7 README                   Sun Feb  2 15:05:28 PST 2003
+POE::Component::IRC 3.0 README                   Mon Dec 27 12:42:58 GMT 2004
 =============================================================================
 
 Table of Contents
@@ -29,9 +29,9 @@ and over until it makes some sense.
 ---------------
 
 The latest stable version of POE::Component::IRC will be available on
-CPAN, in the directory /authors/id/FIMM/ . A more complete mirror,
-wihch includes recent alpha or beta releases, can be found at
-http://www.funkplanet.com/POE/ .
+CPAN, in the directory /authors/id/B/BI/BINGOS/ . A more complete mirror,
+which includes recent alpha or beta releases, can be found at
+http://www.gumbynet.org.uk/poe/ .
 
 
 3. PREREQUISITES
@@ -94,6 +94,9 @@ came with your Perl distribution for details.
 
 8. DEVELOPER INFORMATION
 ------------------------
+
+	Current maintainer Chris "BinGOs" Williams
+			   <chris@bingosnet.co.uk>
 
 	POE::Component::IRC was conceived and written by Dennis "fimmtiu"
 Taylor, with piles of ideas and advice donated by Rocco "dngor"

@@ -1,5 +1,22 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.0   Fri Dec 31 09:00:01 GMT 2004
+    - Fixed Filter-IRC so that it groks WALLOPS properly.
+    - Added docs/ and populated it with rfcs applicable to IRC.
+    - Added a slightly more substantial test case, moved it to t/
+    - Converted use of HEAP to OBJECT. PoCo-IRC is *now* an object.
+    - Added a fix for the infamous PART bug. Has to be explicitly enabled
+      by specifying PartFix => 1 in the 'connect' handler.
+    - Added a switch to 'connect' so that the use of PoCo::Client::DNS
+      can be disabled if necessary.
+    - Applied the outstanding patches:
+	- PoCo::Client::DNS patch by Jim Westfall
+	- DCC Resume patch by Bruno Boettcher
+	- Flood doc patch by Rocco Caputo
+	- Debug param patch by Paul Visscher
+	- Proxy Support patch by Jeff Pinyan
+	- Locops patch by Jon Nistor
+
 2.9   Sat Jul 19 13:32:45 PDT 2003
     - Only one change this time: Adam Foxson's patch to add prioritized
       notices.

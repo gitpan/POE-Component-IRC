@@ -1,4 +1,4 @@
-# $Id: Filter-IRC.pm,v 1.3 1999/12/12 11:48:07 dennis Exp $
+# $Id: Filter-IRC.pm,v 1.2 2004/12/31 10:22:18 chris Exp $
 #
 # POE::Filter::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -76,6 +76,9 @@ sub get {
 
     } elsif ($line =~ /^:(\S+) +INVITE +\S+ +(.+)$/) {
       push @$events, { name => 'invite', args => [$1, _decolon( $2 )] };
+
+    } elsif ($line =~ /^:(\S+) +WALLOPS +(.+)$/) {
+      push @$events, { name => 'wallops', args => [$1, _decolon( $2 )] };
 
       # NICK, QUIT, JOIN, PART, possibly more?
     } elsif ($line =~ /^:(\S+) +(\S+) +(.+)$/) {

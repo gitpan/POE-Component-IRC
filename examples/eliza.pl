@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Id$
+# $Id: eliza.pl,v 1.1.1.1 2004/12/22 19:10:57 chris Exp $
 #
 # This is an adaption of Dennis Taylor's test.pl.  It combines a very
 # simple bot with Chatbot::Eliza to make something fairly annoying.
