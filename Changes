@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.9   Mon Mar 21 09:17:05 GMT 2005
+    - Applied patches from webfox @ MAGnet for UnrealIRCd
+      support in IRC-State.pm and Plugin-State.pm.
+    - Added plugin_list().
+
 3.8   Mon Mar 14 10:15:22 GMT 2005
     - Applied ketas' DCC patch, eventually.
     - Applied a patch from Zsolt Szalai, which adds support

@@ -1,4 +1,4 @@
-# $Id: IRC-State.pm,v 3.10 2005/03/14 10:16:24 chris Exp $
+# $Id: IRC-State.pm,v 3.11 2005/03/19 13:47:54 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -302,9 +302,9 @@ sub irc_mode {
      my ($parsed_mode) = parse_mode_line( @_[ARG2 .. $#_] );
      while ( my $mode = shift ( @{ $parsed_mode->{modes} } ) ) {
         my ($arg);
-        $arg = shift ( @{ $parsed_mode->{args} } ) if ( $mode =~ /^(\+[hovklbIe]|-[hovbIe])/ );
+        $arg = shift ( @{ $parsed_mode->{args} } ) if ( $mode =~ /^(\+[hovklbIeaqfL]|-[hovbIeaq])/ );
         SWITCH: {
-          if ( $mode =~ /\+([ohv])/ ) {
+          if ( $mode =~ /\+([ohvaq])/ ) {
                 my ($flag) = $1;
                 unless ($self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } =~ /$flag/) {
                       $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } .= $flag;
@@ -312,7 +312,7 @@ sub irc_mode {
                 }
                 last SWITCH;
           }
-          if ( $mode =~ /-([ohv])/ ) {
+          if ( $mode =~ /-([ohvaq])/ ) {
                 my ($flag) = $1;
                 if ($self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } =~ /$flag/) {
                       $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } =~ s/$flag//;
@@ -320,7 +320,7 @@ sub irc_mode {
                 }
                 last SWITCH;
           }
-          if ( $mode =~ /[bIe]/ ) {
+          if ( $mode =~ /[bIefL]/ ) {
                 last SWITCH;
           }
           if ( $mode eq '+l' and defined ( $arg ) ) {
@@ -783,6 +783,28 @@ sub is_channel_halfop {
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'h') ) {
 	return 0;
+  }
+  return 1;
+}
+
+sub is_channel_owner {
+  my ($self) = shift;
+  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my ($nick) = u_irc ( $_[1] ) || return 0;
+
+  unless ( $self->_nick_has_channel_mode($channel,$nick,'q') ) {
+        return 0;
+  }
+  return 1;
+}
+
+sub is_channel_admin {
+  my ($self) = shift;
+  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my ($nick) = u_irc ( $_[1] ) || return 0;
+
+  unless ( $self->_nick_has_channel_mode($channel,$nick,'a') ) {
+        return 0;
   }
   return 1;
 }

@@ -193,16 +193,16 @@ sub S_mode {
 	if ( $uchannel ne u_irc( $irc->nick_name() ) ) {
 		my $parsed_mode = parse_mode_line( @modeline );
 		while ( my $mode = shift ( @{ $parsed_mode->{modes} } ) ) {
-			my $arg = shift ( @{ $parsed_mode->{args} } ) if ( $mode =~ /^(\+[hovklbIe]|-[hovbIe])/ );
+			my $arg = shift ( @{ $parsed_mode->{args} } ) if ( $mode =~ /^(\+[hovklbIeaqfL]|-[hovbeIaq])/ );
 
 			# Stupidly long pseudo-switch
-			if ( $mode =~ /\+([ohv])/ ) {
+			if ( $mode =~ /\+([ohvaq])/ ) {
 				my $flag = $1;
 				unless ( $self->{Nicks}->{ u_irc( $arg ) }->{CHANS}->{ $uchannel } =~ /$flag/ ) {
 				      $self->{Nicks}->{ u_irc( $arg ) }->{CHANS}->{ $uchannel } .= $flag;
 				      $self->{Chans}->{ $uchannel }->{Nicks}->{ u_irc( $arg ) } = $self->{Nicks}->{ u_irc( $arg ) }->{CHANS}->{ $uchannel };
 				}
-			} elsif ( $mode =~ /-([ohv])/ ) {
+			} elsif ( $mode =~ /-([ohvaq])/ ) {
 				my $flag = $1;
 				if ( $self->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ $uchannel } =~ /$flag/ ) {
 				      $self->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ $uchannel } =~ s/$flag//;
@@ -216,7 +216,7 @@ sub S_mode {
 				if ( exists $self->{Chans}->{ $uchannel }->{BanList}->{ $arg } ) {
 					delete $self->{Chans}->{ $uchannel }->{BanList}->{ $arg };
 				}
-			} elsif ( $mode =~ /[Ie]/ ) {
+			} elsif ( $mode =~ /[IefL]/ ) {
 				# Do nothing?
 			} elsif ( $mode eq '+l' and defined ( $arg ) ) {
 				$self->{Chans}->{ $uchannel }->{Mode} .= 'l' unless ( $self->{Chans}->{ $uchannel }->{Mode} =~ /l/ );
@@ -597,6 +597,28 @@ sub is_channel_halfop {
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'h') ) {
 	return 0;
+  }
+  return 1;
+}
+
+sub is_channel_owner {
+  my ($self) = shift;
+  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my ($nick) = u_irc ( $_[1] ) || return 0;
+
+  unless ( $self->_nick_has_channel_mode($channel,$nick,'q') ) {
+        return 0;
+  }
+  return 1;
+}
+
+sub is_channel_admin {
+  my ($self) = shift;
+  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my ($nick) = u_irc ( $_[1] ) || return 0;
+
+  unless ( $self->_nick_has_channel_mode($channel,$nick,'a') ) {
+        return 0;
   }
   return 1;
 }

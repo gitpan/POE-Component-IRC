@@ -120,6 +120,12 @@ The general architecture of using the plugins should be:
 	# OOPS, we lost the plugin object!
 	my $pluginobj = $irc->plugin_get( 'ExamplePlugin' );
 
+	# We want a list of plugins and objects
+	my $hashref = $irc->plugin_list();
+
+	# Oh! We want a list of plugin aliases.
+	my @aliases = keys %{ $irc->plugin_list() };
+
 	# Ah, we want to remove the plugin
 	$plugin = $irc->plugin_del( 'ExamplePlugin' );
 
@@ -199,6 +205,13 @@ limited only by imagination and the IRC RFC's ;)
 	This method will call $plugin->PCI_unregister( $irc )
 
 	Returns the plugin object if the plugin was removed, undef if not.
+
+=head2 plugin_list
+
+	Has no arguments.
+
+	Returns a hashref of plugin objects, keyed on alias, or an empty list if there are no
+	plugins loaded.
 
 =head2 plugin_register
 

@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 3.12 2005/03/14 10:16:24 chris Exp $
+# $Id: IRC.pm,v 3.14 2005/03/21 09:17:50 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -50,8 +50,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '3.8';
-$REVISION = do {my@r=(q$Revision: 3.12 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '3.9';
+$REVISION = do {my@r=(q$Revision: 3.14 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -1659,6 +1659,17 @@ sub plugin_get {
 	} else {
 		return undef;
 	}
+}
+
+# Lists loaded plugins
+sub plugin_list {
+	my ($self) = shift;
+	my $return = { };
+
+	foreach my $name ( keys %{ $self->{PLUGINS}->{OBJECTS} } ) {
+		$return->{ $name } = $self->{PLUGINS}->{OBJECTS}->{ $name };
+	}
+	return $return;
 }
 
 # Lets a plugin register for certain events
