@@ -6,6 +6,7 @@ IRC.pm
 IRC-State.pm
 IRC-Qnet.pm
 IRC-Qnet-State.pm
+Plugin.pm
 MANIFEST
 Makefile.PL
 README

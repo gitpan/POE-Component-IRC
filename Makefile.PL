@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 3.5 2005/02/19 13:26:45 chris Exp $
+# $Id: Makefile.PL,v 3.6 2005/03/04 17:37:22 chris Exp $
 
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
@@ -12,6 +12,7 @@ WriteMakefile(
 							 'IRC-Qnet-State.pm' => '$(INST_LIBDIR)/IRC/Qnet/State.pm',
 							 'Filter-IRC.pm' => '$(INST_LIBDIR)/../Filter/IRC.pm',
 							 'Filter-CTCP.pm' => '$(INST_LIBDIR)/../Filter/CTCP.pm',
+							 'Plugin.pm' => '$(INST_LIBDIR)/IRC/Plugin.pm',
 						   },
 			  'PREREQ_PM' => {
 							  'POE'    => 0.06_07,

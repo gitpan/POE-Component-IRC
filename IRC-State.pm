@@ -1,4 +1,4 @@
-# $Id: IRC-State.pm,v 3.7 2005/03/01 17:43:16 chris Exp $
+# $Id: IRC-State.pm,v 3.8 2005/03/04 17:37:21 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -142,6 +142,39 @@ sub _create {
   $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close' };
 
   return $self;
+}
+
+# Parse a message from the IRC server and generate the appropriate
+# event(s) for listening sessions.
+sub _parseline {
+  my ($session, $self, $line) = @_[SESSION, OBJECT, ARG0];
+  my (@events, @cooked);
+
+  # Feed the proper Filter object the raw IRC text and get the
+  # "cooked" events back for sending, then deliver each event. We
+  # handle CTCPs separately from normal IRC messages here, to avoid
+  # silly module dependencies later.
+
+  @cooked = ($line =~ tr/\001// ? @{$self->{ctcp_filter}->get( [$line] )}
+             : @{$self->{irc_filter}->get( [$line] )} );
+
+  foreach my $ev (@cooked) {
+    if ( $ev->{name} eq 'part' and not $self->{'dont_partfix'} ) {
+        (@{$ev->{args}}[1..2]) = split(/ /,$ev->{args}->[1],2);
+        $ev->{args}->[2] =~ s/^:// if ( defined ( $ev->{args}->[2] ) );
+    }
+    # If its 001 event grab the server name and stuff it into {INFO}
+    if ( $ev->{name} eq '001' ) {
+        $self->{INFO}->{ServerName} = $ev->{args}->[0];
+        # Kind of assuming that $line is a single line of IRC protocol.
+        $self->{RealNick} = ( split / /, $line )[2];
+    }
+    if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
+	push ( @{$ev->{args}}, [ $self->nick_channels( ( split /!/, $ev->{args}->[0] )[0] ) ] );
+    }
+    $ev->{name} = 'irc_' . $ev->{name};
+    $self->_send_event( $ev->{name}, @{$ev->{args}} );
+  }
 }
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
@@ -362,11 +395,11 @@ sub irc_315 {
     $self->_channel_sync_who($channel);
     if ( $self->_channel_sync($channel) ) {
 	delete ( $self->{CHANNEL_SYNCH}->{ u_irc ( $channel ) } );
-	$self->_send_event( $kernel, 'irc_chan_sync', $channel );
+	$self->_send_event( 'irc_chan_sync', $channel );
     }
   # Otherwise we assume its a nickname
   } else {
-	$self->_send_event( $kernel, 'irc_nick_sync', $channel );
+	$self->_send_event( 'irc_nick_sync', $channel );
   }
 }
 
@@ -395,7 +428,7 @@ sub irc_324 {
   $self->_channel_sync_mode($channel);
   if ( $self->_channel_sync($channel) ) {
 	delete ( $self->{CHANNEL_SYNCH}->{ u_irc ( $channel ) } );
-	$self->_send_event( $kernel, 'irc_chan_sync', $channel );
+	$self->_send_event( 'irc_chan_sync', $channel );
   }
 }
 
@@ -898,6 +931,21 @@ Sent whenever the component has completed synchronising a channel that it has jo
 
 Sent whenever the component has completed synchronising a user who has joined a channel the component is on.
 ARG0 is the user's nickname.
+
+=back
+
+The following two 'irc_*' events are the same as their L<POE::Component::IRC|POE::Component::IRC> counterparts,
+with the additional parameters:
+
+=over
+
+=item irc_quit
+
+ARG2 contains an arrayref of channel names that are common to the quitting client and the component.
+
+=item irc_nick
+
+ARG2 contains an arrayref of channel names that are common to the nick changing client and the component.
 
 =back
 

@@ -1,5 +1,13 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.7   Fri Mar 04 17:37:34 GMT 2005
+    - Applied massive patch from Apocalypse @ MAGnet that
+      adds plugins. Read the docs in Plugins.pm for more info.
+    - Corrected some grammar mistakes in Plugins.pm >:o)
+    - Amended IRC-State.pm so that 'irc_nick' and 'irc_quit'
+      have an additional parameter in ARG2 which is an 
+      arrayref of channels that are common with the component.
+
 3.6   Tue Mar 01 17:47:05 GMT 2005 "Y Adeilad Daffydd-Sant" 
 				   ( The Saint David Build(ing) )
     - Applied ketas' patch to IRC-State. Adds channel_modes
