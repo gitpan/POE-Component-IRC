@@ -40,18 +40,36 @@ sub debug {
 # appropriate CTCP and normal message events.
 sub get {
   my ($self, $lineref) = @_;
-  my ($who, $where, $ctcp, $text);
+  my ($who, $type, $where, $ctcp, $text, $name, $args);
   my $events = [];
   
   foreach my $line (@$lineref) {
-    ($who, $where, $ctcp, $text) = _ctcp_dequote( $line );
+    ($who, $type, $where, $ctcp, $text) = _ctcp_dequote( $line );
     
     foreach (@$ctcp) {
-      /^(\w+)(?: (.*))?/;
-      push @$events, { name => 'ctcp_' . lc $1,
-		       args => [ $who, [split /,/, $where],
-				 (defined $2 ? $2 : '') ]
-		     };
+      ($name, $args) = $_ =~ /^(\w+)(?: (.*))?/
+	or die "Badly formed CTCP message: \"$_\"";
+      if (lc $name eq 'dcc') {
+	$args =~ /^(\w+) (\S+) (\d+) (\d+)(?: (\d+))?$/
+	  or die "Badly formed DCC request: \"$_\"";
+	push @$events, { name => 'dcc_request',
+			 args => [ $who, uc $1, $4, { open => undef,
+						      nick => $who,
+						      type => uc $1,
+						      file => $2,
+						      size => $5,
+						      done => 0,
+						      addr => $3,
+						      port => $4,
+						    }, $2, $5 ]
+		       };
+
+      } else {
+	push @$events, { name => $type . '_' . lc $name,
+			 args => [ $who, [split /,/, $where],
+				   (defined $args ? $args : '') ]
+		       };
+      }
     }
     
     if ($text and @$text > 0) {
@@ -109,7 +127,7 @@ sub _low_dequote {
     die "Not enough arguments to POE::Filter::CTCP->_low_dequote";
   }
   
-  # Thanks to Abigail (abigail@arena-i.com) for this clever bit.
+  # Thanks to Abigail (abigail@foad.org) for this clever bit.
   if ($line =~ tr/\cP//) {	# dequote \n, \r, ^P, and \0.
     $line =~ s/\cP([nr0\cP])/$dequote{$1}/g;
   }
@@ -135,23 +153,25 @@ sub _ctcp_quote {
 # used with permission. ;-)
 sub _ctcp_dequote {
   my $line = shift;
-  my (@chunks, $ctcp, $text, $who, $where, $msg);    # CHUNG! CHUNG! CHUNG!
-  
+  my (@chunks, $ctcp, $text, $who, $type, $where, $msg);
+
+  # CHUNG! CHUNG! CHUNG!
+
   unless (defined $line) {
     die "Not enough arguments to POE::Filter::CTCP->_ctcp_dequote";
   }
   
   # Strip out any low-level quoting in the text.
   $line = _low_dequote( $line );
-  
-  # Filter misplaced \001s before processing... (Thanks, Tom!)
+
+  # Filter misplaced \001s before processing... (Thanks, tchrist!)
   substr($line, rindex($line, "\001"), 1) = '\\a'
     unless ($line =~ tr/\001//) % 2 == 0;
   
   return unless $line =~ tr/\001//;
   
-  ($who, $where, $msg) = ($line =~ /^:(\S+) +\w+ +(\S+) +:?(.*)$/)
-    or return (undef, undef);
+  ($who, $type, $where, $msg) = ($line =~ /^:(\S+) +(\w+) +(\S+) +:?(.*)$/)
+    or return;
   @chunks = split /\001/, $msg;
   shift @chunks unless length $chunks[0]; # FIXME: Is this safe?
   
@@ -174,8 +194,15 @@ sub _ctcp_dequote {
     push @$text, shift @chunks;
     push @$ctcp, shift @chunks if @chunks;
   }
+
+  # Is this a CTCP request or reply?
+  if ($type eq 'PRIVMSG') {
+    $type = 'ctcp';
+  } else {
+    $type = 'ctcpreply';
+  }
   
-  return ($who, $where, $ctcp, $text);
+  return ($who, $type, $where, $ctcp, $text);
 }
 
 

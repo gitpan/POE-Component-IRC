@@ -1,8 +1,14 @@
 #!/usr/bin/perl -w
+#
+# A simple example of a bot that listens for and responds to on-channel
+# user input. You can say "roll 2d12 + 2" or whatever, and it'll roll
+# the appropriate number and type of dice and speak the result out loud.
+#
+# -- dennis taylor, <dennis@funkplanet.com>
 
 use strict;
-use POE::Kernel;
-use POE::Session;
+use Tk;
+use POE;
 use POE::Component::IRC;
 
 my $nick = 'dicebot';

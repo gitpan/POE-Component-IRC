@@ -6,4 +6,6 @@ MANIFEST
 Makefile.PL
 test.pl
 README
-dicebot.pl
+examples/dicebot.pl
+examples/moo.pl
+examples/dcctest.pl

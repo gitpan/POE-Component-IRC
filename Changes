@@ -1,6 +1,21 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+1.0   Wed Feb 21 15:09:56 PST 2001
+    - Split 'irc_ctcp' messages into 'irc_ctcp' and 'irc_ctcpreply'.
+      My thanks to Jonathan Steinert.
+    - Rocco "dngor" Caputo fixed up my DCC code for me, which was so
+      broken as to exercise POE::Kernel bugs. :-) With his fixes in
+      mind, I rewrote pretty much all the DCC stuff; it's much less
+      hairy now.
+    - Added 'dcc_chat' and 'dcc_accept' commands.
+    - Moved all scripts into the "examples" directory and added a dummy
+      test.pl, so it won't hang during CPAN installations anymore.
+    - Worked around a bug in POE versions <0.1201, which caused DCC
+      SEND/GET connections not to properly respond to pending data.
+    - DCC connections should function properly now. Let me know if you
+      experience problems.
+
 1.0b  Sat Jan 13 14:49:22 PST 2001
     - This is a beta release. It may not entirely work, and DCC receive
       is still unimplemented. I'll list the bugs I remember fixing below.
