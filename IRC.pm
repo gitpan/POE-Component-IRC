@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.25 2005/02/18 12:35:31 chris Exp $
+# $Id: IRC.pm,v 3.6 2005/02/23 13:15:36 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -46,8 +46,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '3.4';
-$REVISION = do {my@r=(q$Revision: 1.25 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '3.5';
+$REVISION = do {my@r=(q$Revision: 3.6 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -201,6 +201,7 @@ sub _configure {
     $self->{'username'} = $arg{'Username'} if exists $arg{'Username'};
     $self->{'NoDNS'} = $arg{'NoDNS'} if exists $arg{'NoDNS'};
     $self->{'nat_addr'} = $arg{'NATAddr'} if exists $arg{'NATAddr'};
+    $self->{'user_bitmode'} = $arg{'BitMode'} if exists $arg{'BitMode'};
     if (exists $arg{'Debug'}) {
       $self->{'debug'} = $arg{'Debug'};
       $self->{irc_filter}->debug( $arg{'Debug'} );
@@ -208,28 +209,8 @@ sub _configure {
     }
     my ($dccport) = delete ( $arg{'DCCPorts'} );
 
-    if ( defined ( $dccport ) ) {
-	my (@values) = split(/,/,$dccport);
-	my (@ports);
-
-	if ( ref $dccport eq 'SCALAR' ) {
-	 foreach ( @values ) {
-  	  next if ( $_ !~ /[0-9\-]+/ );
-  	  SWITCH: {
-        	if ( /\-/ ) {
-          	  my (@range) = split(/\-/);
-                  push(@ports,$range[0] .. $range[1]);
-          	  last SWITCH;
-        	}
-        	push(@ports,$_);
-  	  }
-	 }
-	} elsif ( ref $dccport eq 'ARRAY' ) {
-		@ports = @{ $dccport };
-	}
-	if ( scalar @ports > 0 ) {
-	  $self->{dcc_bind_port} = \@ports;
-	}
+    if ( defined ( $dccport ) and ref $dccport eq 'ARRAY' ) {
+	  $self->{dcc_bind_port} = $dccport;
     }
 
     # This is a hack to make sure that the component doesn't die if no IRCServer is 
@@ -268,36 +249,54 @@ sub _dcc_failed {
     if (exists $self->{wheelmap}->{$id}) {
       $id = $self->{wheelmap}->{$id};
     } else {
-      die "Unknown wheel ID: $id";
+      warn "_dcc_failed: Unknown wheel ID: $id";
+      return;
     }
   }
 
   # Reclaim our port if necessary.
-  if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} ) {
-	push ( @{ $self->{dcc_bind_port} }, $self->{dcc}->{$id}->{port} );
+  if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} and $self->{dcc}->{$id}->{listenport} ) {
+	push ( @{ $self->{dcc_bind_port} }, $self->{dcc}->{$id}->{listenport} );
   }
 
   # Did the peer of a DCC GET connection close the socket after the file
   # transfer finished? If so, it's not really an error.
-  if ($errnum == 0 and $self->{dcc}->{$id}->{type} eq "GET" and
-      $self->{dcc}->{$id}->{done} >= $self->{dcc}->{$id}->{size}) {
+  if ($errnum == 0 and
+  $self->{dcc}->{$id}->{type} eq "GET" and
+  $self->{dcc}->{$id}->{done} >= $self->{dcc}->{$id}->{size}) {
     $self->_send_event( $kernel, 'irc_dcc_done', $id,
-		 @{$self->{dcc}->{$id}}{ qw(nick type port file size done) } );
+    @{$self->{dcc}->{$id}}{ qw(nick type port file size done listenport clientaddr) } );
     close $self->{dcc}->{$id}->{fh};
     delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
     delete $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id};
+  }
 
-  } else {
+  elsif ($errnum == 0 and
+  $self->{dcc}->{$id}->{type} eq "CHAT") {
+    $self->_send_event( $kernel, 'irc_dcc_done', $id,
+    @{$self->{dcc}->{$id}}{ qw(nick type port file size done listenport clientaddr) } );
+    close $self->{dcc}->{$id}->{fh};
+    delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
+    delete $self->{dcc}->{$id}->{wheel};
+    delete $self->{dcc}->{$id};
+  }
+
+  else {
     # In this case, something went wrong.
     if ($errnum == 0 and $self->{dcc}->{$id}->{type} eq "GET") {
       $errstr = "Aborted by sender";
     }
     else {
-      $errstr = "$operation error $errnum: $errstr";
+      if ($errstr) {
+        $errstr = "$operation error $errnum: $errstr";
+      }
+      else {
+        $errstr = "$operation error $errnum";
+      }
     }
     $self->_send_event( $kernel, 'irc_dcc_error', $id, $errstr,
-		 @{$self->{dcc}->{$id}}{qw(nick type port file size done)} );
+		 @{$self->{dcc}->{$id}}{qw(nick type port file size done listenport clientaddr)} );
     # gotta close the file
     close $self->{dcc}->{$id}->{fh} if exists $self->{dcc}->{$id}->{fh};
     if (exists $self->{dcc}->{$id}->{wheel}) {
@@ -338,7 +337,7 @@ sub _dcc_read {
 
     # Send an event to let people know about the newly arrived data.
     $self->_send_event( $kernel, 'irc_dcc_get', $id,
-		 @{$self->{dcc}->{$id}}{ qw(nick port file size done) } );
+		 @{$self->{dcc}->{$id}}{ qw(nick port file size done listenport clientaddr) } );
 
 
   } elsif ($self->{dcc}->{$id}->{type} eq "SEND") {
@@ -346,12 +345,18 @@ sub _dcc_read {
     # Record the client's download progress.
     $self->{dcc}->{$id}->{done} = unpack "N", substr( $data, -4 );
     $self->_send_event( $kernel, 'irc_dcc_send', $id,
-		 @{$self->{dcc}->{$id}}{ qw(nick port file size done) } );
+		 @{$self->{dcc}->{$id}}{ qw(nick port file size done listenport clientaddr) } );
 
     # Are we done yet?
     if ($self->{dcc}->{$id}->{done} >= $self->{dcc}->{$id}->{size}) {
+
+      # Reclaim our port if necessary.
+      if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} and $self->{dcc}->{$id}->{listenport} ) {
+        push ( @{ $self->{dcc_bind_port} }, $self->{dcc}->{$id}->{listenport} );
+      }
+
       $self->_send_event( $kernel, 'irc_dcc_done', $id,
-		   @{$self->{dcc}->{$id}}{ qw(nick type port file size done) }
+		   @{$self->{dcc}->{$id}}{ qw(nick type port file size done listenport clientaddr) }
 		 );
       delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
       delete $self->{dcc}->{$id}->{wheel};
@@ -363,10 +368,11 @@ sub _dcc_read {
     read $self->{dcc}->{$id}->{fh}, $data, $self->{dcc}->{$id}->{blocksize};
     $self->{dcc}->{$id}->{wheel}->put( $data );
 
-  } 
+  }
+
   else {
     $self->_send_event( $kernel, 'irc_dcc_' . lc $self->{dcc}->{$id}->{type},
-		 $id, @{$self->{dcc}->{$id}}{'nick', 'port'}, $data );
+		 $id, @{$self->{dcc}->{$id}}{'nick', 'port'}, $data, @{$self->{dcc}->{$id}}{'listenport', 'clientaddr'} );
   }
 }
 
@@ -387,11 +393,13 @@ sub _dcc_timeout {
 sub _dcc_up {
   my ($kernel, $self, $sock, $addr, $port, $id) =
     @_[KERNEL, OBJECT, ARG0 .. ARG3];
+
   my $buf = '';
 
   # Monitor the new socket for incoming data and delete the listening socket.
   delete $self->{dcc}->{$id}->{factory};
   $self->{dcc}->{$id}->{addr} = $addr;
+  $self->{dcc}->{$id}->{clientaddr} = inet_ntoa($addr);
   $self->{dcc}->{$id}->{port} = $port;
   $self->{dcc}->{$id}->{open} = 1;
   #bboett: -second step - the connection per DCC is opened, following the protocol we have to send a PRIVMSG User1 :DCC RESUME filename port position 
@@ -466,7 +474,7 @@ sub _dcc_up {
   $self->_send_event( $kernel, 'irc_dcc_start',
 	       $id, @{$self->{dcc}->{$id}}{'nick', 'type', 'port'},
 	       ($self->{dcc}->{$id}->{'type'} =~ /^(SEND|GET)$/ ?
-		(@{$self->{dcc}->{$id}}{'file', 'size'}) : ()) );
+		(@{$self->{dcc}->{$id}}{'file', 'size'}) : ()), @{$self->{dcc}->{$id}}{'listenport', 'clientaddr'} );
 }
 
 
@@ -605,8 +613,8 @@ sub _sock_up {
   $kernel->call( $session, 'sl_login', "NICK " . $self->{nick} );
   $kernel->call( $session, 'sl_login', "USER " .
 		 join( ' ', $self->{username},
-		       "foo.bar.com",
-		       $self->{server},
+		       ($self->{'user_bitmode'} ? $self->{'user_bitmode'} : 0),
+		       '*',
 		       ':' . $self->{ircname} ));
 
   # If we have queued data waiting, its flush loop has stopped
@@ -750,7 +758,8 @@ sub ctcp {
   my $message = join ' ', @_[ARG1 .. $#_];
 
   unless (defined $to and defined $message) {
-    die "The POE::Component::IRC event \"$state\" requires two arguments";
+    warn "The POE::Component::IRC event \"$state\" requires two arguments";
+    return;
   }
 
   # CTCP-quote the message text.
@@ -765,12 +774,13 @@ sub ctcp {
 
 # Attempt to initiate a DCC SEND or CHAT connection with another person.
 sub dcc {
-  my ($kernel, $self, $nick, $type, $file, $blocksize) =
-    @_[KERNEL, OBJECT, ARG0 .. ARG3];
+  my ($kernel, $self, $nick, $type, $file, $blocksize, $timeout) =
+    @_[KERNEL, OBJECT, ARG0 .. ARG4];
   my ($factory, $port, $myaddr, $size);
 
   unless ($type) {
-    die "The POE::Component::IRC event \"dcc\" requires at least two arguments";
+    warn "The POE::Component::IRC event \"dcc\" requires at least two arguments";
+    return;
   }
 
   $type = uc $type;
@@ -779,7 +789,8 @@ sub dcc {
 
   } elsif ($type eq 'SEND') {
     unless ($file) {
-      die "The POE::Component::IRC event \"dcc\" requires three arguments for a SEND";
+      warn "The POE::Component::IRC event \"dcc\" requires three arguments for a SEND";
+      return;
     }
     $size = (stat $file)[7];
     unless (defined $size) {
@@ -808,7 +819,10 @@ sub dcc {
   );
   ($port, $myaddr) = unpack_sockaddr_in( $factory->getsockname() );
   $myaddr = $self->{nat_addr} || $self->{localaddr} || inet_aton(hostname() || 'localhost');
-  die "Can't determine our IP address! ($!)" unless $myaddr;
+  unless ($myaddr) {
+    warn "dcc: Can't determine our IP address! ($!)";
+    return;
+  }
   $myaddr = unpack "N", $myaddr;
 
   # Tell the other end that we're waiting for them to connect.
@@ -830,8 +844,11 @@ sub dcc {
 				   blocksize => ($blocksize || BLOCKSIZE),
 				   listener => 1,
 				   factory => $factory,
+
+				   listenport => $bindport,
+				   clientaddr => $myaddr,
 				 };
-  $kernel->alarm( '_dcc_timeout', time() + DCC_TIMEOUT, $factory->ID );
+  $kernel->alarm( '_dcc_timeout', time() + ($timeout || DCC_TIMEOUT), $factory->ID );
 }
 
 
@@ -900,10 +917,18 @@ sub dcc_resume
 sub dcc_chat {
   my ($kernel, $self, $id, @data) = @_[KERNEL, OBJECT, ARG0, ARG1 .. $#_];
 
-  die "Unknown wheel ID: $id" unless exists $self->{dcc}->{$id};
-  die "No DCC wheel for $id!" unless exists $self->{dcc}->{$id}->{wheel};
-  die "$id isn't a DCC CHAT connection!"
-    unless $self->{dcc}->{$id}->{type} eq "CHAT";
+  unless (exists $self->{dcc}->{$id}) {
+    warn "dcc_chat: Unknown wheel ID: $id";
+    return;
+  }
+  unless (exists $self->{dcc}->{$id}->{wheel}) {
+    warn "dcc_chat: No DCC wheel for $id!";
+    return;
+  }
+  unless ($self->{dcc}->{$id}->{type} eq "CHAT") {
+    warn "dcc_chat: $id isn't a DCC CHAT connection!";
+    return;
+  }
 
   $self->{dcc}->{$id}->{wheel}->put( join "\n", @data );
 }
@@ -911,19 +936,21 @@ sub dcc_chat {
 
 # Terminate a DCC connection manually.
 sub dcc_close {
-  my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
+  my ($kernel, $self, $id, $arg1) = @_[KERNEL, OBJECT, ARG0, ARG1];
 
+if ($arg1 eq 'called_twice' && $self->{dcc}->{$id}->{type} eq 'CHAT') {
   $self->_send_event( $kernel, 'irc_dcc_done', $id,
-	       @{$self->{dcc}->{$id}}{ qw(nick type port file size done) } );
+	       @{$self->{dcc}->{$id}}{ qw(nick type port file size done listenport clientaddr) } );
+}
 
   if ($self->{dcc}->{$id}->{wheel}->get_driver_out_octets()) {
-    $kernel->delay( _tryclose => .2 => @_[ARG0..$#_] );
+    $kernel->delay( _tryclose => .2 => @_[ARG0..$#_] => 'called_twice');
     return;
   }
 
   # Reclaim our port if necessary.
-  if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} ) {
-	push ( @{ $self->{dcc_bind_port} }, $self->{dcc}->{$id}->{port} );
+  if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} and $self->{dcc}->{$id}->{listenport} ) {
+	push ( @{ $self->{dcc_bind_port} }, $self->{dcc}->{$id}->{listenport} );
   }
 
   if (exists $self->{dcc}->{$id}->{wheel}) {
@@ -940,7 +967,10 @@ sub ison {
   my ($kernel, @nicks) = @_[KERNEL, ARG0 .. $#_];
   my $tmp = "ISON";
 
-  die "No nicknames passed to POE::Component::IRC::ison" unless @nicks;
+  unless (@nicks) {
+    warn "No nicknames passed to POE::Component::IRC::ison";
+    return;
+  }
 
   # We can pass as many nicks as we want, as long as it's shorter than
   # the maximum command length (510). If the list we get is too long,
@@ -963,7 +993,8 @@ sub kick {
   my $message = join '', @_[ARG2 .. $#_];
 
   unless (defined $chan and defined $nick) {
-    die "The POE::Component::IRC event \"kick\" requires at least two arguments";
+    warn "The POE::Component::IRC event \"kick\" requires at least two arguments";
+    return;
   }
 
   $nick .= " :$message" if defined $message;
@@ -1017,7 +1048,8 @@ sub noargs {
   my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
   if (defined $arg) {
-    die "The POE::Component::IRC event \"$state\" takes no arguments";
+    warn "The POE::Component::IRC event \"$state\" takes no arguments";
+    return;
   }
   $kernel->yield( 'sl_prioritized', $pri, $state );
 }
@@ -1060,7 +1092,8 @@ sub oneortwo {
   my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
   unless (defined $one) {
-    die "The POE::Component::IRC event \"$state\" requires at least one argument";
+    warn "The POE::Component::IRC event \"$state\" requires at least one argument";
+    return;
   }
 
   $state = uc( $state ) . " $one";
@@ -1076,7 +1109,8 @@ sub onlyonearg {
   my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
   unless (defined $arg) {
-    die "The POE::Component::IRC event \"$state\" requires one argument";
+    warn "The POE::Component::IRC event \"$state\" requires one argument";
+    return;
   }
 
   $state = uc $state;
@@ -1093,7 +1127,8 @@ sub onlytwoargs {
   my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
   unless (defined $one and defined $two) {
-    die "The POE::Component::IRC event \"$state\" requires two arguments";
+    warn "The POE::Component::IRC event \"$state\" requires two arguments";
+    return;
   }
 
   $state = uc $state;
@@ -1115,7 +1150,8 @@ sub privandnotice {
   $state =~ s/noticehi/notice/;
 
   unless (defined $to and defined $message) {
-    die "The POE::Component::IRC event \"$state\" requires two arguments";
+    warn "The POE::Component::IRC event \"$state\" requires two arguments";
+    return;
   }
 
   if (ref $to eq 'ARRAY') {
@@ -1133,7 +1169,10 @@ sub register {
   my ($kernel, $self, $session, $sender, @events) =
     @_[KERNEL, OBJECT, SESSION, SENDER, ARG0 .. $#_];
 
-  die "Not enough arguments" unless @events;
+  unless (@events) {
+    warn "register: Not enough arguments";
+    return;
+  }
 
   # FIXME: What "special" event names go here? (ie, "errors")
   # basic, dcc (implies ctcp), ctcp, oper ...what other categories?
@@ -1151,8 +1190,14 @@ sub register_session {
   my ($kernel, $self, $session, $called_by, $sender, @events) =
     @_[KERNEL, OBJECT, SESSION, SENDER, ARG0 .. $#_];
 
-  die "Naughty. Naughty. Only my session can call this" unless ( $session eq $called_by );
-  die "Not enough arguments" unless @events;
+  unless ($session eq $called_by) {
+    warn "register_session: Naughty. Naughty. Only my session can call this";
+    return;
+  }
+  unless (@events) {
+    warn "register_session: Not enough arguments";
+    return;
+  }
 
   # FIXME: What "special" event names go here? (ie, "errors")
   # basic, dcc (implies ctcp), ctcp, oper ...what other categories?
@@ -1298,7 +1343,10 @@ sub unregister {
   my ($kernel, $self, $session, $sender, @events) =
     @_[KERNEL,  OBJECT, SESSION,  SENDER,  ARG0 .. $#_];
 
-  die "Not enough arguments" unless @events;
+  unless (@events) {
+    warn "unregister: Not enough arguments";
+    return;
+  }
 
   foreach (@events) {
     delete $self->{events}->{$_}->{$sender};
@@ -1315,7 +1363,10 @@ sub unregister_sessions {
   my ($kernel, $self, $session, $called_by) =
     @_[KERNEL,  OBJECT, SESSION,  SENDER];
 
-  die "Naughty. Naughty. Only I can call this event" unless ( $session eq $called_by );
+  unless ($session eq $called_by) {
+    warn "unregister_sessions: Naughty. Naughty. Only I can call this event";
+    return;
+  }
 
   foreach my $sender ( keys %{ $self->{sessions} } ) {
     foreach ( keys %{ $self->{events} } ) {
@@ -1336,7 +1387,10 @@ sub userhost {
   my ($kernel, @nicks) = @_[KERNEL, ARG0 .. $#_];
   my @five;
 
-  die "No nicknames passed to POE::Component::IRC::userhost" unless @nicks;
+  unless (@nicks) {
+    warn "No nicknames passed to POE::Component::IRC::userhost";
+    return;
+  }
 
   # According to the RFC, you can only send 5 nicks at a time.
   while (@nicks) {
@@ -1351,6 +1405,12 @@ sub version {
   my ($self) = shift;
 
   return $VERSION;
+}
+
+sub _revision {
+  my ($self) = shift;
+
+  return $REVISION;
 }
 
 sub server_name {
@@ -1731,11 +1791,13 @@ I<actual> IRC server's port if you provide a proxy but omit the proxy's
 port.
 
 For those people who run bots behind firewalls and/or Network Address Translation
-there are two additional attributes for DCC. "DCCPorts", is either an arrayref of ports
-to use when initiating DCC, using dcc() or a scalar with the following format,
-"<port>,<port>-<port>", eg. "1024,1050-1060,1080", would represent ports 1024 and 1080 and all 
-the ports from 1050 to 1060, simple, huh?; "NATAddr", is the NAT'ed IP address that your bot is
+there are two additional attributes for DCC. "DCCPorts", is an arrayref of ports
+to use when initiating DCC, using dcc();
+"NATAddr", is the NAT'ed IP address that your bot is
 hidden behind, this is sent whenever you do DCC.
+
+On servers that support it, use "BitMode" option to provide a bitmask to set your
+initial umode. See RFC 2812 USER command for details.
 
 =item ctcp and ctcpreply
 

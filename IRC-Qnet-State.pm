@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet-State.pm,v 1.8 2005/02/18 12:35:30 chris Exp $
+# $Id: IRC-Qnet-State.pm,v 3.6 2005/02/23 13:15:36 chris Exp $
 #
 # POE::Component::IRC::Qnet::State, by Chris Williams
 #
@@ -38,7 +38,7 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '1.1';
+$VERSION = '1.2';
 
 sub _create {
   my ($package) = shift;
@@ -307,8 +307,10 @@ sub irc_mode {
         SWITCH: {
           if ( $mode =~ /\+([ohv])/ ) {
                 my ($flag) = $1;
-                $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } .= $flag;
-                $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $arg ) } = $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) };
+                unless ( $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } =~ $flag ) {
+                	$self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } .= $flag;
+                	$self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $arg ) } = $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) };
+		}
 		if ( $source =~ /^[QL]$/ and ( not $self->is_nick_authed($arg) ) and ( not $self->{USER_AUTHED}->{ u_irc ( $arg ) } ) ) {
 		   $self->{USER_AUTHED}->{ u_irc ( $arg ) } = 0;
 		   $kernel->yield ( 'sl' => "WHO $arg " . '%cunharsf' );
@@ -318,7 +320,7 @@ sub irc_mode {
           if ( $mode =~ /-([ohv])/ ) {
                 my ($flag) = $1;
                 $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) } =~ s/$flag//;
-                $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $arg ) } = $self->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) };
+                $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $arg ) } = $self->{STATE}->{Nicks}->{ u_irc ( $arg ) }->{CHANS}->{ u_irc ( $channel ) };
                 last SWITCH;
           }
           if ( $mode =~ /[bIe]/ ) {

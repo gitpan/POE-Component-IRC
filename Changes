@@ -1,6 +1,11 @@
 Revision history for Perl extension POE::Component::IRC.
 
-3.4   <Put date here>
+3.5   Wed Feb 23 13:28:05 GMT 2005
+    - IRC-State bug spotted and patched by ketas
+    - Same bug caught and squashed in IRC-Qnet-State by me.
+    - Sorted out DCCPorts. It has to be an arrayref now.
+
+3.4   Fri Feb 18 12:01:58 GMT 2005
     - Deprecated new() in favour of new constructor spawn().
       spawn() will except all the same parameters as connect().
       Moved config stuff to _configure() to save duplication.

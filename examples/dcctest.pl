@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Id: dcctest.pl,v 1.1.1.1 2004/12/22 19:10:57 chris Exp $
+# $Id: dcctest.pl,v 3.5 2005/02/19 13:26:46 chris Exp $
 #
 # This simple test program should give you an idea of how a basic
 # POE::Component::IRC script fits together.
