@@ -2,6 +2,7 @@ Changes
 Filter-IRC.pm
 Filter-CTCP.pm
 IRC.pm
+IRC-Qnet.pm
 MANIFEST
 Makefile.PL
 README
@@ -17,3 +18,4 @@ examples/eliza.pl
 examples/tinyurl.pl
 examples/aimproxy.pl
 t/1.t
+t/2.t

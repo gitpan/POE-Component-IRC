@@ -41,6 +41,9 @@ http://www.gumbynet.org.uk/poe/ .
 requires Carp and Socket, but if you find yourself lacking either of
 those, you're in more trouble than we can help with anyways...
 
+	If the module finds POE::Component::Client::DNS installed it
+will use it to resolve the IP address of the servername given to connect.
+
 
 4. INSTALLATION
 ---------------
@@ -64,9 +67,8 @@ good template for your own bots, if you need one.
 	- Needs a better test script. I'd settle for anything that did
 	  something more exhaustive than "use POE::Component::IRC; exit;".
 
-	To report bugs, email the maintainer at dennis@funkplanet.com,
-or just bug the hell out of him on irc.rhizomatic.net, channel #tempura.
-His nick is "fimmtiu". Be gentle.
+	To report bugs, email the maintainer or preferably
+	use http://rt.cpan.org/
 
 
 6. DISCLAIMER
@@ -113,3 +115,4 @@ members of the EFnet channel #perl. Thanks to the following IRCers:
 
 	Apologies to anyone I forgot!
 
+	Check the Changes file for further contributors.

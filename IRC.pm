@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.5 2004/12/31 10:22:18 chris Exp $
+# $Id: IRC.pm,v 1.8 2005/01/21 12:17:55 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -87,7 +87,7 @@ my %irc_commands =
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
   );
 
-$VERSION = '3.0';
+$VERSION = '3.1';
 
 BEGIN {
   my $has_client_dns = 0;
@@ -120,7 +120,7 @@ sub _dcc_failed {
   # transfer finished? If so, it's not really an error.
   if ($errnum == 0 and $self->{dcc}->{$id}->{type} eq "GET" and
       $self->{dcc}->{$id}->{done} >= $self->{dcc}->{$id}->{size}) {
-    _send_event( $kernel, $self, 'irc_dcc_done', $id,
+    $self->_send_event( $kernel, 'irc_dcc_done', $id,
 		 @{$self->{dcc}->{$id}}{ qw(nick type port file size done) } );
     close $self->{dcc}->{$id}->{fh};
     delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
@@ -135,7 +135,7 @@ sub _dcc_failed {
     else {
       $errstr = "$operation error $errnum: $errstr";
     }
-    _send_event( $kernel, $self, 'irc_dcc_error', $id, $errstr,
+    $self->_send_event( $kernel, 'irc_dcc_error', $id, $errstr,
 		 @{$self->{dcc}->{$id}}{qw(nick type port file size done)} );
     # gotta close the file
     close $self->{dcc}->{$id}->{fh} if exists $self->{dcc}->{$id}->{fh};
@@ -176,7 +176,7 @@ sub _dcc_read {
     $self->{dcc}->{$id}->{wheel}->put( pack "N", $self->{dcc}->{$id}->{done} );
 
     # Send an event to let people know about the newly arrived data.
-    _send_event( $kernel, $self, 'irc_dcc_get', $id,
+    $self->_send_event( $kernel, 'irc_dcc_get', $id,
 		 @{$self->{dcc}->{$id}}{ qw(nick port file size done) } );
 
 
@@ -184,12 +184,12 @@ sub _dcc_read {
 
     # Record the client's download progress.
     $self->{dcc}->{$id}->{done} = unpack "N", substr( $data, -4 );
-    _send_event( $kernel, $self, 'irc_dcc_send', $id,
+    $self->_send_event( $kernel, 'irc_dcc_send', $id,
 		 @{$self->{dcc}->{$id}}{ qw(nick port file size done) } );
 
     # Are we done yet?
     if ($self->{dcc}->{$id}->{done} >= $self->{dcc}->{$id}->{size}) {
-      _send_event( $kernel, $self, 'irc_dcc_done', $id,
+      $self->_send_event( $kernel, 'irc_dcc_done', $id,
 		   @{$self->{dcc}->{$id}}{ qw(nick type port file size done) }
 		 );
       delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
@@ -204,7 +204,7 @@ sub _dcc_read {
 
   } 
   else {
-    _send_event( $kernel, $self, 'irc_dcc_' . lc $self->{dcc}->{$id}->{type},
+    $self->_send_event( $kernel, 'irc_dcc_' . lc $self->{dcc}->{$id}->{type},
 		 $id, @{$self->{dcc}->{$id}}{'nick', 'port'}, $data );
   }
 }
@@ -302,7 +302,7 @@ sub _dcc_up {
   }
 
   # Tell any listening sessions that the connection is up.
-  _send_event( $kernel, $self, 'irc_dcc_start',
+  $self->_send_event( $kernel, 'irc_dcc_start',
 	       $id, @{$self->{dcc}->{$id}}{'nick', 'type', 'port'},
 	       ($self->{dcc}->{$id}->{'type'} =~ /^(SEND|GET)$/ ?
 		(@{$self->{dcc}->{$id}}{'file', 'size'}) : ()) );
@@ -333,7 +333,7 @@ sub _parseline {
 	$self->{INFO}->{ServerName} = $ev->{args}->[0];
     }
     $ev->{name} = 'irc_' . $ev->{name};
-    _send_event( $kernel, $self, $ev->{name}, @{$ev->{args}} );
+    $self->_send_event( $kernel, $ev->{name}, @{$ev->{args}} );
   }
 }
 
@@ -341,8 +341,10 @@ sub _parseline {
 # Sends an event to all interested sessions. This is a separate sub
 # because I do it so much, but it's not an actual POE event because it
 # doesn't need to be one and I don't need the overhead.
+# Changed to a method by BinGOs, 21st January 2005.
 sub _send_event  {
-  my ($kernel, $self, $event, @args) = @_;
+  my ($self) = shift;
+  my ($kernel, $event, @args) = @_;
   my %sessions;
 
   foreach (values %{$self->{events}->{'irc_all'}},
@@ -380,7 +382,7 @@ sub _sock_down {
 sub _sock_failed {
   my ($kernel, $self, $op, $errno, $errstr) = @_[KERNEL, OBJECT, ARG0..ARG2];
 
-  _send_event( $kernel, $self, 'irc_socketerr', "$op error $errno: $errstr" );
+  $self->_send_event( $kernel, 'irc_socketerr', "$op error $errno: $errstr" );
 }
 
 
@@ -407,7 +409,7 @@ sub _sock_up {
   if ($self->{'socket'}) {
     $self->{connected} = 1;
   } else {
-    _send_event( $kernel, $self, 'irc_socketerr',
+    $self->_send_event( $kernel, 'irc_socketerr',
 		 "Couldn't create ReadWrite wheel for IRC socket" );
   }
 
@@ -580,14 +582,14 @@ sub got_dns_response {
   my ($net_dns_packet, $net_dns_errorstring) = @{$_[ARG1]};
                                     
   unless(defined $net_dns_packet) {
-    _send_event( $kernel, $self, 'irc_socketerr', $net_dns_errorstring );
+    $self->_send_event( $kernel, 'irc_socketerr', $net_dns_errorstring );
     return;
   }
                                     
   my @net_dns_answers = $net_dns_packet->answer;
                                     
   unless (@net_dns_answers) {
-    _send_event( $kernel, $self, 'irc_socketerr', "Unable to resolve $self->{'server'}");
+    $self->_send_event( $kernel, 'irc_socketerr', "Unable to resolve $self->{'server'}");
     return;
   }
                                     
@@ -599,7 +601,7 @@ sub got_dns_response {
     return;
   }
     
-  _send_event( $kernel, $self, 'irc_socketerr', "Unable to resolve $self->{'server'}");
+  $self->_send_event( $kernel, 'irc_socketerr', "Unable to resolve $self->{'server'}");
 
 }
 
@@ -642,7 +644,7 @@ sub dcc {
     }
     $size = (stat $file)[7];
     unless (defined $size) {
-      _send_event( $kernel, $self, 'irc_dcc_error', 0,
+      $self->_send_event( $kernel, 'irc_dcc_error', 0,
 		   "Couldn't get ${file}'s size: $!", $nick, $type, 0, $file );
     }
   }
@@ -764,7 +766,7 @@ sub dcc_chat {
 sub dcc_close {
   my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
 
-  _send_event( $kernel, $self, 'irc_dcc_done', $id,
+  $self->_send_event( $kernel, 'irc_dcc_done', $id,
 	       @{$self->{dcc}->{$id}}{ qw(nick type port file size done) } );
 
   if ($self->{dcc}->{$id}->{wheel}->get_driver_out_octets()) {

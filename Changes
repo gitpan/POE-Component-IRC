@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.1   Fri Jan 21 11:59:56 GMT 2005
+    - Converted _send_event sub to object method.
+    - Added IRC-Qnet, with specific extensions for Quakenet.
+    - Updated README
+
 3.0   Fri Dec 31 09:00:01 GMT 2004
     - Fixed Filter-IRC so that it groks WALLOPS properly.
     - Added docs/ and populated it with rfcs applicable to IRC.
@@ -16,6 +21,8 @@ Revision history for Perl extension POE::Component::IRC.
 	- Debug param patch by Paul Visscher
 	- Proxy Support patch by Jeff Pinyan
 	- Locops patch by Jon Nistor
+
+========== Maintainership changed from Fimm to BinGOs ====================
 
 2.9   Sat Jul 19 13:32:45 PDT 2003
     - Only one change this time: Adam Foxson's patch to add prioritized
