@@ -1,0 +1,1042 @@
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/CVSLOG,v
+Working file: CVSLOG
+head: 1.3
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.3
+date: 2005/02/18 15:25:19;  author: chris;  state: Exp;  lines: +30 -10
+CPAN here we come.
+----------------------------
+revision 1.2
+date: 2005/02/18 12:35:30;  author: chris;  state: Exp;  lines: +28 -4
+Added a few more things. Including hacking IRC.pm so that merlyn's logtail code will work.
+----------------------------
+revision 1.1
+date: 2005/02/17 18:43:10;  author: chris;  state: Exp;
+Added CVSLOG as a public testimony of my development efforts.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/Changes,v
+Working file: Changes
+head: 1.12
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 13;	selected revisions: 13
+description:
+----------------------------
+revision 1.12
+date: 2005/02/18 12:35:30;  author: chris;  state: Exp;  lines: +4 -0
+Added a few more things. Including hacking IRC.pm so that merlyn's logtail code will work.
+----------------------------
+revision 1.11
+date: 2005/02/17 18:43:10;  author: chris;  state: Exp;  lines: +2 -0
+Added CVSLOG as a public testimony of my development efforts.
+----------------------------
+revision 1.10
+date: 2005/02/17 16:18:34;  author: chris;  state: Exp;  lines: +11 -0
+Various changes.
+----------------------------
+revision 1.9
+date: 2005/02/14 21:48:16;  author: chris;  state: Exp;  lines: +8 -0
+New test
+----------------------------
+revision 1.8
+date: 2005/02/08 13:59:19;  author: chris;  state: Exp;  lines: +6 -0
+Stuff.
+----------------------------
+revision 1.7
+date: 2005/02/02 14:11:43;  author: chris;  state: Exp;  lines: +4 -0
+Updated Qnet POD.
+----------------------------
+revision 1.6
+date: 2005/02/02 10:19:37;  author: chris;  state: Exp;  lines: +6 -0
+Implemented WHOIS and WHOWAS handlers. Amended README to include patch blurb. Updated Changes, natch.
+----------------------------
+revision 1.5
+date: 2005/01/21 12:05:48;  author: chris;  state: Exp;  lines: +7 -0
+More stuff and nonsense.
+----------------------------
+revision 1.4
+date: 2004/12/31 10:22:18;  author: chris;  state: Exp;  lines: +6 -1
+Tidied up a few things prior to releasing on CPAN.
+----------------------------
+revision 1.3
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;  lines: +1 -0
+Added docs/ Populated it with the IRC RFCs.
+----------------------------
+revision 1.2
+date: 2004/12/26 10:11:26;  author: chris;  state: Exp;  lines: +11 -0
+Rolled in the last patch.
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/Filter-CTCP.pm,v
+Working file: Filter-CTCP.pm
+head: 1.1
+branch: 1.1.1
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/Filter-IRC.pm,v
+Working file: Filter-IRC.pm
+head: 1.2
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.2
+date: 2004/12/31 10:22:18;  author: chris;  state: Exp;  lines: +4 -1
+Tidied up a few things prior to releasing on CPAN.
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet-State.pm,v
+Working file: IRC-Qnet-State.pm
+head: 1.8
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 8;	selected revisions: 8
+description:
+----------------------------
+revision 1.8
+date: 2005/02/18 12:35:30;  author: chris;  state: Exp;  lines: +7 -1
+Added a few more things. Including hacking IRC.pm so that merlyn's logtail code will work.
+----------------------------
+revision 1.7
+date: 2005/02/17 16:18:34;  author: chris;  state: Exp;  lines: +27 -43
+Various changes.
+----------------------------
+revision 1.6
+date: 2005/02/15 14:21:28;  author: chris;  state: Exp;  lines: +113 -34
+Added in auth stuff.
+----------------------------
+revision 1.5
+date: 2005/02/15 10:05:12;  author: chris;  state: Exp;  lines: +4 -3
+.
+----------------------------
+revision 1.4
+date: 2005/02/15 09:51:14;  author: chris;  state: Exp;  lines: +54 -1
+Forgot about the various subs
+----------------------------
+revision 1.3
+date: 2005/02/15 09:36:18;  author: chris;  state: Exp;  lines: +51 -2
+Hopefully implemented Qnet-State engine.
+----------------------------
+revision 1.2
+date: 2005/02/14 22:04:43;  author: chris;  state: Exp;  lines: +2 -4
+Finally twigged to inheritance.
+----------------------------
+revision 1.1
+date: 2005/02/14 21:49:05;  author: chris;  state: Exp;
+YASC - Yet Another Sub-Class
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet.pm,v
+Working file: IRC-Qnet.pm
+head: 1.6
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 1.6
+date: 2005/02/07 20:59:01;  author: chris;  state: Exp;  lines: +128 -95
+Various changes. Blah what do you want a fecking essay.
+----------------------------
+revision 1.5
+date: 2005/02/07 10:19:19;  author: chris;  state: Exp;  lines: +3 -45
+Major changes, trying to make it a bit more friendly to inheritance.
+----------------------------
+revision 1.4
+date: 2005/02/02 14:11:43;  author: chris;  state: Exp;  lines: +11 -1
+Updated Qnet POD.
+----------------------------
+revision 1.3
+date: 2005/02/02 14:07:27;  author: chris;  state: Exp;  lines: +14 -4
+Updated IRC-Qnet to support WHOIS reply 330 for ircu account.
+----------------------------
+revision 1.2
+date: 2005/01/21 12:05:48;  author: chris;  state: Exp;  lines: +127 -728
+More stuff and nonsense.
+----------------------------
+revision 1.1
+date: 2005/01/21 09:08:43;  author: chris;  state: Exp;
+Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL accordingly.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-State.pm,v
+Working file: IRC-State.pm
+head: 1.12
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 12;	selected revisions: 12
+description:
+----------------------------
+revision 1.12
+date: 2005/02/18 12:35:30;  author: chris;  state: Exp;  lines: +56 -1
+Added a few more things. Including hacking IRC.pm so that merlyn's logtail code will work.
+----------------------------
+revision 1.11
+date: 2005/02/17 16:18:34;  author: chris;  state: Exp;  lines: +37 -1
+Various changes.
+----------------------------
+revision 1.10
+date: 2005/02/16 17:34:09;  author: chris;  state: Exp;  lines: +18 -13
+Documentation revision.
+----------------------------
+revision 1.9
+date: 2005/02/14 21:48:16;  author: chris;  state: Exp;  lines: +20 -1
+New test
+----------------------------
+revision 1.8
+date: 2005/02/14 12:18:52;  author: chris;  state: Exp;  lines: +2 -2
+Small problem fixed.
+----------------------------
+revision 1.7
+date: 2005/02/14 12:08:24;  author: chris;  state: Exp;  lines: +89 -2
+Added two new events to IRC-State
+----------------------------
+revision 1.6
+date: 2005/02/13 14:21:14;  author: chris;  state: Exp;  lines: +12 -2
+This turkey might be ready to fly.
+----------------------------
+revision 1.5
+date: 2005/02/13 11:18:33;  author: chris;  state: Exp;  lines: +294 -2
+Stuff.
+----------------------------
+revision 1.4
+date: 2005/02/11 08:35:57;  author: chris;  state: Exp;  lines: +3 -5
+Stuff.
+----------------------------
+revision 1.3
+date: 2005/02/11 08:31:42;  author: chris;  state: Exp;  lines: +2 -3
+Stuff.
+----------------------------
+revision 1.2
+date: 2005/02/10 22:05:44;  author: chris;  state: Exp;  lines: +231 -4
+Stuff.
+----------------------------
+revision 1.1
+date: 2005/02/08 16:54:53;  author: chris;  state: Exp;
+Jiggled some stuff about.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/IRC.pm,v
+Working file: IRC.pm
+head: 1.25
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 26;	selected revisions: 26
+description:
+----------------------------
+revision 1.25
+date: 2005/02/18 12:35:31;  author: chris;  state: Exp;  lines: +18 -2
+Added a few more things. Including hacking IRC.pm so that merlyn's logtail code will work.
+----------------------------
+revision 1.24
+date: 2005/02/17 16:18:34;  author: chris;  state: Exp;  lines: +13 -10
+Various changes.
+----------------------------
+revision 1.23
+date: 2005/02/17 12:29:43;  author: chris;  state: Exp;  lines: +6 -2
+Added sub version to return $VERSION
+----------------------------
+revision 1.22
+date: 2005/02/17 12:21:40;  author: chris;  state: Exp;  lines: +8 -2
+:)
+----------------------------
+revision 1.21
+date: 2005/02/17 12:18:30;  author: chris;  state: Exp;  lines: +3 -2
+Added $REVISION.
+----------------------------
+revision 1.20
+date: 2005/02/17 12:15:49;  author: chris;  state: Exp;  lines: +15 -9
+Fixed up _sock_up and _sock_down so that used _send_event like everyone else.
+----------------------------
+revision 1.19
+date: 2005/02/11 16:53:36;  author: chris;  state: Exp;  lines: +90 -16
+Stuff.
+----------------------------
+revision 1.18
+date: 2005/02/10 22:05:44;  author: chris;  state: Exp;  lines: +12 -2
+Stuff.
+----------------------------
+revision 1.17
+date: 2005/02/09 16:56:41;  author: chris;  state: Exp;  lines: +72 -32
+Bits and pieces.
+----------------------------
+revision 1.16
+date: 2005/02/08 21:40:08;  author: chris;  state: Exp;  lines: +15 -1
+Beta release of version 3.4
+----------------------------
+revision 1.15
+date: 2005/02/08 16:54:53;  author: chris;  state: Exp;  lines: +75 -52
+Jiggled some stuff about.
+----------------------------
+revision 1.14
+date: 2005/02/08 13:59:20;  author: chris;  state: Exp;  lines: +31 -1
+Stuff.
+----------------------------
+revision 1.13
+date: 2005/02/07 20:59:01;  author: chris;  state: Exp;  lines: +107 -63
+Various changes. Blah what do you want a fecking essay.
+----------------------------
+revision 1.12
+date: 2005/02/07 10:19:20;  author: chris;  state: Exp;  lines: +97 -34
+Major changes, trying to make it a bit more friendly to inheritance.
+----------------------------
+revision 1.11
+date: 2005/02/02 14:07:28;  author: chris;  state: Exp;  lines: +2 -2
+Updated IRC-Qnet to support WHOIS reply 330 for ircu account.
+----------------------------
+revision 1.10
+date: 2005/02/02 11:53:01;  author: chris;  state: Exp;  lines: +32 -9
+Numerous debugs for the new whois and whowas. Updated the POD.
+----------------------------
+revision 1.9
+date: 2005/02/02 10:19:37;  author: chris;  state: Exp;  lines: +114 -15
+Implemented WHOIS and WHOWAS handlers. Amended README to include patch blurb. Updated Changes, natch.
+----------------------------
+revision 1.8
+date: 2005/01/21 12:17:55;  author: chris;  state: Exp;  lines: +2 -2
+Doh. Forgot to bump up the version number. Have done so. So there.
+----------------------------
+revision 1.7
+date: 2005/01/21 12:05:48;  author: chris;  state: Exp;  lines: +19 -17
+More stuff and nonsense.
+----------------------------
+revision 1.6
+date: 2004/12/31 11:57:32;  author: chris;  state: Exp;  lines: +18 -10
+Some more testing and some more fixes. This is it, had enough. CPAN here we come!!!! Tora! Tora! Tora!
+----------------------------
+revision 1.5
+date: 2004/12/31 10:22:18;  author: chris;  state: Exp;  lines: +16 -5
+Tidied up a few things prior to releasing on CPAN.
+----------------------------
+revision 1.4
+date: 2004/12/29 20:20:13;  author: chris;  state: Exp;  lines: +281 -276
+Final commit of PoCo-IRC-3.0
+----------------------------
+revision 1.3
+date: 2004/12/26 11:48:53;  author: chris;  state: Exp;  lines: +14 -4
+Added documentation for my amendments.
+----------------------------
+revision 1.2
+date: 2004/12/26 10:11:26;  author: chris;  state: Exp;  lines: +57 -2
+Rolled in the last patch.
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/MANIFEST,v
+Working file: MANIFEST
+head: 1.15
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 16;	selected revisions: 16
+description:
+----------------------------
+revision 1.15
+date: 2005/02/17 18:43:10;  author: chris;  state: Exp;  lines: +1 -0
+Added CVSLOG as a public testimony of my development efforts.
+----------------------------
+revision 1.14
+date: 2005/02/14 21:48:16;  author: chris;  state: Exp;  lines: +2 -0
+New test
+----------------------------
+revision 1.13
+date: 2005/02/14 12:08:24;  author: chris;  state: Exp;  lines: +2 -0
+Added two new events to IRC-State
+----------------------------
+revision 1.12
+date: 2005/02/13 14:21:14;  author: chris;  state: Exp;  lines: +0 -1
+This turkey might be ready to fly.
+----------------------------
+revision 1.11
+date: 2005/02/11 16:53:37;  author: chris;  state: Exp;  lines: +2 -0
+Stuff.
+----------------------------
+revision 1.10
+date: 2005/02/11 08:27:12;  author: chris;  state: Exp;  lines: +0 -1
+Hmm.
+----------------------------
+revision 1.9
+date: 2005/02/09 16:56:42;  author: chris;  state: Exp;  lines: +1 -0
+Bits and pieces.
+----------------------------
+revision 1.8
+date: 2005/02/08 21:40:09;  author: chris;  state: Exp;  lines: +1 -0
+Beta release of version 3.4
+----------------------------
+revision 1.7
+date: 2005/02/08 16:54:53;  author: chris;  state: Exp;  lines: +3 -1
+Jiggled some stuff about.
+----------------------------
+revision 1.6
+date: 2005/02/08 10:55:18;  author: chris;  state: Exp;  lines: +2 -1
+Updated MANIFEST to include new tests.
+----------------------------
+revision 1.5
+date: 2005/01/21 12:05:48;  author: chris;  state: Exp;  lines: +1 -0
+More stuff and nonsense.
+----------------------------
+revision 1.4
+date: 2005/01/21 09:08:43;  author: chris;  state: Exp;  lines: +1 -0
+Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL accordingly.
+----------------------------
+revision 1.3
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;  lines: +7 -2
+Added docs/ Populated it with the IRC RFCs.
+----------------------------
+revision 1.2
+date: 2004/12/29 20:20:13;  author: chris;  state: Exp;  lines: +1 -1
+Final commit of PoCo-IRC-3.0
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/META.yml,v
+Working file: META.yml
+head: 1.2
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 2005/02/14 10:07:11;  author: chris;  state: Exp;  lines: +13 -0
+Stuff.
+----------------------------
+revision 1.1
+date: 2005/02/11 08:35:57;  author: chris;  state: Exp;
+Stuff.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/Makefile.PL,v
+Working file: Makefile.PL
+head: 1.4
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 1.4
+date: 2005/02/14 21:48:16;  author: chris;  state: Exp;  lines: +2 -1
+New test
+----------------------------
+revision 1.3
+date: 2005/02/08 16:54:53;  author: chris;  state: Exp;  lines: +2 -1
+Jiggled some stuff about.
+----------------------------
+revision 1.2
+date: 2005/01/21 09:08:43;  author: chris;  state: Exp;  lines: +2 -1
+Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL accordingly.
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/README,v
+Working file: README
+head: 1.6
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+----------------------------
+revision 1.6
+date: 2005/02/14 12:08:24;  author: chris;  state: Exp;  lines: +2 -4
+Added two new events to IRC-State
+----------------------------
+revision 1.5
+date: 2005/02/02 10:19:38;  author: chris;  state: Exp;  lines: +3 -5
+Implemented WHOIS and WHOWAS handlers. Amended README to include patch blurb. Updated Changes, natch.
+----------------------------
+revision 1.4
+date: 2005/01/21 12:05:48;  author: chris;  state: Exp;  lines: +4 -0
+More stuff and nonsense.
+----------------------------
+revision 1.3
+date: 2005/01/17 14:44:33;  author: chris;  state: Exp;  lines: +2 -3
+Amended README where I had left Dennis as the maintainer. Suggested that bugs are reported using rt.cpan.org
+----------------------------
+revision 1.2
+date: 2004/12/29 20:20:13;  author: chris;  state: Exp;  lines: +7 -4
+Final commit of PoCo-IRC-3.0
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/test.pl,v
+Working file: test.pl
+head: 1.2
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.2
+date: 2004/12/27 12:41:31;  author: chris;  state: dead;  lines: +0 -0
+Moved test.pl to t/1.t
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/ctcpspec.html,v
+Working file: docs/ctcpspec.html
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/02/13 11:51:25;  author: chris;  state: Exp;
+Boo.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/dccspec.html,v
+Working file: docs/dccspec.html
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/02/13 11:51:25;  author: chris;  state: Exp;
+Boo.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/rfc1459.txt,v
+Working file: docs/rfc1459.txt
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;
+Added docs/ Populated it with the IRC RFCs.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/rfc2810.txt,v
+Working file: docs/rfc2810.txt
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;
+Added docs/ Populated it with the IRC RFCs.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/rfc2811.txt,v
+Working file: docs/rfc2811.txt
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;
+Added docs/ Populated it with the IRC RFCs.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/rfc2812.txt,v
+Working file: docs/rfc2812.txt
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;
+Added docs/ Populated it with the IRC RFCs.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/docs/rfc2813.txt,v
+Working file: docs/rfc2813.txt
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2004/12/29 20:31:23;  author: chris;  state: Exp;
+Added docs/ Populated it with the IRC RFCs.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/Attic/State.pl,v
+Working file: examples/State.pl
+head: 1.2
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 2005/02/13 11:22:43;  author: chris;  state: dead;  lines: +1 -1
+Tsuff.
+----------------------------
+revision 1.1
+date: 2005/02/10 22:05:45;  author: chris;  state: Exp;
+Stuff.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/aimproxy.pl,v
+Working file: examples/aimproxy.pl
+head: 1.1
+branch: 1.1.1
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/dcctest.pl,v
+Working file: examples/dcctest.pl
+head: 1.1
+branch: 1.1.1
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/dicebot.pl,v
+Working file: examples/dicebot.pl
+head: 1.1
+branch: 1.1.1
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/eliza.pl,v
+Working file: examples/eliza.pl
+head: 1.3
+branch:
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+----------------------------
+revision 1.3
+date: 2005/02/09 16:56:42;  author: chris;  state: Exp;  lines: +9 -9
+Bits and pieces.
+----------------------------
+revision 1.2
+date: 2005/02/08 21:40:09;  author: chris;  state: Exp;  lines: +21 -17
+Beta release of version 3.4
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/moo.pl,v
+Working file: examples/moo.pl
+head: 1.1
+branch: 1.1.1
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/tinyurl.pl,v
+Working file: examples/tinyurl.pl
+head: 1.1
+branch: 1.1.1
+locks: strict
+access list:
+symbolic names:
+	POE-Component-IRC: 1.1.1.1
+	PoCo-IRC-3: 1.1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;
+branches:  1.1.1;
+Initial revision
+----------------------------
+revision 1.1.1.1
+date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
+Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/Attic/1.t,v
+Working file: t/1.t
+head: 1.4
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+----------------------------
+revision 1.4
+date: 2005/02/07 20:59:02;  author: chris;  state: dead;  lines: +0 -0
+Various changes. Blah what do you want a fecking essay.
+----------------------------
+revision 1.3
+date: 2004/12/31 10:22:18;  author: chris;  state: Exp;  lines: +2 -1
+Tidied up a few things prior to releasing on CPAN.
+----------------------------
+revision 1.2
+date: 2004/12/29 20:20:14;  author: chris;  state: Exp;  lines: +28 -15
+Final commit of PoCo-IRC-3.0
+----------------------------
+revision 1.1
+date: 2004/12/27 12:41:31;  author: chris;  state: Exp;
+Moved test.pl to t/1.t
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/1_new.t,v
+Working file: t/1_new.t
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/02/07 20:59:02;  author: chris;  state: Exp;
+Various changes. Blah what do you want a fecking essay.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/1_spawn.t,v
+Working file: t/1_spawn.t
+head: 1.3
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.3
+date: 2005/02/08 21:40:09;  author: chris;  state: Exp;  lines: +1 -1
+Beta release of version 3.4
+----------------------------
+revision 1.2
+date: 2005/02/08 13:59:20;  author: chris;  state: Exp;  lines: +1 -1
+Stuff.
+----------------------------
+revision 1.1
+date: 2005/02/07 20:59:02;  author: chris;  state: Exp;
+Various changes. Blah what do you want a fecking essay.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/Attic/2.t,v
+Working file: t/2.t
+head: 1.3
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.3
+date: 2005/02/08 16:54:53;  author: chris;  state: dead;  lines: +0 -0
+Jiggled some stuff about.
+----------------------------
+revision 1.2
+date: 2005/02/07 20:59:02;  author: chris;  state: Exp;  lines: +1 -1
+Various changes. Blah what do you want a fecking essay.
+----------------------------
+revision 1.1
+date: 2005/01/21 09:08:43;  author: chris;  state: Exp;
+Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL accordingly.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/2_Qnet.t,v
+Working file: t/2_Qnet.t
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/02/08 16:54:53;  author: chris;  state: Exp;
+Jiggled some stuff about.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/2_Qnet_State.t,v
+Working file: t/2_Qnet_State.t
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/02/14 21:48:17;  author: chris;  state: Exp;
+New test
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/2_State.t,v
+Working file: t/2_State.t
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/02/08 16:55:22;  author: chris;  state: Exp;
+Another test script
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/t/3_connect.t,v
+Working file: t/3_connect.t
+head: 1.2
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 2005/02/09 16:56:42;  author: chris;  state: Exp;  lines: +4 -5
+Bits and pieces.
+----------------------------
+revision 1.1
+date: 2005/02/09 12:03:20;  author: chris;  state: Exp;
+We have a better testcase \o/
+=============================================================================

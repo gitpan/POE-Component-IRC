@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Id: eliza.pl,v 1.1.1.1 2004/12/22 19:10:57 chris Exp $
+# $Id: eliza.pl,v 1.3 2005/02/09 16:56:42 chris Exp $
 #
 # This is an adaption of Dennis Taylor's test.pl.  It combines a very
 # simple bot with Chatbot::Eliza to make something fairly annoying.
@@ -10,7 +10,7 @@ use strict;
 
 use POE::Kernel;
 use POE::Session;
-use POE::Component::IRC;
+use POE::Component::IRC 3.4;
 use Chatbot::Eliza;
 
 
@@ -24,23 +24,18 @@ my $eliza = Chatbot::Eliza->new();
 sub _start {
   my ($kernel, $session) = @_[KERNEL, SESSION];
 
+  $_[HEAP] = $_[ARG0];
+
   # Uncomment this to turn on more verbose POE debugging information.
   # $session->option( trace => 1 );
 
   # Ask the IRC component to send us all IRC events it receives. This
   # is the easy, indiscriminate way to do it.
-  $kernel->post( 'test', 'register', 'all');
+  $_[HEAP]->yield( 'register', 'all');
 
   # Setting Debug to 1 causes P::C::IRC to print all raw lines of text
   # sent to and received from the IRC server. Very useful for debugging.
-  $kernel->post( 'test', 'connect', { Debug    => 1,
-				      Nick     => $nick,
-				      Server   => $ARGV[0] ||
-				                  'irc.rhizomatic.net',
-				      Port     => $ARGV[1] || 6667,
-				      Username => $name,
-				      Ircname  => 'Ask me about my colon!',
-                                    }
+  $_[HEAP]->yield( 'connect', { }
 	       );
 }
 
@@ -48,9 +43,10 @@ sub _start {
 # After we successfully log into the IRC server, join a channel.
 sub irc_001 {
   my ($kernel) = $_[KERNEL];
-  $kernel->post( 'test', 'mode', $nick, '+i' );
-  $kernel->post( 'test', 'join', '#IRC.pm' );
-  $kernel->post( 'test', 'away',
+
+  $_[HEAP]->yield( 'mode', $nick, '+i' );
+  $_[HEAP]->yield( 'join', $ARGV[2] || '#IRC.pm' );
+  $_[HEAP]->yield( 'away',
                  'JOSHUA SCHACTER IST MEIN GELEESCHAUMGUMMIRING DER LIEBE!' );
 }
 
@@ -59,7 +55,7 @@ sub _stop {
   my ($kernel) = $_[KERNEL];
 
   print "Control session stopped.\n";
-  $kernel->call( 'test', 'quit', 'Neenios on ice!' );
+  $_[HEAP]->call( 'quit', 'Neenios on ice!' );
 }
 
 
@@ -96,7 +92,7 @@ sub irc_public {
   my ($kernel, $who, $where, $msg) = @_[KERNEL, ARG0 .. ARG2];
   my $nick = (split /!/, $who)[0];
   print "<$nick:@{$where}[0]> $msg\n";
-  $kernel->post( test => privmsg => $where,
+  $_[HEAP]->yield( privmsg => $where,
                  $eliza->transform($msg)     # Filter it through a Chatbot.
                );
 }
@@ -104,14 +100,22 @@ sub irc_public {
 
 # here's where execution starts.
 
-POE::Component::IRC->new( 'test' ) or
+my ($object) = POE::Component::IRC->spawn(
+  				      Debug    => 1,
+				      Nick     => $nick,
+				      Server   => $ARGV[0] ||
+				                  'irc.rhizomatic.net',
+				      Port     => $ARGV[1] || 6667,
+				      Username => $name,
+				      Ircname  => 'Ask me about my colon!' ) or
   die "Can't instantiate new IRC component!\n";
 
 POE::Session->new( 'main' =>
                    [ qw( _start _stop irc_001 irc_kick irc_disconnected
 			 irc_error irc_socketerr irc_public
                        )
-                   ]
+                   ],
+		   [ $object ],
                  );
 $poe_kernel->run();
 

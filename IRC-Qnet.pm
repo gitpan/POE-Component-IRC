@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet.pm,v 1.4 2005/02/02 14:11:43 chris Exp $
+# $Id: IRC-Qnet.pm,v 1.6 2005/02/07 20:59:01 chris Exp $
 #
 # POE::Component::IRC::Qnet, by Chris Williams
 #
@@ -38,8 +38,28 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-my %irc_commands =
-  ( 'rehash'    => [ PRI_HIGH,   'noargs',        ],
+$VERSION = '1.1';
+
+sub _create {
+  my ($package) = shift;
+
+  my $self = bless ( { }, $package );
+
+  BEGIN {
+    my $has_client_dns = 0;
+    eval {
+      require POE::Component::Client::DNS;
+      $has_client_dns = 1;
+    };
+    $self->{HAS_CLIENT_DNS} = $has_client_dns;
+  }
+
+  if ( $self->{HAS_CLIENT_DNS} ) {
+    POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
+  }
+
+  $self->{IRC_CMDS} =
+  { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
     'restart'   => [ PRI_HIGH,   'noargs',        ],
     'quit'      => [ PRI_NORMAL, 'oneoptarg',     ],
     'version'   => [ PRI_HIGH,   'oneoptarg',     ],
@@ -78,105 +98,13 @@ my %irc_commands =
     'whois'     => [ PRI_HIGH,   'commasep',      ],
     'ctcp'      => [ PRI_HIGH,   'ctcp',          ],
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
-  );
-
-my @qbot_commands = qw(
-	hello
-	whoami
-	challengeauth
-	showcommands
-	auth
-	challenge
-	help
-	unlock
-	requestpassword
-	reset
-	newpass
-	email
-	authhistory
-	banclear
-	op
-	invite
-	removeuser
-	banlist
-	recover
-	limit
-	unbanall
-	whois
-	version
-	autolimit
-	ban
-	clearchan
-	adduser
-	settopic
-	chanflags
-	deopall
-	requestowner
-	bandel
-	chanlev
-	key
-	welcome
-	voice
-	);
-
-my @lbot_commands = qw(
-	whoami
-	whois
-	chanlev
-	adduser
-	removeuser
-	showcommands
-	op
-	voice
-	invite
-	setinvite
-	clearinvite
-	recover
-	deopall
-	unbanall
-	clearchan
-	version
-	welcome
-	requestowner
-	);
-
-my (@irc_events) = qw(ping 311 312 313 317 319 318 314 369 330);
-
-$VERSION = '1.1';
-
-BEGIN {
-  my $has_client_dns = 0;
-  eval {
-    require POE::Component::Client::DNS;
-    $has_client_dns = 1;
   };
-  eval "sub HAS_CLIENT_DNS () { $has_client_dns }";
-}
 
-if (HAS_CLIENT_DNS) {
-  POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
-}
+  $self->{IRC_EVTS} = [ qw(ping 311 312 313 317 319 318 314 369 330) ];
 
-# Set up a new IRC component. Doesn't actually create and return an object.
-sub new {
-  my ($package, $alias) = splice @_, 0, 2;
+  my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
 
-  unless ($alias) {
-    croak "Not enough arguments to $package->new()";
-  }
-
-  my @event_map = map {($_, $irc_commands{$_}->[CMD_SUB])} keys %irc_commands;
-  my @qbot_map = map {('qbot_' . $_, 'qnet_bot_commands')} @qbot_commands;
-  my @lbot_map = map {('lbot_' . $_, 'qnet_bot_commands')} @lbot_commands;
-  my @irc_event_map = map {( 'irc_' . $_ )} @irc_events;
-
-  my $self = bless ( { }, $package );
-
-  POE::Session->create( 
-		object_states => [
-		     $self => { @event_map,
-		                '_tryclose' => 'dcc_close', },
-		     $self => [qw( _dcc_failed
+  $self->{OBJECT_STATES_ARRAYREF} = [qw( _dcc_failed
 				      _dcc_read
 				      _dcc_timeout
 				      _dcc_up
@@ -206,12 +134,75 @@ sub new {
 				      sl_prioritized
 				      topic
 				      unregister
-				      userhost )], 
-		     $self => { @lbot_map, @qbot_map },
-		     $self => [ @irc_event_map ], ],
-		     args => [ $alias, @_ ] );
+				      userhost ), ( map {( 'irc_' . $_ )} @{ $self->{IRC_EVTS} } ) ];
 
-  # Set up defaults
+
+  # Stuff specific to IRC-Qnet
+
+  my @qbot_commands = qw(
+        hello
+        whoami
+        challengeauth
+        showcommands
+        auth
+        challenge
+        help
+        unlock
+        requestpassword
+        reset
+        newpass
+        email
+        authhistory
+        banclear
+        op
+        invite
+        removeuser
+        banlist
+        recover
+        limit
+        unbanall
+        whois
+        version
+        autolimit
+        ban
+        clearchan
+        adduser
+        settopic
+        chanflags
+        deopall
+        requestowner
+        bandel
+        chanlev
+        key
+        welcome
+        voice
+        );
+
+  my @lbot_commands = qw(
+        whoami
+        whois
+        chanlev
+        adduser
+        removeuser
+        showcommands
+        op
+        voice
+        invite
+        setinvite
+        clearinvite
+        recover
+        deopall
+        unbanall
+        clearchan
+        version
+        welcome
+        requestowner
+        );
+
+  my @qbot_map = map {('qbot_' . $_, 'qnet_bot_commands')} @qbot_commands;
+  my @lbot_map = map {('lbot_' . $_, 'qnet_bot_commands')} @lbot_commands;
+
+  $self->{OBJECT_STATES_HASHREF} = { @event_map, @qbot_map, @lbot_map, '_tryclose' => 'dcc_close' };
 
   $self->{server} = 'irc.quakenet.org';
   $self->{QBOT} = 'Q@Cserve.quakenet.org';
@@ -223,7 +214,7 @@ sub new {
 sub qnet_bot_commands {
   my ($kernel, $state, $self) = @_[KERNEL,STATE,OBJECT];
   my $message = join ' ', @_[ARG0 .. $#_];
-  my $pri = $irc_commands{'privmsghi'}->[CMD_PRI];
+  my $pri = $self->{IRC_CMDS}->{'privmsghi'}->[CMD_PRI];
   my $command = "PRIVMSG ";
 
   my ($target,$cmd) = split(/_/,$state);

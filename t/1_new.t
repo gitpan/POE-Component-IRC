@@ -33,5 +33,5 @@ sub test_start {
   my ($kernel,$heap) = @_[KERNEL,HEAP];
 
   pass('blah');
-  $kernel->post( 'irc-client' => 'shutdown' );
+  $kernel->post( 'irc-client'  => 'shutdown' );
 }
