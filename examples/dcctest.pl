@@ -56,14 +56,6 @@ sub irc_dcc_error {
 }
 
 
-sub _default {
-  my ($state, $event, $args) = @_[STATE, ARG0, ARG1];
-
-  $args ||= [];
-  print "$state -- $event @$args\n";
-}
-
-
 sub _stop {
   my ($kernel) = $_[KERNEL];
 
@@ -127,7 +119,7 @@ sub irc_dcc_request {
 
 POE::Component::IRC->new( 'test' ) or
   die "Can't instantiate new IRC component!\n";
-POE::Session->new( 'main' => [qw(_start _stop _default irc_001 irc_kick
+POE::Session->new( 'main' => [qw(_start _stop irc_001 irc_kick
 				 irc_disconnected irc_error irc_socketerr
 				 irc_dcc_done irc_dcc_error irc_dcc_request
 				 irc_public)] );

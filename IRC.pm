@@ -28,7 +28,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '2.2';
+$VERSION = '2.3';
 
 
 # What happens when an attempted DCC connection fails.
@@ -405,7 +405,7 @@ sub connect {
 				    SuccessEvent   => '_sock_up',
 				    FailureEvent   => '_sock_failed',
 				    ($heap->{localaddr} ?
-				     (BindAddress => $heap->{localaddr}) : ()),
+				       (BindAddress => $heap->{localaddr}) : ()),
 				  );
 }
 
@@ -532,6 +532,11 @@ sub dcc_close {
   _send_event( $kernel, $heap, 'irc_dcc_done', $id,
 	       @{$heap->{dcc}->{$id}}{ qw(nick type port file size done) } );
 
+  if ($heap->{dcc}->{$id}->{wheel}->get_driver_out_octets()) {
+    $kernel->delay( _tryclose => .2 => @_[ARG0..$#_] );
+    return;
+  }
+
   if (exists $heap->{dcc}->{$id}->{wheel}) {
     delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
     delete $heap->{dcc}->{$id}->{wheel};
@@ -626,6 +631,7 @@ sub new {
 		     'whois'     => \&commasep,
 		     'ctcp'      => \&ctcp,
 		     'ctcpreply' => \&ctcp,
+		     '_tryclose' => \&dcc_close,
 		     $package => [qw( _dcc_failed
 				      _dcc_read
 				      _dcc_timeout
@@ -682,7 +688,7 @@ sub oneandtwoopt {
 # The handler for commands that take at least one optional argument.
 sub oneoptarg {
   my ($kernel, $state) = @_[KERNEL, STATE];
-  my $arg = join '', @_[ARG0 .. $#_];
+  my $arg = join '', @_[ARG0 .. $#_] if defined $_[ARG0];
 
   $state = uc $state;
   if (defined $arg) {

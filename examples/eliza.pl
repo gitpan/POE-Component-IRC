@@ -55,15 +55,6 @@ sub irc_001 {
 }
 
 
-sub _default {
-  my ($state, $event, $args) = @_[STATE, ARG0, ARG1];
-  $args ||= [];
-
-  # Uncomment for noisy operation.
-  # print "$state -- $event @$args\n";
-}
-
-
 sub _stop {
   my ($kernel) = $_[KERNEL];
 
@@ -117,9 +108,8 @@ POE::Component::IRC->new( 'test' ) or
   die "Can't instantiate new IRC component!\n";
 
 POE::Session->new( 'main' =>
-                   [ qw( _start _stop _default irc_001
-                         irc_kick irc_disconnected irc_error irc_socketerr
-                         irc_public
+                   [ qw( _start _stop irc_001 irc_kick irc_disconnected
+			 irc_error irc_socketerr irc_public
                        )
                    ]
                  );
