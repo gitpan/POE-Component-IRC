@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 3.6 2005/02/23 13:15:36 chris Exp $
+# $Id: IRC.pm,v 3.8 2005/03/01 17:43:16 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -46,8 +46,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '3.5';
-$REVISION = do {my@r=(q$Revision: 3.6 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '3.6';
+$REVISION = do {my@r=(q$Revision: 3.8 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -635,7 +635,13 @@ sub _start {
   $self->{send_time}  = 0;
 
   $session->option( @options ) if @options;
-  $kernel->alias_set($alias) if ( defined ( $alias ) );
+
+  if ( $alias ) {
+     $kernel->alias_set($alias);
+  } else {
+     $kernel->alias_set('PoCo-IRC-' . $session->ID() );
+  }
+
   $kernel->yield( 'register', @{ $self->{IRC_EVTS} } );
   $self->{irc_filter} = POE::Filter::IRC->new();
   $self->{ctcp_filter} = POE::Filter::CTCP->new();
@@ -807,7 +813,10 @@ sub dcc {
 
   if ( $self->{dcc_bind_port} ) {
 	$bindport = shift @{ $self->{dcc_bind_port} };
-	return unless ( defined ( $bindport ) );
+	unless ($bindport) {
+		warn "dcc: Can't allocate listen port for DCC $type";
+		return;
+	}
   }
 
   $factory = POE::Wheel::SocketFactory->new(
@@ -1450,6 +1459,24 @@ sub call {
   my ($self) = shift;
 
   $poe_kernel->call( $self->session_id() => @_ );
+}
+
+sub _validate_command {
+  my ($self) = shift;
+  my ($cmd) = lc ( $_[0] ) || return 0;
+
+  foreach my $command ( keys %{ $self->{IRC_CMDS} } ) {
+	if ( $cmd eq $command ) {
+		return 1;
+	}
+  }
+  return 0;
+}
+
+sub connected {
+  my ($self) = shift;
+
+  return $self->{connected};
 }
 
 # Automatically replies to a PING from the server. Do not confuse this

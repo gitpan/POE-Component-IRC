@@ -23,6 +23,7 @@ examples/dcctest.pl
 examples/eliza.pl
 examples/tinyurl.pl
 examples/aimproxy.pl
+examples/simpleclient.pl
 t/1_new.t
 t/1_spawn.t
 t/2_State.t

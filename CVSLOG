@@ -1,15 +1,19 @@
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/CVSLOG,v
 Working file: CVSLOG
-head: 3.5
+head: 3.6
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.4.0.2
 keyword substitution: kv
-total revisions: 5;	selected revisions: 5
+total revisions: 6;	selected revisions: 6
 description:
+----------------------------
+revision 3.6
+date: 2005/02/23 19:36:49;  author: chris;  state: Exp;  lines: +291 -68
+Hmmmm.
 ----------------------------
 revision 3.5
 date: 2005/02/19 13:26:44;  author: chris;  state: Exp;  lines: +0 -0
@@ -34,7 +38,7 @@ Added CVSLOG as a public testimony of my development efforts.
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/Changes,v
 Working file: Changes
-head: 3.7
+head: 3.9
 branch:
 locks: strict
 access list:
@@ -43,8 +47,16 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 18;	selected revisions: 18
+total revisions: 20;	selected revisions: 20
 description:
+----------------------------
+revision 3.9
+date: 2005/03/01 18:00:51;  author: chris;  state: Exp;  lines: +2 -1
+Final update before CPAN release.
+----------------------------
+revision 3.8
+date: 2005/03/01 17:43:16;  author: chris;  state: Exp;  lines: +22 -2
+See Changes for details. 3.6
 ----------------------------
 revision 3.7
 date: 2005/02/23 13:30:00;  author: chris;  state: Exp;  lines: +2 -1
@@ -183,15 +195,19 @@ Initial check in with patches applied.
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet-State.pm,v
 Working file: IRC-Qnet-State.pm
-head: 3.6
+head: 3.7
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.8.0.2
 keyword substitution: kv
-total revisions: 12;	selected revisions: 12
+total revisions: 13;	selected revisions: 13
 description:
+----------------------------
+revision 3.7
+date: 2005/03/01 17:43:16;  author: chris;  state: Exp;  lines: +8 -8
+See Changes for details. 3.6
 ----------------------------
 revision 3.6
 date: 2005/02/23 13:15:36;  author: chris;  state: Exp;  lines: +7 -5
@@ -286,15 +302,19 @@ Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL a
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-State.pm,v
 Working file: IRC-State.pm
-head: 3.6
+head: 3.7
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.12.0.2
 keyword substitution: kv
-total revisions: 16;	selected revisions: 16
+total revisions: 17;	selected revisions: 17
 description:
+----------------------------
+revision 3.7
+date: 2005/03/01 17:43:16;  author: chris;  state: Exp;  lines: +27 -8
+See Changes for details. 3.6
 ----------------------------
 revision 3.6
 date: 2005/02/23 13:15:36;  author: chris;  state: Exp;  lines: +10 -6
@@ -364,7 +384,7 @@ Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qn
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC.pm,v
 Working file: IRC.pm
-head: 3.6
+head: 3.8
 branch:
 locks: strict
 access list:
@@ -373,8 +393,16 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 32;	selected revisions: 32
+total revisions: 34;	selected revisions: 34
 description:
+----------------------------
+revision 3.8
+date: 2005/03/01 17:43:16;  author: chris;  state: Exp;  lines: +7 -4
+See Changes for details. 3.6
+----------------------------
+revision 3.7
+date: 2005/02/28 07:27:05;  author: chris;  state: Exp;  lines: +27 -3
+Various things
 ----------------------------
 revision 3.6
 date: 2005/02/23 13:15:36;  author: chris;  state: Exp;  lines: +137 -75
@@ -509,7 +537,7 @@ Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qn
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/MANIFEST,v
 Working file: MANIFEST
-head: 3.5
+head: 3.6
 branch:
 locks: strict
 access list:
@@ -518,8 +546,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 17;	selected revisions: 17
+total revisions: 18;	selected revisions: 18
 description:
+----------------------------
+revision 3.6
+date: 2005/02/28 07:27:06;  author: chris;  state: Exp;  lines: +1 -0
+Various things
 ----------------------------
 revision 3.5
 date: 2005/02/19 13:26:45;  author: chris;  state: Exp;  lines: +0 -0
@@ -1044,6 +1076,26 @@ Initial revision
 revision 1.1.1.1
 date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
 Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/examples/simpleclient.pl,v
+Working file: examples/simpleclient.pl
+head: 3.2
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 3.2
+date: 2005/02/28 07:27:06;  author: chris;  state: Exp;  lines: +81 -6
+Various things
+----------------------------
+revision 3.1
+date: 2005/02/23 14:07:36;  author: chris;  state: Exp;
+Started work on examples/simpleclient.pl
 =============================================================================
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/examples/tinyurl.pl,v

@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet-State.pm,v 3.6 2005/02/23 13:15:36 chris Exp $
+# $Id: IRC-Qnet-State.pm,v 3.7 2005/03/01 17:43:16 chris Exp $
 #
 # POE::Component::IRC::Qnet::State, by Chris Williams
 #
@@ -38,7 +38,7 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '1.2';
+$VERSION = '1.3';
 
 sub _create {
   my ($package) = shift;
@@ -223,7 +223,7 @@ sub irc_330 {
 sub irc_354 {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
   my ($first,$real) = split(/ :/,$_[ARG1]);
-  my ($channel,$user,$host,$server,$nick,$status,$auth) = split(/ /,$first);
+  my ($query,$channel,$user,$host,$server,$nick,$status,$auth) = split(/ /,$first);
   
   $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{Nick} = $nick;
   $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{User} = $user;
@@ -234,7 +234,7 @@ sub irc_354 {
   if ( $auth and defined ( $self->{USER_AUTHED}->{ u_irc ( $nick ) } ) ) {
 	$self->{USER_AUTHED}->{ u_irc ( $nick ) } = $auth;
   }
-  if ( $channel ne '*' ) {
+  if ( $query eq '101' ) {
     my ($whatever) = '';
     if ( $status =~ /\@/ ) { $whatever .= 'o'; }
     if ( $status =~ /\+/ ) { $whatever .= 'v'; }
@@ -276,15 +276,15 @@ sub irc_join {
   my ($nick) = ( split /!/, $who )[0];
   my ($userhost) = ( split /!/, $who )[1];
   my ($user,$host) = split(/\@/,$userhost);
-  my ($flags) = '%cunharsf';
+  my ($flags) = '%cunharsft';
 
   if ( u_irc ( $nick ) eq u_irc ( $self->{RealNick} ) ) {
         delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) } );
         $self->{CHANNEL_SYNCH}->{ u_irc ( $channel ) } = { MODE => 0, WHO => 0 };
-        $kernel->yield ( 'sl' => "WHO $channel $flags" );
+        $kernel->yield ( 'sl' => "WHO $channel $flags,101" );
         $kernel->yield ( 'mode' => $channel );
   } else {
-        $kernel->yield ( 'sl' => "WHO $nick $flags" );
+        $kernel->yield ( 'sl' => "WHO $nick $flags,102" );
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{Nick} = $nick;
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{User} = $user;
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{Host} = $host;
@@ -313,7 +313,7 @@ sub irc_mode {
 		}
 		if ( $source =~ /^[QL]$/ and ( not $self->is_nick_authed($arg) ) and ( not $self->{USER_AUTHED}->{ u_irc ( $arg ) } ) ) {
 		   $self->{USER_AUTHED}->{ u_irc ( $arg ) } = 0;
-		   $kernel->yield ( 'sl' => "WHO $arg " . '%cunharsf' );
+		   $kernel->yield ( 'sl' => "WHO $arg " . '%cunharsft,102' );
 		}
                 last SWITCH;
           }

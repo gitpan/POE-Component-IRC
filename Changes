@@ -1,7 +1,21 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.6   Tue Mar 01 17:47:05 GMT 2005 "Y Adeilad Daffydd-Sant" 
+				   ( The Saint David Build(ing) )
+    - Applied ketas' patch to IRC-State. Adds channel_modes
+      method and some code tidying.
+    - Spotted that in some cases the component *needs* an
+      alias. Made it use an internal alias unless one is 
+      specified.
+    - Applied another ketas patch to IRC.pm, puts a 
+      friendly message when we can't allocate a DCC port.
+    - Updated IRC-Qnet-State.pm to use a 'querytype' in the 
+      extended WHO command, to specify <channel> or <nick>
+      WHO queries, due to spurious channels appearing in the
+      state. Big thanks to MikeC @ Qnet for the pointers.
+
 3.5   Wed Feb 23 13:28:05 GMT 2005
-    - IRC-State bug spotted and patched by ketas
+    - IRC-State bug spotted and patched by ketas @ MAGnet
     - Same bug caught and squashed in IRC-Qnet-State by me.
     - Sorted out DCCPorts. It has to be an arrayref now.
 
@@ -44,7 +58,7 @@ Revision history for Perl extension POE::Component::IRC.
     - Implemented 'irc_whois' and 'irc_whowas' which
       gather all the salient data from the numeric replies
       and send one event containing a hashref.
-      As suggested by numerous bods on #PoE >;o)
+      As suggested by numerous bods on #PoE @ MAGnet >;o)
 
 3.1   Fri Jan 21 11:59:56 GMT 2005
     - Converted _send_event sub to object method.
@@ -267,3 +281,10 @@ Revision history for Perl extension POE::Component::IRC.
       functional. Can send every command (I think), and has a
       half-written parser that handles the most common IRC events, and
       a few which it wasn't meant to handle.
+
+=============================================================================
+
+Key:
+
+Qnet == Quakenet <irc.quakenet.org>
+MAGnet == MAGnet <irc.perl.org>

@@ -1,4 +1,4 @@
-# $Id: IRC-State.pm,v 3.6 2005/02/23 13:15:36 chris Exp $
+# $Id: IRC-State.pm,v 3.7 2005/03/01 17:43:16 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -310,14 +310,16 @@ sub irc_mode {
           }
           if ( $mode =~ /^-(.)/ ) {
                 my ($flag) = $1;
-                $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} =~ s/$flag//;
+                if ($self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} =~ /$flag/) {
+                      $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} =~ s/$flag//;
+                }
                 last SWITCH;
           }
         }
      }
      # Lets make the channel mode nice
      if ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} ) {
-        $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} = join('', sort( split( //, $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} ) ) );
+        $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} = join('', sort {uc $a cmp uc $b} ( split( //, $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} ) ) );
      } else {
         delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} );
      }
@@ -388,7 +390,7 @@ sub irc_324 {
         }
   }
   if ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} ) {
-        $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} = join('', sort( split( //, $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} ) ) );
+        $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} = join('', sort {uc $a cmp uc $b} ( split( //, $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} ) ) );
   }
   $self->_channel_sync_mode($channel);
   if ( $self->_channel_sync($channel) ) {
@@ -682,6 +684,20 @@ sub channel_key {
   return undef;
 }
 
+sub channel_modes {
+  my ($self) = shift;
+  my ($channel) = u_irc ( $_[0] ) || return undef;
+
+  unless ( $self->_channel_exists($channel) ) {
+	return undef;
+  }
+
+  if ( defined ( $self->{STATE}->{Chans}->{ $channel }->{Mode} ) ) {
+	return $self->{STATE}->{Chans}->{ $channel }->{Mode};
+  }
+  return undef;
+}
+
 sub is_channel_member {
   my ($self) = shift;
   my ($channel) = u_irc ( $_[0] ) || return 0;
@@ -742,9 +758,9 @@ sub ban_mask {
 
   # Convert the mask from IRC to regex.
   $mask = u_irc ( $mask );
-  $mask =~ s/\*/[\x01-\xFF]{0,}/g;
-  $mask =~ s/\?/[\x01-\xFF]{1,1}/g;
-  $mask =~ s/\@/\x40/g;
+  $mask = quotemeta $mask;
+  $mask =~ s/\\\*/[\x01-\xFF]{0,}/g;
+  $mask =~ s/\\\?/[\x01-\xFF]{1,1}/g;
 
   foreach my $nick ( $self->channel_list($channel) ) {
 	if ( $self->nick_long_form($nick) =~ /^$mask$/ ) {
@@ -822,7 +838,10 @@ not exist in the state then a 0 will be returned.
 =item is_channel_mode_set
 
 Expects a channel and a single mode flag [A-Za-z]. Returns 1 if that mode is set on the channel, 0 otherwise.
-It 
+
+=item channel_modes
+
+Expects a channel as parameter. Returns channel modes or undef.
 
 =item is_channel_member
 
