@@ -1,6 +1,17 @@
 $Id: Changes,v 1.5 1999/12/12 11:48:07 dennis Exp $
 Revision history for Perl extension POE::Component::IRC.
 
+2.6   date
+    - Brian Kelly thoughtfully pointed out an URL in the documentation
+      that was being mangled by pod2html. Should look better now.
+    - Added a note about handling CTCP actions to the POD documentation,
+      since that seems to be a source of confusion for a lot of people.
+    - Added a 'list' event, which I seem to have overlooked entirely
+      until now. Thanks to J.D. McCown for pointing it out.
+    - Attempted to add Jim Westfall's asynchronous DNS patch, but I
+      really need to learn a little more about IPv6 before I attempt to
+      port somebody else's code to it. Hopefully in the next release.
+
 2.5   Sun Oct 27 11:03:57 PST 2002
     - Added an AIM <-> IRC proxy bot to the example scripts. Share and enjoy!
     - I just now noticed that POE::Component::IRC sessions never get

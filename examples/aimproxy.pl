@@ -15,7 +15,7 @@ use POE::Component::IRC;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Net::AIM;
 
-use constant MSG_INTERVAL => 1.4;
+use constant MSG_INTERVAL => 2.2;
 
 my $channel = '#tempura';
 my $irc_server = $ARGV[1] || "scissorman.phreeow.net";
@@ -43,6 +43,7 @@ sub _start {
   $kernel->alias_set( 'control' );
   $kernel->yield( 'aim_listen' );
   $heap->{aimqueue} = [];
+  $heap->{lastsend} = [gettimeofday];
 }
 
 
@@ -140,7 +141,7 @@ sub aim_got_message {
     } elsif ($msg =~ m|^/me\s+(.*)$|i) {
       $kernel->post( "irc_$nick", 'ctcp', $channel, "ACTION $1" );
 
-    } elsif ($msg =~ m!^/(?:quit|leave)(?:\s+(.*))?$!i) {
+    } elsif ($msg =~ m!^/(?:quit|part|leave)(?:\s+(.*))?$!i) {
       my $quitmsg = $1 || "Client Exiting";
       $kernel->post( "irc_$nick", 'quit', "[aimproxy] $quitmsg" );
 
@@ -188,7 +189,7 @@ sub aim_queue {
   my ($kernel, $heap, $nick, $msg) = @_[KERNEL, HEAP, ARG0, ARG1];
 
   return unless $heap->{friends}->{$nick};
-  push @{$heap->{aimqueue}}, [[gettimeofday], $nick, $msg];
+  push @{$heap->{aimqueue}}, [$nick, $msg];
   $kernel->yield( 'aim_send' );
 }
 
@@ -198,9 +199,10 @@ sub aim_send {
   my $timenow = [gettimeofday];
 
   if (@{$heap->{aimqueue}} > 0 and
-      tv_interval( $heap->{aimqueue}->[0]->[0], $timenow ) > MSG_INTERVAL) {
+	tv_interval( $heap->{lastsend}, $timenow ) > MSG_INTERVAL) {
     my $msg = shift @{$heap->{aimqueue}};
-    $aim->send_im( $msg->[1], $msg->[2] );
+    $aim->send_im( $msg->[0], $msg->[1] );
+    $heap->{lastsend} = $timenow;
   }
 }
 
@@ -230,6 +232,15 @@ sub _get_aim_username {
   my $user = (split /_/, ($kernel->alias_list( $sender ))[0], 2)[1];
   die "No such user: \"$user\"" unless exists $heap->{friends}->{$user};
   return $user;
+}
+
+
+sub irc_ctcp_action {
+  my ($kernel, $heap, $who, $msg) = @_[KERNEL, HEAP, ARG0, ARG2];
+  my $user = _get_aim_username( @_ );
+  my ($nick) = ($who =~ /^(.*)?!/);
+
+  $kernel->yield( 'aim_queue', $user, "* $nick $msg" );
 }
 
 
@@ -356,10 +367,10 @@ sub irc_socketerr {
 
 POE::Session->new( 'main' => [qw( _start _stop aim_buddy_update aim_friends
 				  aim_got_message aim_listen aim_queue aim_send
-				  irc_001 irc_433 irc_disconnected irc_error
-				  irc_join irc_kick irc_mode irc_msg irc_nick
-				  irc_notice irc_part irc_public irc_quit
-				  irc_socketerr )]
+				  irc_001 irc_433 irc_ctcp_action
+                                  irc_disconnected irc_error irc_join irc_kick
+				  irc_mode irc_msg irc_nick irc_notice irc_part
+				  irc_public irc_quit irc_socketerr )]
 		  );
 $poe_kernel->run();
 

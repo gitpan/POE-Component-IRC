@@ -74,12 +74,13 @@ my %irc_commands =
     'mode'      => [ PRI_HIGH,   \&spacesep,      ],
     'part'      => [ PRI_HIGH,   \&commasep,      ],
     'names'     => [ PRI_HIGH,   \&commasep,      ],
+    'list'      => [ PRI_HIGH,   \&commasep,      ],
     'whois'     => [ PRI_HIGH,   \&commasep,      ],
     'ctcp'      => [ PRI_HIGH,   \&ctcp,          ],
     'ctcpreply' => [ PRI_HIGH,   \&ctcp,          ],
   );
 
-$VERSION = '2.5';
+$VERSION = '2.6';
 
 
 # What happens when an attempted DCC connection fails.
@@ -1253,6 +1254,14 @@ network. Takes two optional arguments, which I'm too lazy to document
 here, so all you would-be linklooker writers should probably go dig up
 the RFC.
 
+=item list
+
+Asks the server for a list of visible channels and their topics. Takes
+any number of optional arguments: names of channels to get topic
+information for. If called without any channel names, it'll list every
+visible channel on the IRC network. This is usually a really big list,
+so don't do this often.
+
 =item motd
 
 Request the server's "Message of the Day", a document which typically
@@ -1420,9 +1429,10 @@ anything back to the server.
 
 irc_ctcp_whatever events are generated upon receipt of CTCP messages.
 For instance, receiving a CTCP PING request generates an irc_ctcp_ping
-event, CTCP SOURCE generates an irc_ctcp_source event, blah blah, so on
-and so forth. ARG0 is the nick!hostmask of the sender. ARG1 is the
-channel/recipient name(s). ARG2 is the text of the CTCP message.
+event, CTCP ACTION (produced by typing "/me" in most IRC clients)
+generates an irc_ctcp_action event, blah blah, so on and so forth. ARG0
+is the nick!hostmask of the sender. ARG1 is the channel/recipient
+name(s). ARG2 is the text of the CTCP message.
 
 Note that DCCs are handled separately -- see the 'irc_dcc_request'
 event, below.
@@ -1539,7 +1549,7 @@ is the name of the server which sent the message. ARG1 is the text of
 the message.
 
 For an excellent list of the various numeric codes and what they mean,
-try this page: E<lt>http://www.pairc.com/raw/E<gt>.
+try this page: http://www.pairc.com/raw/
 
 =back
 
