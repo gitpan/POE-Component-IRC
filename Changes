@@ -1,5 +1,11 @@
 Revision history for Perl extension POE::Component::IRC.
 
+3.2   Wed Feb 02 11:00:59 GMT 2005
+    - Implemented 'irc_whois' and 'irc_whowas' which
+      gather all the salient data from the numeric replies
+      and send one event containing a hashref.
+      As suggested by numerous bods on #PoE >;o)
+
 3.1   Fri Jan 21 11:59:56 GMT 2005
     - Converted _send_event sub to object method.
     - Added IRC-Qnet, with specific extensions for Quakenet.

@@ -61,15 +61,13 @@ the "examples" subdirectory of the distribution; these scripts make a
 good template for your own bots, if you need one.
 
 
-5. BUGS AND WISH LIST
----------------------
-
-	- Needs a better test script. I'd settle for anything that did
-	  something more exhaustive than "use POE::Component::IRC; exit;".
+5. BUGS AND WISH LIST AND PATCHES
+---------------------------------
 
 	To report bugs, email the maintainer or preferably
 	use http://rt.cpan.org/
 
+	Patches against the current CPAN distribution will be accepted.
 
 6. DISCLAIMER
 -------------

@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.8 2005/01/21 12:17:55 chris Exp $
+# $Id: IRC.pm,v 1.9 2005/02/02 10:19:37 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -87,7 +87,9 @@ my %irc_commands =
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
   );
 
-$VERSION = '3.1';
+my (@irc_events) = qw(ping 311 312 313 317 319 318 314 369);
+
+$VERSION = '3.2';
 
 BEGIN {
   my $has_client_dns = 0;
@@ -342,17 +344,21 @@ sub _parseline {
 # because I do it so much, but it's not an actual POE event because it
 # doesn't need to be one and I don't need the overhead.
 # Changed to a method by BinGOs, 21st January 2005.
+# Amended by BinGOs (2nd February 2005) use call to send events to *our* session first.
 sub _send_event  {
   my ($self) = shift;
   my ($kernel, $event, @args) = @_;
+  my ($session) = $kernel->get_active_session();
   my %sessions;
 
   foreach (values %{$self->{events}->{'irc_all'}},
 	   values %{$self->{events}->{$event}}) {
     $sessions{$_} = $_;
   }
+  # Make sure our session gets notified of any requested events before any other bugger
+  $kernel->call( $session => $event => @args ) if ( defined ( $sessions{$session} ) );
   foreach (values %sessions) {
-    $kernel->post( $_, $event, @args );
+    $kernel->post( $_, $event, @args ) unless ( $_ eq $session );
   }
 }
 
@@ -453,7 +459,7 @@ sub _start {
 
   $session->option( @options ) if @options;
   $kernel->alias_set($alias);
-  $kernel->yield( 'register', 'ping' );
+  $kernel->yield( 'register', @irc_events );
   $self->{irc_filter} = POE::Filter::IRC->new();
   $self->{ctcp_filter} = POE::Filter::CTCP->new();
 }
@@ -782,15 +788,6 @@ sub dcc_close {
 }
 
 
-# Automatically replies to a PING from the server. Do not confuse this
-# with CTCP PINGs, which are a wholly different animal that evolved
-# much later on the technological timeline.
-sub irc_ping {
-  my ($kernel, $arg) = @_[KERNEL, ARG0];
-
-  $kernel->yield( 'sl_login', "PONG $arg" );
-}
-
 
 # The way /notify is implemented in IRC clients.
 sub ison {
@@ -838,6 +835,8 @@ sub new {
 
   my @event_map = map {($_, $irc_commands{$_}->[CMD_SUB])} keys %irc_commands;
 
+  my @irc_event_map = map {( 'irc_' . $_ )} @irc_events;
+
   my $self = bless ( { }, $package );
 
   POE::Session->create( 
@@ -863,7 +862,6 @@ sub new {
 				      dcc_close
 				      do_connect
 				      got_dns_response
-				      irc_ping
 				      ison
 				      kick
 				      register
@@ -875,7 +873,8 @@ sub new {
 				      sl_prioritized
 				      topic
 				      unregister
-				      userhost )], ],
+				      userhost )],
+		     $self => [ @irc_event_map ], ],
 		     args => [ $alias, @_ ] );
   return $self;
 }
@@ -1178,6 +1177,111 @@ sub server_name {
   my ($self) = shift;
 
   return $self->{INFO}->{ServerName};
+}
+
+# Automatically replies to a PING from the server. Do not confuse this
+# with CTCP PINGs, which are a wholly different animal that evolved
+# much later on the technological timeline.
+sub irc_ping {
+  my ($kernel, $arg) = @_[KERNEL, ARG0];
+
+  $kernel->yield( 'sl_login', "PONG $arg" );
+}
+
+# Handlers for WHOIS and WHOWAS ( yes, they are nearly the same, xantus )
+
+# RPL_WHOISUSER
+sub irc_311 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick,$user,$host) = ( split / /, $_[ARG1] )[0..2];
+  my ($real) = substr($_[ARG1],index($_[ARG1],' :')+2);
+
+  $self->{WHOIS}->{ $nick }->{nick} = $nick;
+  $self->{WHOIS}->{ $nick }->{user} = $user;
+  $self->{WHOIS}->{ $nick }->{host} = $host;
+  $self->{WHOIS}->{ $nick }->{real} = $real;
+}
+
+# RPL_WHOISOPERATOR
+sub irc_313 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($oper) = substr($_[ARG1],index($_[ARG1],' :')+2);
+  my ($nick) = ( split / :/, $_[ARG1] )[0];
+
+
+  $self->{WHOIS}->{ $nick }->{oper} = $oper;
+}
+
+# RPL_WHOISSERVER
+sub irc_312 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick,$server) = ( split / /, $_[ARG1] )[0..1];
+
+  # This can be returned in reply to either a WHOIS or a WHOWAS *sigh*
+  if ( defined ( $self->{WHOWAS}->{ $nick } ) ) {
+	$self->{WHOWAS}->{ $nick }->{server} = $server;
+  } else {
+	$self->{WHOIS}->{ $nick }->{server} = $server;
+  }
+}
+
+# RPL_WHOISIDLE
+sub irc_317 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick,@args) = split (/ /, ( split / :/, $_[ARG1] )[0] );
+
+  $self->{WHOIS}->{ $nick }->{idle} = $args[0];
+  $self->{WHOIS}->{ $nick }->{signon} = $args[1];
+}
+
+# RPL_WHOISCHANNELS
+sub irc_319 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my (@args) = split(/ /, $_[ARG1]);
+  my ($nick) = shift @args;
+  $args[0] =~ s/^://;
+
+  if ( not defined ( $self->{WHOIS}->{ $nick }->{channels} ) ) {
+	$self->{WHOIS}->{ $nick }->{channels} = [ @args ];
+  } else {
+  	push( @{ $self->{WHOIS}->{ $nick }->{channels} }, @args );
+  }
+}
+
+# RPL_ENDOFWHOIS
+sub irc_318 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick) = ( split / :/, $_[ARG1] )[0];
+
+  my ($whois) = delete ( $self->{WHOIS}->{ $nick } );
+
+  if ( defined ( $whois ) ) {
+	$self->_send_event( $kernel, 'irc_whois', $whois );
+  }
+}
+
+# RPL_WHOWASUSER
+sub irc_314 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick,$user,$host) = ( split / /, $_[ARG1] )[0..2];
+  my ($real) = substr($_[ARG1],index($_[ARG1],' :')+2);
+
+  $self->{WHOWAS}->{ $nick }->{nick} = $nick;
+  $self->{WHOWAS}->{ $nick }->{user} = $user;
+  $self->{WHOWAS}->{ $nick }->{host} = $host;
+  $self->{WHOWAS}->{ $nick }->{real} = $real;
+}
+
+# RPL_ENDOFWHOWAS
+sub irc_369 {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  my ($nick) = ( split / :/, $_[ARG1] )[0];
+
+  my ($whowas) = delete ( $self->{WHOWAS}->{ $nick } );
+
+  if ( defined ( $whowas ) ) {
+	$self->_send_event( $kernel, 'irc_whowas', $whowas );
+  }
 }
 
 1;
@@ -1578,14 +1682,17 @@ the RFC.
 
 Queries the IRC server for detailed information about a particular
 user. Takes any number of arguments: nicknames or hostmasks to ask for
-information about.
+information about. As of version 3.2, you will receive an 'irc_whois' 
+event in addition to the usual numeric responses. See below for details.
 
 =item whowas
 
 Asks the server for information about nickname which is no longer
 connected. Takes at least one argument: a nickname to look up (no
 wildcards allowed), the optional maximum number of history entries to
-return, and the optional server hostname to query.
+return, and the optional server hostname to query. As of version 3.2,
+you will receive an 'irc_whowas' event in addition to the usual numeric
+responses. See below for details.
 
 =back
 
@@ -1782,6 +1889,21 @@ the clever, witty message they left behind on the way out.
 
 Sent when a connection couldn't be established to the IRC server. ARG0
 is probably some vague and/or misleading reason for what failed.
+
+=item irc_whois
+
+Sent in response to a 'whois' query. ARG0 is a hashref, with the following
+keys: 'nick', the users nickname; 'user', the users username; 'host', their
+hostname; 'real', their real name; 'idle', their idle time in seconds; 'signon',
+the epoch time they signed on ( will be undef if ircd does not support this );
+'channels', an arrayref listing visible channels they are on, the channel is prefixed
+with '@','+','%' depending on whether they have +o +v or +h; 'server', their server ( 
+might not be useful on some networks ); 'oper', whether they are an IRCop, contains the
+IRC operator string if they are, undef if they aren't.
+
+=item irc_whowas
+
+Similar to the above, except some keys will be missing.
 
 =item All numeric events (see RFC 1459)
 
