@@ -28,11 +28,7 @@ sub new {
 # Set/clear the 'debug' flag.
 sub debug {
   my $self = shift;
-
-  if (@_) {
-    $self->{'debug'} = $_[0];
-  }
-
+  $self->{'debug'} = $_[0] if @_;
   return( $self->{'debug'} );
 }
 

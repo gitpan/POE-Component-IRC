@@ -25,7 +25,7 @@ use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
 use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
 use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
 
-$VERSION = '1.6';
+$VERSION = '1.7';
 
 
 # What happens when an attempted DCC connection fails.
@@ -513,8 +513,8 @@ sub dcc_chat {
 sub dcc_close {
   my ($kernel, $heap, $id) = @_[KERNEL, HEAP, ARG0];
 
-  _send_event( $kernel, $heap, 'done', $id,
-	       @{$heap->{dcc}->{$id}}{qw(nick type port file)} );
+  _send_event( $kernel, $heap, 'irc_dcc_done', $id,
+	       @{$heap->{dcc}->{$id}}{ qw(nick type port file size done) } );
 
   if (exists $heap->{dcc}->{$id}->{wheel}) {
     delete $heap->{wheelmap}->{$heap->{dcc}->{$id}->{wheel}->ID};
