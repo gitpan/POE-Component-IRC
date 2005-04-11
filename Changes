@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.1   Mon Apr 11 11:24:44 BST 2005
+    - NATAddr bug spotted by apeiron @ MAGnet. Fixed.
+    - webfox spotted a problem with whois plugin and POE
+      Kernel assert_default. Hopefully fixed.
+
 4.0   Tue Apr 05 10:39:42 BST 2005
     - Fixed a minor bug in Filter-IRC.pm, where it wasn't
       decoloning the mode line before splitting it. 

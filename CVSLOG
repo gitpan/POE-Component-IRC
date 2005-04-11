@@ -1,15 +1,19 @@
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/CVSLOG,v
 Working file: CVSLOG
-head: 3.10
+head: 3.11
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.4.0.2
 keyword substitution: kv
-total revisions: 10;	selected revisions: 10
+total revisions: 11;	selected revisions: 11
 description:
+----------------------------
+revision 3.11
+date: 2005/04/05 22:29:53;  author: chris;  state: Exp;  lines: +80 -16
+Bug reported by apeiron with nataddr argument. Fixed.
 ----------------------------
 revision 3.10
 date: 2005/03/28 18:24:11;  author: chris;  state: Exp;  lines: +50 -14
@@ -54,7 +58,7 @@ Added CVSLOG as a public testimony of my development efforts.
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/Changes,v
 Working file: Changes
-head: 3.21
+head: 3.23
 branch:
 locks: strict
 access list:
@@ -63,8 +67,16 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 32;	selected revisions: 32
+total revisions: 34;	selected revisions: 34
 description:
+----------------------------
+revision 3.23
+date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +3 -1
+webfox teased a bug with whois plugin and POE::Kernel assert_default. Fixed by moving plugin_add Whois to _start event handler.
+----------------------------
+revision 3.22
+date: 2005/04/05 22:29:53;  author: chris;  state: Exp;  lines: +3 -0
+Bug reported by apeiron with nataddr argument. Fixed.
 ----------------------------
 revision 3.21
 date: 2005/04/05 09:42:11;  author: chris;  state: Exp;  lines: +1 -1
@@ -263,15 +275,19 @@ Initial check in with patches applied.
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet-State.pm,v
 Working file: IRC-Qnet-State.pm
-head: 3.11
+head: 3.12
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.8.0.2
 keyword substitution: kv
-total revisions: 17;	selected revisions: 17
+total revisions: 18;	selected revisions: 18
 description:
+----------------------------
+revision 3.12
+date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +2 -4
+webfox teased a bug with whois plugin and POE::Kernel assert_default. Fixed by moving plugin_add Whois to _start event handler.
 ----------------------------
 revision 3.11
 date: 2005/03/31 14:22:11;  author: chris;  state: Exp;  lines: +11 -1
@@ -345,15 +361,19 @@ Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qn
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet.pm,v
 Working file: IRC-Qnet.pm
-head: 3.7
+head: 3.8
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.6.0.2
 keyword substitution: kv
-total revisions: 9;	selected revisions: 9
+total revisions: 10;	selected revisions: 10
 description:
+----------------------------
+revision 3.8
+date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +2 -4
+webfox teased a bug with whois plugin and POE::Kernel assert_default. Fixed by moving plugin_add Whois to _start event handler.
 ----------------------------
 revision 3.7
 date: 2005/03/31 14:22:12;  author: chris;  state: Exp;  lines: +11 -1
@@ -394,15 +414,19 @@ Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL a
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-State.pm,v
 Working file: IRC-State.pm
-head: 3.13
+head: 3.14
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.12.0.2
 keyword substitution: kv
-total revisions: 23;	selected revisions: 23
+total revisions: 24;	selected revisions: 24
 description:
+----------------------------
+revision 3.14
+date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +2 -4
+webfox teased a bug with whois plugin and POE::Kernel assert_default. Fixed by moving plugin_add Whois to _start event handler.
 ----------------------------
 revision 3.13
 date: 2005/04/04 10:55:03;  author: chris;  state: Exp;  lines: +3 -3
@@ -500,7 +524,7 @@ Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qn
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/IRC.pm,v
 Working file: IRC.pm
-head: 3.18
+head: 3.20
 branch:
 locks: strict
 access list:
@@ -509,8 +533,16 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 44;	selected revisions: 44
+total revisions: 46;	selected revisions: 46
 description:
+----------------------------
+revision 3.20
+date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +8 -6
+webfox teased a bug with whois plugin and POE::Kernel assert_default. Fixed by moving plugin_add Whois to _start event handler.
+----------------------------
+revision 3.19
+date: 2005/04/05 22:29:53;  author: chris;  state: Exp;  lines: +3 -3
+Bug reported by apeiron with nataddr argument. Fixed.
 ----------------------------
 revision 3.18
 date: 2005/04/05 09:42:11;  author: chris;  state: Exp;  lines: +3 -3

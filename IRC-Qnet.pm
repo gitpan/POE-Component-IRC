@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet.pm,v 3.7 2005/03/31 14:22:12 chris Exp $
+# $Id: IRC-Qnet.pm,v 3.8 2005/04/11 10:26:11 chris Exp $
 #
 # POE::Component::IRC::Qnet, by Chris Williams
 #
@@ -69,9 +69,6 @@ sub _create {
     $self->{HAS_SSL} = $has_ssl;
   }
 
-  # Plugin 'irc_whois' and 'irc_whowas' support
-  $self->plugin_add ( 'Whois', POE::Component::IRC::Plugin::Whois->new() );
-
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
     'restart'   => [ PRI_HIGH,   'noargs',        ],
@@ -123,6 +120,7 @@ sub _create {
 				      _dcc_timeout
 				      _dcc_up
 				      _parseline
+				      __send_event
 				      _sock_down
 				      _sock_failed
 				      _sock_up

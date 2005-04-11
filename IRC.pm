@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 3.18 2005/04/05 09:42:11 chris Exp $
+# $Id: IRC.pm,v 3.20 2005/04/11 10:26:11 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -50,8 +50,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '4.0';
-$REVISION = do {my@r=(q$Revision: 3.18 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '4.1';
+$REVISION = do {my@r=(q$Revision: 3.20 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -91,9 +91,6 @@ sub _create {
     };
     $self->{HAS_SSL} = $has_ssl;
   }
-
-  # Plugin 'irc_whois' and 'irc_whowas' support
-  $self->plugin_add ( 'Whois', POE::Component::IRC::Plugin::Whois->new() );
 
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
@@ -692,6 +689,11 @@ sub _start {
   $self->{ctcp_filter} = POE::Filter::CTCP->new();
 
   $self->{SESSION_ID} = $session->ID();
+
+  # Plugin 'irc_whois' and 'irc_whowas' support
+  $self->plugin_add ( 'Whois', POE::Component::IRC::Plugin::Whois->new() );
+
+  return 1;
 }
 
 
@@ -883,7 +885,7 @@ sub dcc {
       Reuse        => 'yes',
   );
   ($port, $myaddr) = unpack_sockaddr_in( $factory->getsockname() );
-  $myaddr = $self->{nat_addr} || $self->{localaddr} || inet_aton(hostname() || 'localhost');
+  $myaddr = inet_aton($self->{nat_addr}) || $self->{localaddr} || inet_aton(hostname() || 'localhost');
   unless ($myaddr) {
     warn "dcc: Can't determine our IP address! ($!)";
     return;

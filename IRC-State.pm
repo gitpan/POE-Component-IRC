@@ -1,4 +1,4 @@
-# $Id: IRC-State.pm,v 3.13 2005/04/04 10:55:03 chris Exp $
+# $Id: IRC-State.pm,v 3.14 2005/04/11 10:26:11 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -67,9 +67,6 @@ sub _create {
     $self->{HAS_SSL} = $has_ssl;
   }
 
-  # Plugin 'irc_whois' and 'irc_whowas' support
-  $self->plugin_add ( 'Whois', POE::Component::IRC::Plugin::Whois->new() );
-
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
     'restart'   => [ PRI_HIGH,   'noargs',        ],
@@ -122,6 +119,7 @@ sub _create {
 				      _dcc_read
 				      _dcc_timeout
 				      _dcc_up
+				      __send_event
 				      _parseline
 				      _sock_down
 				      _sock_failed
