@@ -1,4 +1,4 @@
-# $Id: IRC-State.pm,v 3.14 2005/04/11 10:26:11 chris Exp $
+# $Id: State.pm,v 1.1 2005/04/14 19:23:17 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -111,7 +111,7 @@ sub _create {
 
   # We need to register additional events with ourselves.
 
-  $self->{IRC_EVTS} = [ qw(001 ping join part kick nick mode quit 352 324 315) ];
+  $self->{IRC_EVTS} = [ qw(001 ping join part kick nick mode quit 352 324 315 disconnected socketerr error) ];
 
   my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
 
@@ -191,8 +191,20 @@ sub _parseline {
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
 
-# Make sure we have a clean STATE when we first join the network.
+# Make sure we have a clean STATE when we first join the network and if we inadvertently get disconnected
 sub irc_001 {
+  delete ( $_[OBJECT]->{STATE} );
+}
+
+sub irc_disconnected {
+  delete ( $_[OBJECT]->{STATE} );
+}
+
+sub irc_error {
+  delete ( $_[OBJECT]->{STATE} );
+}
+
+sub irc_socketerr {
   delete ( $_[OBJECT]->{STATE} );
 }
 

@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 3.20 2005/04/11 10:26:11 chris Exp $
+# $Id: IRC.pm,v 1.1 2005/04/14 19:23:16 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -50,8 +50,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '4.1';
-$REVISION = do {my@r=(q$Revision: 3.20 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '4.2';
+$REVISION = do {my@r=(q$Revision: 1.1 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.

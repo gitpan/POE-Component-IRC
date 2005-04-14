@@ -1,4 +1,4 @@
-# $Id: Filter-IRC.pm,v 3.6 2005/03/28 18:24:11 chris Exp $
+# $Id: IRC.pm,v 1.1 2005/04/14 19:23:17 chris Exp $
 #
 # POE::Filter::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #

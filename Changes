@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.2   <Date>
+    - Minor changes to State.pm to delete the STATE info when
+      we disconnect, error or socketerr.
+    - Reorganised the distribution.
+
 4.1   Mon Apr 11 11:24:44 BST 2005
     - NATAddr bug spotted by apeiron @ MAGnet. Fixed.
     - webfox spotted a problem with whois plugin and POE

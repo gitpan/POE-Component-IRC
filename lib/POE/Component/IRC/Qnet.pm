@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet.pm,v 3.8 2005/04/11 10:26:11 chris Exp $
+# $Id: Qnet.pm,v 1.1 2005/04/14 19:23:17 chris Exp $
 #
 # POE::Component::IRC::Qnet, by Chris Williams
 #

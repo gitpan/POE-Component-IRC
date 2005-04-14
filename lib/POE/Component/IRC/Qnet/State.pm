@@ -1,4 +1,4 @@
-# $Id: IRC-Qnet-State.pm,v 3.12 2005/04/11 10:26:11 chris Exp $
+# $Id: State.pm,v 1.1 2005/04/14 19:23:17 chris Exp $
 #
 # POE::Component::IRC::Qnet::State, by Chris Williams
 #
@@ -110,7 +110,7 @@ sub _create {
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
   };
 
-  $self->{IRC_EVTS} = [ qw(001 ping join part kick nick mode quit 354 324 315 ) ];
+  $self->{IRC_EVTS} = [ qw(001 ping join part kick nick mode quit 354 324 315 disconnected socketerr error) ];
 
   my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
 

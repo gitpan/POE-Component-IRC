@@ -1,15 +1,19 @@
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/CVSLOG,v
 Working file: CVSLOG
-head: 3.11
+head: 3.12
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.4.0.2
 keyword substitution: kv
-total revisions: 11;	selected revisions: 11
+total revisions: 12;	selected revisions: 12
 description:
+----------------------------
+revision 3.12
+date: 2005/04/14 19:23:15;  author: chris;  state: Exp;  lines: +44 -12
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.11
 date: 2005/04/05 22:29:53;  author: chris;  state: Exp;  lines: +80 -16
@@ -58,7 +62,7 @@ Added CVSLOG as a public testimony of my development efforts.
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/Changes,v
 Working file: Changes
-head: 3.23
+head: 3.24
 branch:
 locks: strict
 access list:
@@ -67,8 +71,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 34;	selected revisions: 34
+total revisions: 35;	selected revisions: 35
 description:
+----------------------------
+revision 3.24
+date: 2005/04/14 19:27:35;  author: chris;  state: Exp;  lines: +5 -0
+Ready for 4.2 release.
 ----------------------------
 revision 3.23
 date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +3 -1
@@ -209,9 +217,9 @@ date: 2005/02/19 13:42:07;  author: chris;  state: Exp;  lines: +3 -0
 Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qnet-State
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/Filter-CTCP.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/Filter-CTCP.pm,v
 Working file: Filter-CTCP.pm
-head: 3.5
+head: 3.6
 branch:
 locks: strict
 access list:
@@ -220,8 +228,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 3;	selected revisions: 3
+total revisions: 4;	selected revisions: 4
 description:
+----------------------------
+revision 3.6
+date: 2005/04/14 19:23:15;  author: chris;  state: dead;  lines: +1 -1
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.5
 date: 2005/02/19 13:26:44;  author: chris;  state: Exp;  lines: +1 -1
@@ -237,9 +249,9 @@ date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
 Initial check in with patches applied.
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/Filter-IRC.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/Filter-IRC.pm,v
 Working file: Filter-IRC.pm
-head: 3.6
+head: 3.7
 branch:
 locks: strict
 access list:
@@ -248,8 +260,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 5;	selected revisions: 5
+total revisions: 6;	selected revisions: 6
 description:
+----------------------------
+revision 3.7
+date: 2005/04/14 19:23:15;  author: chris;  state: dead;  lines: +1 -1
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.6
 date: 2005/03/28 18:24:11;  author: chris;  state: Exp;  lines: +2 -2
@@ -273,17 +289,21 @@ date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
 Initial check in with patches applied.
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet-State.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/IRC-Qnet-State.pm,v
 Working file: IRC-Qnet-State.pm
-head: 3.12
+head: 3.13
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.8.0.2
 keyword substitution: kv
-total revisions: 18;	selected revisions: 18
+total revisions: 19;	selected revisions: 19
 description:
+----------------------------
+revision 3.13
+date: 2005/04/14 19:23:15;  author: chris;  state: dead;  lines: +1 -1
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.12
 date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +2 -4
@@ -359,17 +379,21 @@ date: 2005/02/19 13:42:07;  author: chris;  state: Exp;  lines: +3 -3
 Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qnet-State
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-Qnet.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/IRC-Qnet.pm,v
 Working file: IRC-Qnet.pm
-head: 3.8
+head: 3.9
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.6.0.2
 keyword substitution: kv
-total revisions: 10;	selected revisions: 10
+total revisions: 11;	selected revisions: 11
 description:
+----------------------------
+revision 3.9
+date: 2005/04/14 19:23:15;  author: chris;  state: dead;  lines: +1 -1
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.8
 date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +2 -4
@@ -412,17 +436,21 @@ date: 2005/01/21 09:08:43;  author: chris;  state: Exp;
 Added initial Quakenet object. Updated tests. Amended MANIFEST and Makefile.PL accordingly.
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/IRC-State.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/IRC-State.pm,v
 Working file: IRC-State.pm
-head: 3.14
+head: 3.15
 branch:
 locks: strict
 access list:
 symbolic names:
 	PoCo-IRC-3_5: 1.12.0.2
 keyword substitution: kv
-total revisions: 24;	selected revisions: 24
+total revisions: 25;	selected revisions: 25
 description:
+----------------------------
+revision 3.15
+date: 2005/04/14 19:23:15;  author: chris;  state: dead;  lines: +1 -1
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.14
 date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +2 -4
@@ -522,9 +550,9 @@ date: 2005/02/19 13:42:07;  author: chris;  state: Exp;  lines: +13 -7
 Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qnet-State
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/IRC.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/IRC.pm,v
 Working file: IRC.pm
-head: 3.20
+head: 3.21
 branch:
 locks: strict
 access list:
@@ -533,8 +561,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 46;	selected revisions: 46
+total revisions: 47;	selected revisions: 47
 description:
+----------------------------
+revision 3.21
+date: 2005/04/14 19:23:16;  author: chris;  state: dead;  lines: +2 -2
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.20
 date: 2005/04/11 10:26:11;  author: chris;  state: Exp;  lines: +8 -6
@@ -725,7 +757,7 @@ Applied patch from ketas to fix a bug in IRC-State. Fixed the same bug in IRC-Qn
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/MANIFEST,v
 Working file: MANIFEST
-head: 3.9
+head: 3.10
 branch:
 locks: strict
 access list:
@@ -734,8 +766,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 21;	selected revisions: 21
+total revisions: 22;	selected revisions: 22
 description:
+----------------------------
+revision 3.10
+date: 2005/04/14 19:23:16;  author: chris;  state: Exp;  lines: +9 -9
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.9
 date: 2005/03/12 12:12:07;  author: chris;  state: Exp;  lines: +1 -0
@@ -850,7 +886,7 @@ Stuff.
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/Makefile.PL,v
 Working file: Makefile.PL
-head: 3.8
+head: 3.9
 branch:
 locks: strict
 access list:
@@ -859,8 +895,12 @@ symbolic names:
 	POE-Component-IRC: 1.1.1.1
 	PoCo-IRC-3: 1.1.1
 keyword substitution: kv
-total revisions: 9;	selected revisions: 9
+total revisions: 10;	selected revisions: 10
 description:
+----------------------------
+revision 3.9
+date: 2005/04/14 19:23:16;  author: chris;  state: Exp;  lines: +2 -12
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.8
 date: 2005/03/12 12:12:07;  author: chris;  state: Exp;  lines: +2 -1
@@ -900,16 +940,20 @@ date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
 Initial check in with patches applied.
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/Plugin-State.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/Plugin-State.pm,v
 Working file: Plugin-State.pm
-head: 3.2
+head: 3.3
 branch:
 locks: strict
 access list:
 symbolic names:
 keyword substitution: kv
-total revisions: 2;	selected revisions: 2
+total revisions: 3;	selected revisions: 3
 description:
+----------------------------
+revision 3.3
+date: 2005/04/14 19:23:16;  author: chris;  state: dead;  lines: +0 -0
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.2
 date: 2005/03/19 13:47:54;  author: chris;  state: Exp;  lines: +26 -4
@@ -920,16 +964,20 @@ date: 2005/03/10 20:58:04;  author: chris;  state: Exp;
 Added Apocalypse's port of IRC-State.pm using the plugin API.
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/Plugin-Whois.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/Plugin-Whois.pm,v
 Working file: Plugin-Whois.pm
-head: 3.2
+head: 3.3
 branch:
 locks: strict
 access list:
 symbolic names:
 keyword substitution: kv
-total revisions: 2;	selected revisions: 2
+total revisions: 3;	selected revisions: 3
 description:
+----------------------------
+revision 3.3
+date: 2005/04/14 19:23:16;  author: chris;  state: dead;  lines: +0 -0
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 3.2
 date: 2005/03/14 10:16:24;  author: chris;  state: Exp;  lines: +50 -16
@@ -940,16 +988,20 @@ date: 2005/03/12 12:12:07;  author: chris;  state: Exp;
 Initial check-in of Plugin-Whois, the irc_whois ported to plugin system.
 =============================================================================
 
-RCS file: /usr/cvs/repository/POE-Component-IRC/Plugin.pm,v
+RCS file: /usr/cvs/repository/POE-Component-IRC/Attic/Plugin.pm,v
 Working file: Plugin.pm
-head: 1.3
+head: 1.4
 branch:
 locks: strict
 access list:
 symbolic names:
 keyword substitution: kv
-total revisions: 3;	selected revisions: 3
+total revisions: 4;	selected revisions: 4
 description:
+----------------------------
+revision 1.4
+date: 2005/04/14 19:23:16;  author: chris;  state: dead;  lines: +0 -0
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 ----------------------------
 revision 1.3
 date: 2005/04/04 10:55:04;  author: chris;  state: Exp;  lines: +34 -0
@@ -1404,6 +1456,150 @@ Initial revision
 revision 1.1.1.1
 date: 2004/12/22 19:10:57;  author: chris;  state: Exp;  lines: +0 -0
 Initial check in with patches applied.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC.pm,v
+Working file: lib/POE/Component/IRC.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:16;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC/Plugin.pm,v
+Working file: lib/POE/Component/IRC/Plugin.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC/Qnet.pm,v
+Working file: lib/POE/Component/IRC/Qnet.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC/State.pm,v
+Working file: lib/POE/Component/IRC/State.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC/Plugin/State.pm,v
+Working file: lib/POE/Component/IRC/Plugin/State.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC/Plugin/Whois.pm,v
+Working file: lib/POE/Component/IRC/Plugin/Whois.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Component/IRC/Qnet/State.pm,v
+Working file: lib/POE/Component/IRC/Qnet/State.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Filter/CTCP.pm,v
+Working file: lib/POE/Filter/CTCP.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
+=============================================================================
+
+RCS file: /usr/cvs/repository/POE-Component-IRC/lib/POE/Filter/IRC.pm,v
+Working file: lib/POE/Filter/IRC.pm
+head: 1.1
+branch:
+locks: strict
+access list:
+symbolic names:
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 2005/04/14 19:23:17;  author: chris;  state: Exp;
+Minor changes to State.pm. Totally reorgnaised the distribution. The old way was just unmaintainable.
 =============================================================================
 
 RCS file: /usr/cvs/repository/POE-Component-IRC/t/Attic/1.t,v
