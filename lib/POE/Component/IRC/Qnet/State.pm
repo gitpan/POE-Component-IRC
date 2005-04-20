@@ -1,4 +1,4 @@
-# $Id: State.pm,v 1.1 2005/04/14 19:23:17 chris Exp $
+# $Id: State.pm,v 1.2 2005/04/18 17:16:23 chris Exp $
 #
 # POE::Component::IRC::Qnet::State, by Chris Williams
 #
@@ -225,6 +225,8 @@ sub _create {
 sub _parseline {
   my ($session, $self, $line) = @_[SESSION, OBJECT, ARG0];
   my (@events, @cooked);
+
+  $self->_send_event( 'irc_raw' => $line ) if ( $self->{raw_events} );
 
   # Feed the proper Filter object the raw IRC text and get the
   # "cooked" events back for sending, then deliver each event. We

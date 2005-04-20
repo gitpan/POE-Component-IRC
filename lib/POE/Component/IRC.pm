@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.1 2005/04/14 19:23:16 chris Exp $
+# $Id: IRC.pm,v 1.3 2005/04/20 08:26:40 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -50,8 +50,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '4.2';
-$REVISION = do {my@r=(q$Revision: 1.1 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '4.3';
+$REVISION = do {my@r=(q$Revision: 1.3 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -197,6 +197,11 @@ sub _configure {
       $self->{'dont_flood'} = 1;
     }
 
+    if (exists $arg{'raw'} and $arg{'raw'}) {
+      $self->{'raw_events'} = 1;
+    } else {
+      $self->{'raw_events'} = 0;
+    }
 
     if (exists $arg{'partfix'} and ( not $arg{'partfix'} ) ) {
       $self->{'dont_partfix'} = 1;
@@ -498,6 +503,8 @@ sub _dcc_up {
 sub _parseline {
   my ($session, $self, $line) = @_[SESSION, OBJECT, ARG0];
   my (@events, @cooked);
+
+  $self->_send_event( 'irc_raw' => $line ) if ( $self->{raw_events} );
 
   # Feed the proper Filter object the raw IRC text and get the
   # "cooked" events back for sending, then deliver each event. We
@@ -2075,6 +2082,7 @@ connection are:
 "Username", your client's username;
 "Ircname", some cute comment or something.
 "UseSSL", set to some true value if you want to connect using SSL. 
+"Raw", set to some true value to enable the component to send 'irc_raw' events.
 
 =back
 
@@ -2112,6 +2120,9 @@ hidden behind, this is sent whenever you do DCC.
 SSL support requires POE::Component::SSLify, as well as an IRC server that supports 
 SSL connections. If you're missing POE::Component::SSLify, specifing 'UseSSL' will do
 nothing. The default is to not try to use SSL.
+
+Setting 'Raw' to true, will enable the component to send 'irc_raw' events to interested plugins
+and sessions. See below for more details on what a 'irc_raw' events is :)
 
 =item ctcp and ctcpreply
 
@@ -2615,6 +2626,11 @@ identified with NICKSERV there will be an additional key: 'identified'.
 =item irc_whowas
 
 Similar to the above, except some keys will be missing.
+
+=item irc_raw
+
+Enabled by passing 'Raw' => 1 to spawn() or connect(), ARG0 is the raw IRC string received
+by the component from the IRC server, before it has been mangled by filters and such like.
 
 =item All numeric events (see RFC 1459)
 

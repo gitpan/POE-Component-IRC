@@ -1,6 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
-4.2   <Date>
+4.3   Wed Apr 20 09:25:21 BST 2005
+    - Added 'irc_raw' events and parameter to spawn/connect() to
+      enable them. Thanks to webfox for the idea.
+
+4.2   Thu Apr 14 12:00:00 BST 2005
     - Minor changes to State.pm to delete the STATE info when
       we disconnect, error or socketerr.
     - Reorganised the distribution.
