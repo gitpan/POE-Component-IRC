@@ -1,4 +1,4 @@
-# $Id: State.pm,v 1.2 2005/04/18 17:16:23 chris Exp $
+# $Id: State.pm,v 1.4 2005/04/28 14:18:19 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -39,32 +39,33 @@ use constant CMD_SUB => 1; # Command handler.
 
 $VERSION = '1.2';
 
+my ($GOT_CLIENT_DNS);
+my ($GOT_SSL);
+
+BEGIN {
+    $GOT_CLIENT_DNS = 0;
+    eval {
+      require POE::Component::Client::DNS;
+      $GOT_CLIENT_DNS = 1;
+    };
+}
+
+BEGIN {
+    $GOT_SSL = 0;
+    eval {
+      require POE::Component::SSLify;
+      import POE::Component::SSLify qw( Client_SSLify );
+      $GOT_SSL = 1;
+    };
+}
+
 sub _create {
   my ($package) = shift;
 
   my $self = bless ( { }, $package );
 
-  BEGIN {
-    my $has_client_dns = 0;
-    eval {
-      require POE::Component::Client::DNS;
-      $has_client_dns = 1;
-    };
-    $self->{HAS_CLIENT_DNS} = $has_client_dns;
-  }
-
-  if ( $self->{HAS_CLIENT_DNS} ) {
+  if ( $GOT_CLIENT_DNS ) {
     POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
-  }
-
-  BEGIN {
-    my $has_ssl = 0;
-    eval {
-      require POE::Component::SSLify;
-      import POE::Component::SSLify qw( Client_SSLify );
-      $has_ssl = 1;
-    };
-    $self->{HAS_SSL} = $has_ssl;
   }
 
   $self->{IRC_CMDS} =
@@ -107,6 +108,8 @@ sub _create {
     'whois'     => [ PRI_HIGH,   'commasep',      ],
     'ctcp'      => [ PRI_HIGH,   'ctcp',          ],
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
+    'ping'      => [ PRI_HIGH,   'oneortwo',      ],
+    'pong'      => [ PRI_HIGH,   'oneortwo',      ],
   };
 
   # We need to register additional events with ourselves.
@@ -183,7 +186,7 @@ sub _parseline {
         $self->{RealNick} = ( split / /, $line )[2];
     }
     if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
-	push ( @{$ev->{args}}, [ $self->nick_channels( ( split /!/, $ev->{args}->[0] )[0] ) ] );
+	push ( @{$ev->{args}}, [ $self->nick_channels( ( split( /!/, $ev->{args}->[0] ) )[0] ) ] );
     }
     $ev->{name} = 'irc_' . $ev->{name};
     $self->_send_event( $ev->{name}, @{$ev->{args}} );
@@ -234,23 +237,25 @@ sub irc_join {
 
 # Channel PART messages
 sub irc_part {
-  my ($kernel,$self,$who,$channel) = @_[KERNEL,OBJECT,ARG0,ARG1];
-  my ($nick) = ( split /!/, $who )[0];
+  my ($kernel,$self,$who) = @_[KERNEL,OBJECT,ARG0];
+  my ($channel) = u_irc ( $_[ARG1] );
+  my ($nick) = u_irc ( ( split /!/, $who )[0] );
 
-  if ( u_irc ( $nick ) eq u_irc ( $self->{RealNick} ) ) {
-        delete ( $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS}->{ u_irc ( $channel ) } );
-        delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $nick ) } );
-        foreach my $member ( keys %{ $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks} } ) {
-           delete ( $self->{STATE}->{Nicks}->{ u_irc ( $member ) }->{CHANS}->{ u_irc ( $channel ) } );
-           if ( scalar ( keys %{ $self->{STATE}->{Nicks}->{ u_irc ( $member ) }->{CHANS} } ) <= 0 ) {
-                delete ( $self->{STATE}->{Nicks}->{ u_irc ( $member ) } );
+  if ( $nick eq u_irc ( $self->nick_name() ) ) {
+        delete ( $self->{STATE}->{Nicks}->{ $nick }->{CHANS}->{ $channel } );
+        delete ( $self->{STATE}->{Chans}->{ $channel }->{Nicks}->{ $nick } );
+        foreach my $member ( keys %{ $self->{STATE}->{Chans}->{ $channel }->{Nicks} } ) {
+           delete ( $self->{STATE}->{Nicks}->{ $member }->{CHANS}->{ $channel } );
+           if ( scalar ( keys %{ $self->{STATE}->{Nicks}->{ $member }->{CHANS} } ) <= 0 ) {
+                delete ( $self->{STATE}->{Nicks}->{ $member } );
            }
         }
+	delete ( $self->{STATE}->{Chans}->{ $channel } );
   } else {
-        delete ( $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS}->{ u_irc ( $channel ) } );
-        delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $nick ) } );
-        if ( scalar ( keys %{ $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS} } ) <= 0 ) {
-                delete ( $self->{STATE}->{Nicks}->{ u_irc ( $nick ) } );
+        delete ( $self->{STATE}->{Nicks}->{ $nick }->{CHANS}->{ $channel } );
+        delete ( $self->{STATE}->{Chans}->{ $channel }->{Nicks}->{ $nick } );
+        if ( scalar ( keys %{ $self->{STATE}->{Nicks}->{ $nick }->{CHANS} } ) <= 0 ) {
+                delete ( $self->{STATE}->{Nicks}->{ $nick } );
         }
   }
 }
@@ -283,6 +288,7 @@ sub irc_kick {
                 delete ( $self->{STATE}->{Nicks}->{ u_irc ( $member ) } );
            }
         }
+	delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) } );
   } else {
         delete ( $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS}->{ u_irc ( $channel ) } );
         delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $nick ) } );

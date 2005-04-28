@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.1 2005/04/14 19:23:17 chris Exp $
+# $Id: IRC.pm,v 1.2 2005/04/28 14:18:20 chris Exp $
 #
 # POE::Filter::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -40,8 +40,8 @@ sub get {
     warn "<<< $line\n" if $self->{'debug'};
     next unless $line =~ /\S/;
 
-    if ($line =~ /^PING (.+)$/) {
-      push @$events, { name => 'ping', args => [$1] };
+    if ($line =~ /^(PING|PONG) (.+)$/) {
+      push @$events, { name => lc $1, args => [$2] };
 
       # PRIVMSG and NOTICE
     } elsif ($line =~ /^:(\S+) +(PRIVMSG|NOTICE) +(\S+) +(.+)$/) {

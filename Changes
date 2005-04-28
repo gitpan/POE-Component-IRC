@@ -1,5 +1,15 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.4   Thu Apr 28 15:16:03 BST 2005
+    - Added event handlers for PING and PONG IRC commands.
+    - Added connected() method, so punters can query if the 
+      component is connected to an IRC server or not.
+    - Applied a patch from Apocalypse re: DNS and SSL.
+    - Fixed Filter::IRC so it now parses PONG properly.
+    - ketas pointed out that in State.pm, the state for a 
+      channel wasn't getting deleted when the bot parted or 
+      got kicked. Fixed.
+
 4.3   Wed Apr 20 09:25:21 BST 2005
     - Added 'irc_raw' events and parameter to spawn/connect() to
       enable them. Thanks to webfox for the idea.

@@ -1,4 +1,4 @@
-# $Id: IRC.pm,v 1.3 2005/04/20 08:26:40 chris Exp $
+# $Id: IRC.pm,v 1.4 2005/04/24 10:31:28 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
 #
@@ -20,7 +20,7 @@ use Socket;
 use Sys::Hostname;
 use File::Basename ();
 use Symbol;
-use vars qw($VERSION $REVISION);
+use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
@@ -50,8 +50,8 @@ use constant MSG_TEXT => 1; # Queued message text.
 use constant CMD_PRI => 0; # Command priority.
 use constant CMD_SUB => 1; # Command handler.
 
-$VERSION = '4.3';
-$REVISION = do {my@r=(q$Revision: 1.3 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '4.4';
+$REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -64,32 +64,35 @@ $REVISION = do {my@r=(q$Revision: 1.3 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 #	  $self->{IRC_CMDS} contains the traditional %irc_commands, mapping commands to events
 #		and the priority that the command has.
 
+my ($GOT_SSL);
+my ($GOT_CLIENT_DNS);
+
+# Check for SSL availability
+BEGIN {
+	$GOT_SSL = 0;
+	eval {
+		require POE::Component::SSLify;
+		import POE::Component::SSLify qw( Client_SSLify );
+		$GOT_SSL = 1;
+	};
+}
+
+# Check for Client::DNS availability
+BEGIN {
+	$GOT_CLIENT_DNS = 0;
+	eval {
+		require POE::Component::Client::DNS;
+		$GOT_CLIENT_DNS = 1;
+	};
+}
+
 sub _create {
   my ($package) = shift;
 
   my $self = bless ( { }, $package );
 
-  BEGIN {
-    my $has_client_dns = 0;
-    eval {
-      require POE::Component::Client::DNS;
-      $has_client_dns = 1;
-    };
-    $self->{HAS_CLIENT_DNS} = $has_client_dns;
-  }
-
-  if ( $self->{HAS_CLIENT_DNS} ) {
+  if ( $GOT_CLIENT_DNS ) {
     POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
-  }
-
-  BEGIN {
-    my $has_ssl = 0;
-    eval {
-      require POE::Component::SSLify;
-      import POE::Component::SSLify qw( Client_SSLify );
-      $has_ssl = 1;
-    };
-    $self->{HAS_SSL} = $has_ssl;
   }
 
   $self->{IRC_CMDS} =
@@ -132,6 +135,8 @@ sub _create {
     'whois'     => [ PRI_HIGH,   'commasep',      ],
     'ctcp'      => [ PRI_HIGH,   'ctcp',          ],
     'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
+    'ping'      => [ PRI_HIGH,   'oneortwo',      ],
+    'pong'      => [ PRI_HIGH,   'oneortwo',      ],
   };
 
   $self->{IRC_EVTS} = [ qw(nick ping) ];
@@ -229,7 +234,7 @@ sub _configure {
     }
     my ($dccport) = delete ( $arg{'dccports'} );
     $self->{'UseSSL'} = $arg{'usessl'} if exists $arg{'usessl'};
-    
+
     if ( defined ( $dccport ) and ref ( $dccport ) eq 'ARRAY' ) {
 	  $self->{dcc_bind_port} = $dccport;
     }
@@ -534,7 +539,7 @@ sub _parseline {
 # Hack to make plugin_add/del send events from OUR session
 sub __send_event {
 	my( $self, $event, @args ) = @_[ OBJECT, ARG0, ARG1 .. $#_ ];
-	
+
 	# Actually send the event...
 	$self->_send_event( $event, @args );
 	return 1;
@@ -619,7 +624,7 @@ sub _sock_up {
   $self->{'localaddr'} = (unpack_sockaddr_in( getsockname $socket ))[1];
 
   #ssl!
-  if ($self->{HAS_SSL} and $self->{'UseSSL'}) {
+  if ($GOT_SSL and $self->{'UseSSL'}) {
     eval {
       $socket = Client_SSLify( $socket );
     };
@@ -629,7 +634,6 @@ sub _sock_up {
       $self->{'UseSSL'} = 0;
     }
   }
-
 
   # Create a new ReadWrite wheel for the connected socket.
   $self->{'socket'} = new POE::Wheel::ReadWrite
@@ -752,7 +756,7 @@ sub connect {
   $self->_configure( \%arg );
 
   # try and use non-blocking resolver if needed
-  if ( $self->{HAS_CLIENT_DNS} && !($self->{'server'} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) && ( not $self->{'NoDNS'} ) ) {
+  if ( $GOT_CLIENT_DNS && !($self->{'server'} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) && ( not $self->{'NoDNS'} ) ) {
     $kernel->post(irc_resolver => resolve => got_dns_response => $self->{'server'} => "A", "IN");
   } else {
     $kernel->yield("do_connect");
@@ -2052,6 +2056,11 @@ Takes no arguments. Returns the version number of the module.
 The component provides anti-flood throttling. This method takes no arguments and returns a scalar
 representing the number of messages that are queued up waiting for dispatch to the irc server.
 
+=item connected 
+
+Takes no arguments. Returns true or false depending on whether the component is currently
+connected to an IRC network or not.
+
 =back
 
 =head1 INPUT
@@ -2081,7 +2090,7 @@ connection are:
 "Nick", your client's IRC nickname;
 "Username", your client's username;
 "Ircname", some cute comment or something.
-"UseSSL", set to some true value if you want to connect using SSL. 
+"UseSSL", set to some true value if you want to connect using SSL.
 "Raw", set to some true value to enable the component to send 'irc_raw' events.
 
 =back
@@ -2117,7 +2126,7 @@ to use when initiating DCC, using dcc() or a scalar with the following format,
 the ports from 1050 to 1060, simple, huh?; "NATAddr", is the NAT'ed IP address that your bot is
 hidden behind, this is sent whenever you do DCC.
 
-SSL support requires POE::Component::SSLify, as well as an IRC server that supports 
+SSL support requires POE::Component::SSLify, as well as an IRC server that supports
 SSL connections. If you're missing POE::Component::SSLify, specifing 'UseSSL' will do
 nothing. The default is to not try to use SSL.
 
@@ -2415,6 +2424,11 @@ return, and the optional server hostname to query. As of version 3.2,
 you will receive an 'irc_whowas' event in addition to the usual numeric
 responses. See below for details.
 
+=item ping/pong
+
+Included for completeness sake. The component will deal with ponging to
+pings automatically. Don't worry about it.
+
 =back
 
 =head2 Purely Esoteric Commands
@@ -2620,7 +2634,7 @@ the epoch time they signed on ( will be undef if ircd does not support this );
 'channels', an arrayref listing visible channels they are on, the channel is prefixed
 with '@','+','%' depending on whether they have +o +v or +h; 'server', their server (
 might not be useful on some networks ); 'oper', whether they are an IRCop, contains the
-IRC operator string if they are, undef if they aren't. On Freenode if the user has 
+IRC operator string if they are, undef if they aren't. On Freenode if the user has
 identified with NICKSERV there will be an additional key: 'identified'.
 
 =item irc_whowas
