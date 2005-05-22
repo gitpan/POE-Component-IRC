@@ -1,5 +1,17 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.5   Sun May 22 16:21:08 BST 2005
+    - Moved repository from cvs to svn \o/
+    - Applied patch from ketas.
+    - Fixed docs for DCCPorts parameter to connect().
+    - Removed State.pm plugin as it was becoming difficult to 
+      keep in sync with State subclass. Eventually hope to replace
+      State subclass with a proper plugin wrapper.
+    - Relocated constants to Constants.pm, tidied up subclasses.
+    - Added Connector.pm plugin. See docs for details.
+    - PoCo-IRC will now send an 'irc_registered' event to 
+      registering sessions. ARG0 will the poco's object.
+
 4.4   Thu Apr 28 15:16:03 BST 2005
     - Added event handlers for PING and PONG IRC commands.
     - Added connected() method, so punters can query if the 

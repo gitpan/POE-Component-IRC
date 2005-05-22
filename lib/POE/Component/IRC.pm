@@ -15,6 +15,7 @@ use POE qw( Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
 use POE::Filter::IRC;
 use POE::Filter::CTCP;
 use POE::Component::IRC::Plugin::Whois;
+use POE::Component::IRC::Constants;
 use Carp;
 use Socket;
 use Sys::Hostname;
@@ -25,32 +26,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-# For the purposes of inheriting this class the constants below are required.
-
-# The name of the reference count P::C::I keeps in client sessions.
-use constant PCI_REFCOUNT_TAG => "P::C::I registered";
-
-use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
-use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
-use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
-
-# Message priorities.
-use constant PRI_LOGIN  => 10; # PASS/NICK/USER messages must go first.
-use constant PRI_HIGH   => 20; # KICK/MODE etc. is more important than chatter.
-use constant PRI_NORMAL => 30; # Random chatter.
-
-use constant MSG_PRI  => 0; # Queued message priority.
-use constant MSG_TEXT => 1; # Queued message text.
-
-# RCC: Since most of the commands are data driven, I have moved their
-# event/handler maps here and added priorities for each data driven
-# command.  The priorities determine message importance when messages
-# are queued up.  Lower ones get sent first.
-
-use constant CMD_PRI => 0; # Command priority.
-use constant CMD_SUB => 1; # Command handler.
-
-$VERSION = '4.4';
+$VERSION = '4.5';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -1045,7 +1021,7 @@ sub dcc_close {
   }
 
   # Reclaim our port if necessary.
-  if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} ) {
+  if ( $self->{dcc}->{$id}->{listener} and $self->{dcc_bind_port} and $self->{dcc}->{$id}->{listenport} ) {
 	push ( @{ $self->{dcc_bind_port} }, $self->{dcc}->{$id}->{port} );
   }
 
@@ -1283,6 +1259,13 @@ sub register {
       $kernel->refcount_increment($sender->ID(), PCI_REFCOUNT_TAG);
     }
   }
+  # BINGOS:
+  # Apocalypse is gonna hate me for this as 'irc_registered' events will bypass 
+  # the Plugins system, but I can't see how this event will be relevant without 
+  # some sort of reference, like what session has registered. I'm not going to
+  # start hurling session references around at this point :)
+
+  $kernel->post( $sender => 'irc_registered' => $self );
 }
 
 sub register_session {
@@ -2120,10 +2103,8 @@ I<actual> IRC server's port if you provide a proxy but omit the proxy's
 port.
 
 For those people who run bots behind firewalls and/or Network Address Translation
-there are two additional attributes for DCC. "DCCPorts", is either an arrayref of ports
-to use when initiating DCC, using dcc() or a scalar with the following format,
-"<port>,<port>-<port>", eg. "1024,1050-1060,1080", would represent ports 1024 and 1080 and all
-the ports from 1050 to 1060, simple, huh?; "NATAddr", is the NAT'ed IP address that your bot is
+there are two additional attributes for DCC. "DCCPorts", is an arrayref of ports
+to use when initiating DCC, using dcc(). "NATAddr", is the NAT'ed IP address that your bot is
 hidden behind, this is sent whenever you do DCC.
 
 SSL support requires POE::Component::SSLify, as well as an IRC server that supports
@@ -2252,6 +2233,11 @@ channel.
 Registering for C<'all'> will cause it to send all IRC-related events to
 you; this is the easiest way to handle it. See the test script for an
 example.
+
+Registering will generate an 'irc_registered' event that your session can
+trap. ARG0 is the components object. Useful if you want to bolt PoCo-IRC's
+new features such as Plugins into a bot coded to the older deprecated API.
+If you are using the new API, ignore this :)
 
 =item shutdown
 
@@ -2645,6 +2631,11 @@ Similar to the above, except some keys will be missing.
 
 Enabled by passing 'Raw' => 1 to spawn() or connect(), ARG0 is the raw IRC string received
 by the component from the IRC server, before it has been mangled by filters and such like.
+
+=item irc_registered
+
+Sent once to the requesting session on registration ( see register() ). ARG0 is a reference to
+the component's object.
 
 =item All numeric events (see RFC 1459)
 

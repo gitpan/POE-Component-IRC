@@ -11,31 +11,9 @@ package POE::Component::IRC::State;
 
 use strict;
 use POE qw(Component::IRC::Plugin::Whois);
+use POE::Component::IRC::Constants;
 use base qw(POE::Component::IRC);
 use vars qw($VERSION);
-
-# The name of the reference count P::C::I keeps in client sessions.
-use constant PCI_REFCOUNT_TAG => "P::C::I registered";
-
-use constant BLOCKSIZE => 1024;           # Send DCC data in 1k chunks
-use constant INCOMING_BLOCKSIZE => 10240; # 10k per DCC socket read
-use constant DCC_TIMEOUT => 300;          # Five minutes for listening DCCs
-
-# Message priorities.
-use constant PRI_LOGIN  => 10; # PASS/NICK/USER messages must go first.
-use constant PRI_HIGH   => 20; # KICK/MODE etc. is more important than chatter.
-use constant PRI_NORMAL => 30; # Random chatter.
-
-use constant MSG_PRI  => 0; # Queued message priority.
-use constant MSG_TEXT => 1; # Queued message text.
-
-# RCC: Since most of the commands are data driven, I have moved their
-# event/handler maps here and added priorities for each data driven
-# command.  The priorities determine message importance when messages
-# are queued up.  Lower ones get sent first.
-
-use constant CMD_PRI => 0; # Command priority.
-use constant CMD_SUB => 1; # Command handler.
 
 $VERSION = '1.2';
 
@@ -645,6 +623,8 @@ sub nick_info {
 
   my (%result) = %{ $record };
 
+  $result{Userhost} = $result{User} . '@' . $result{Host};
+
   delete ( $result{'CHANS'} );
 
   return \%result;
@@ -885,10 +865,10 @@ POE::Component::IRC::State - a fully event-driven IRC client module with channel
 
 =head1 DESCRIPTION
 
-POE::Component::IRC::State is an extension to L<POE::Component::IRC|POE::Component::IRC>
+POE::Component::IRC::State is a sub-class of L<POE::Component::IRC|POE::Component::IRC>
 which tracks IRC state entities such as nicks and channels. See the documentation for
 L<POE::Component::IRC|POE::Component::IRC> for general usage. This document covers the
-extensions.
+extra methods that POE::Component::IRC::State provides.
 
 The component tracks channels and nicks, so that it always has a current snapshot of what
 channels it is on and who else is on those channels. The returned object provides methods
@@ -966,7 +946,7 @@ will be returned if the nickname does not exist in the state.
 =item nick_info
 
 Expects a nickname. Returns a hashref containing similar information to that returned by WHOIS. Returns an undef
-if the nickname doesn't exist in the state. The hashref contains the following keys: 'Nick', 'User', 'Host', 'Server' and, if applicable, 'IRCop'.
+if the nickname doesn't exist in the state. The hashref contains the following keys: 'Nick', 'User', 'Host', 'Userhost', 'Server' and, if applicable, 'IRCop'.
 
 =item ban_mask
 
