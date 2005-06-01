@@ -1,4 +1,7 @@
 Changes
+lib/POE/Component/IRC/Test/Harness.pm
+lib/POE/Component/IRC/Test/Plugin.pm
+lib/POE/Component/IRC/Plugin/BotAddressed.pm
 lib/POE/Component/IRC/Plugin/Connector.pm
 lib/POE/Component/IRC/Plugin/Whois.pm
 lib/POE/Component/IRC/Qnet/State.pm
@@ -34,3 +37,5 @@ t/2_State.t
 t/2_Qnet.t
 t/2_Qnet_State.t
 t/3_connect.t
+t/4_testharness.t
+t/testsuite_01_plugin.t
