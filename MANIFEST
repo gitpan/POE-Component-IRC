@@ -9,8 +9,10 @@ lib/POE/Component/IRC/Qnet/State.pm
 lib/POE/Component/IRC/Constants.pm
 lib/POE/Component/IRC/Pipeline.pm
 lib/POE/Component/IRC/Plugin.pm
+lib/POE/Component/IRC/Projects.pm
 lib/POE/Component/IRC/Qnet.pm
 lib/POE/Component/IRC/State.pm
+lib/POE/Component/IRC/State/Lite.pm
 lib/POE/Component/IRC.pm
 lib/POE/Filter/CTCP.pm
 lib/POE/Filter/IRC.pm
@@ -40,4 +42,5 @@ t/2_Qnet.t
 t/2_Qnet_State.t
 t/3_connect.t
 t/4_testharness.t
+t/5_pod.t
 t/testsuite_01_plugin.t
