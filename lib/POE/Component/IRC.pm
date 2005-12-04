@@ -1,6 +1,8 @@
 # $Id: IRC.pm,v 1.4 2005/04/24 10:31:28 chris Exp $
 #
 # POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
+# 
+# Additional enhancements by Chris 'BinGOs' Williams.
 #
 # This module may be used, modified, and distributed under the same
 # terms as Perl itself. Please see the license that came with your Perl
@@ -12,10 +14,12 @@ package POE::Component::IRC;
 use strict;
 use warnings;
 use POE qw( Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
-	    Filter::Line Filter::Stream );
-use POE::Filter::IRC;
+	    Filter::Line Filter::Stream Filter::Stackable);
+use POE::Filter::IRCD;
+use POE::Filter::IRC::Compat;
 use POE::Filter::CTCP;
 use POE::Component::IRC::Plugin::Whois;
+use POE::Component::IRC::Plugin::ISupport;
 use POE::Component::IRC::Constants;
 use POE::Component::IRC::Pipeline;
 use Carp;
@@ -28,7 +32,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.74';
+$VERSION = '4.75';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -153,7 +157,6 @@ sub _create {
 				      sl_prioritized
 				      topic
 				      unregister
-				      unregister_sessions
 				      userhost ), ( map {( 'irc_' . $_ )} @{ $self->{IRC_EVTS} } ) ];
 
   $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close' };
@@ -186,12 +189,6 @@ sub _configure {
       $self->{'raw_events'} = 0 unless ( $self->{'raw_events'} );
     }
 
-    if (exists $arg{'partfix'} and ( not $arg{'partfix'} ) ) {
-      $self->{'dont_partfix'} = 1;
-    } else {
-      $self->{'dont_partfix'} = 0 unless ( $self->{'dont_partfix'} );
-    }
-
     $self->{'password'} = $arg{'password'} if exists $arg{'password'};
     $self->{'localaddr'} = $arg{'localaddr'} if exists $arg{'localaddr'};
     $self->{'localport'} = $arg{'localport'} if exists $arg{'localport'};
@@ -207,8 +204,7 @@ sub _configure {
     $self->{'user_bitmode'} = $arg{'bitmode'} if exists $arg{'bitmode'};
     if (exists $arg{'debug'}) {
       $self->{'debug'} = $arg{'debug'};
-      $self->{irc_filter}->debug( $arg{'debug'} );
-      $self->{ctcp_filter}->debug( $arg{'debug'} );
+      $self->{ircd_filter}->{DEBUG} = $arg{'debug'};
     }
     my ($dccport) = delete ( $arg{'dccports'} );
     $self->{'UseSSL'} = $arg{'usessl'} if exists $arg{'usessl'};
@@ -317,6 +313,7 @@ sub _dcc_failed {
     }
     delete $self->{dcc}->{$id};
   }
+  undef;
 }
 
 sub debug {
@@ -329,7 +326,7 @@ sub debug {
     }
 
     $self->{debug} = $switch;
-    $self->{irc_filter}->debug( $switch );
+    $self->{ircd_filter}->debug( $switch );
     $self->{ctcp_filter}->debug( $switch );
 }
 
@@ -385,6 +382,7 @@ sub _dcc_read {
     $self->_send_event( 'irc_dcc_' . lc $self->{dcc}->{$id}->{type},
 		 $id, @{$self->{dcc}->{$id}}{'nick', 'port'}, $data );
   }
+  undef;
 }
 
 
@@ -397,6 +395,7 @@ sub _dcc_timeout {
     $kernel->yield( '_dcc_failed', 'connection', 0,
 		    'DCC connection timed out', $id );
   }
+  undef;
 }
 
 
@@ -486,39 +485,25 @@ sub _dcc_up {
 	       $id, @{$self->{dcc}->{$id}}{'nick', 'type', 'port'},
 	       ($self->{dcc}->{$id}->{'type'} =~ /^(SEND|GET)$/ ?
 		(@{$self->{dcc}->{$id}}{'file', 'size'}) : ()), @{$self->{dcc}->{$id}}{'listenport', 'clientaddr'} );
+  undef;
 }
-
 
 # Parse a message from the IRC server and generate the appropriate
 # event(s) for listening sessions.
 sub _parseline {
-  my ($session, $self, $line) = @_[SESSION, OBJECT, ARG0];
-  my (@events, @cooked);
+  my ($session, $self, $ev) = @_[SESSION, OBJECT, ARG0];
 
-  $self->_send_event( 'irc_raw' => $line ) if ( $self->{raw_events} );
+  $self->_send_event( 'irc_raw' => $ev->{raw_line} ) if ( $self->{raw_events} );
 
-  # Feed the proper Filter object the raw IRC text and get the
-  # "cooked" events back for sending, then deliver each event. We
-  # handle CTCPs separately from normal IRC messages here, to avoid
-  # silly module dependencies later.
-
-  @cooked = ($line =~ tr/\001// ? @{$self->{ctcp_filter}->get( [$line] )}
-	     : @{$self->{irc_filter}->get( [$line] )} );
-
-  foreach my $ev (@cooked) {
-    if ( $ev->{name} eq 'part' and not $self->{'dont_partfix'} ) {
-	(@{$ev->{args}}[1..2]) = split(/ /,$ev->{args}->[1],2);
-	$ev->{args}->[2] =~ s/^:// if ( defined ( $ev->{args}->[2] ) );
-    }
-    # If its 001 event grab the server name and stuff it into {INFO}
-    if ( $ev->{name} eq '001' ) {
+  # If its 001 event grab the server name and stuff it into {INFO}
+  if ( $ev->{name} eq '001' ) {
 	$self->{INFO}->{ServerName} = $ev->{args}->[0];
 	# Kind of assuming that $line is a single line of IRC protocol.
-	$self->{RealNick} = ( split / /, $line )[2];
-    }
-    $ev->{name} = 'irc_' . $ev->{name};
-    $self->_send_event( $ev->{name}, @{$ev->{args}} );
+	$self->{RealNick} = ( split / /, $ev->{raw_line} )[2];
   }
+  $ev->{name} = 'irc_' . $ev->{name};
+  $self->_send_event( $ev->{name}, @{$ev->{args}} );
+  undef;
 }
 
 
@@ -569,6 +554,7 @@ sub _send_event  {
   foreach (values %sessions) {
     $kernel->post( $_, $event, @args ) unless ( $_ eq $session );
   }
+  undef;
 }
 
 
@@ -586,8 +572,17 @@ sub _sock_down {
   $self->{send_time}  = 0;
   $kernel->delay( sl_delayed => undef );
 
+  # Reset the filters if necessary
+  $self->compress_uplink( 0 );
+  $self->compress_downlink( 0 );
+
   # post a 'irc_disconnected' to each session that cares
   $self->_send_event( 'irc_disconnected', $self->{server} );
+  undef;
+}
+
+sub disconnect {
+  $poe_kernel->post( $_[0]->session_id() => '_sock_down' );
 }
 
 
@@ -595,7 +590,9 @@ sub _sock_down {
 sub _sock_failed {
   my ($self, $op, $errno, $errstr) = @_[OBJECT, ARG0..ARG2];
 
+  delete $self->{'socketfactory'};
   $self->_send_event( 'irc_socketerr', "$op error $errno: $errstr" );
+  undef;
 }
 
 
@@ -623,12 +620,12 @@ sub _sock_up {
 
   # Create a new ReadWrite wheel for the connected socket.
   $self->{'socket'} = new POE::Wheel::ReadWrite
-    ( Handle     => $socket,
-      Driver     => POE::Driver::SysRW->new(),
-      Filter     => POE::Filter::Line->new( InputRegexp => '\015?\012',
-					    OutputLiteral => "\015\012" ),
-      InputEvent => '_parseline',
-      ErrorEvent => '_sock_down',
+    ( Handle       => $socket,
+      Driver       => POE::Driver::SysRW->new(),
+      InputFilter  => $self->{srv_filter},
+      OutputFilter => $self->{out_filter},
+      InputEvent   => '_parseline',
+      ErrorEvent   => '_sock_down',
     );
 
   if ($self->{'socket'}) {
@@ -659,6 +656,7 @@ sub _sock_up {
   # If we have queued data waiting, its flush loop has stopped
   # while we were disconnected.  Start that up again.
   $kernel->delay(sl_delayed => 0);
+  undef;
 }
 
 
@@ -682,14 +680,30 @@ sub _start {
   }
 
   $kernel->yield( 'register', @{ $self->{IRC_EVTS} } );
-  $self->{irc_filter} = POE::Filter::IRC->new();
+  $self->{ircd_filter} = POE::Filter::IRCD->new( DEBUG => $self->{debug} );
+  $self->{ircd_compat} = POE::Filter::IRC::Compat->new( DEBUG => $self->{debug} );
   $self->{ctcp_filter} = POE::Filter::CTCP->new();
+  my $filters = [
+		   POE::Filter::Line->new( InputRegexp => '\015?\012',
+					    OutputLiteral => "\015\012" ),
+		   $self->{ircd_filter},
+		   $self->{ircd_compat},
+		];
+		   
+  $self->{srv_filter} = POE::Filter::Stackable->new( Filters => $filters );
+  $self->{out_filter} = POE::Filter::Stackable->new( Filters => [ POE::Filter::Line->new( OutputLiteral => "\015\012" ) ] );
 
+  eval{ 
+	require POE::Filter::Zlib;
+  };
+  $self->{can_do_zlib} = 1 unless ( $@ );
   $self->{SESSION_ID} = $session->ID();
 
   # Plugin 'irc_whois' and 'irc_whowas' support
-  $self->plugin_add ( 'Whois', POE::Component::IRC::Plugin::Whois->new() );
+  $self->plugin_add ( 'Whois' . $self->{SESSION_ID}, POE::Component::IRC::Plugin::Whois->new() );
 
+  $self->{isupport} = POE::Component::IRC::Plugin::ISupport->new();
+  $self->plugin_add( 'ISupport' . $self->{SESSION_ID}, $self->{isupport} );
   return 1;
 }
 
@@ -702,6 +716,7 @@ sub _stop {
     $kernel->call( $_[SESSION], 'quit', $quitmsg );
     $kernel->call( $_[SESSION], 'shutdown', $quitmsg );
   }
+  undef;
 }
 
 
@@ -714,6 +729,7 @@ sub commasep {
   $state = uc $state;
   $state .= " $args" if defined $args;
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -780,6 +796,7 @@ sub do_connect {
 				    ($self->{localaddr} ?
 				       (BindAddress => $self->{localaddr}) : ()),
 				  );
+  undef;
 }
 
 # got response from POE::Component::Client::DNS
@@ -809,7 +826,7 @@ sub got_dns_response {
   }
 
   $self->_send_event( 'irc_socketerr', "Unable to resolve $self->{'server'}");
-
+  undef;
 }
 
 # Send a CTCP query or reply, with the same syntax as a PRIVMSG event.
@@ -829,6 +846,7 @@ sub ctcp {
   $state = $state eq 'ctcpreply' ? 'notice' : 'privmsg';
 
   $kernel->yield( $state, $to, $message );
+  undef;
 }
 
 
@@ -887,7 +905,7 @@ sub dcc {
       Reuse        => 'yes',
   );
   ($port, $myaddr) = unpack_sockaddr_in( $factory->getsockname() );
-  $myaddr = inet_aton($self->{nat_addr}) || $self->{localaddr} || inet_aton(hostname() || 'localhost');
+  $myaddr = inet_aton( $self->{nat_addr} || '' ) || $self->{localaddr} || inet_aton(hostname() || 'localhost');
   unless ($myaddr) {
     warn "dcc: Can't determine our IP address! ($!)";
     return;
@@ -918,6 +936,7 @@ sub dcc {
 				   clientaddr => $myaddr,
 				 };
   $kernel->alarm( '_dcc_timeout', time() + ($timeout || DCC_TIMEOUT), $factory->ID );
+  undef;
 }
 
 
@@ -989,6 +1008,7 @@ sub dcc_resume
       }# if(open(FILE,">>".$myfile))
     }# if($mysize)
   }
+  undef;
 }# sub dcc_resume
 
 
@@ -1015,6 +1035,7 @@ sub dcc_chat {
   }
 
   $self->{dcc}->{$id}->{wheel}->put( join "\n", @data );
+  undef;
 }
 
 
@@ -1045,6 +1066,7 @@ sub dcc_close {
     delete $self->{dcc}->{$id}->{wheel};
   }
   delete $self->{dcc}->{$id};
+  undef;
 }
 
 
@@ -1071,6 +1093,7 @@ sub ison {
     $tmp .= " $nick";
   }
   $kernel->yield( 'sl_high', $tmp );
+  undef;
 }
 
 
@@ -1086,6 +1109,7 @@ sub kick {
 
   $nick .= " :$message" if defined $message;
   $kernel->yield( 'sl_high', "KICK $chan $nick" );
+  undef;
 }
 
 # Set up a new IRC component. Deprecated.
@@ -1144,6 +1168,7 @@ sub noargs {
     return;
   }
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1159,6 +1184,7 @@ sub oneandtwoopt {
     $state .= " $arg";
   }
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1174,6 +1200,7 @@ sub oneoptarg {
     $state .= " $arg";
   }
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1191,6 +1218,7 @@ sub oneortwo {
   $state = uc( $state ) . " $one";
   $state .= " $two" if defined $two;
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1209,6 +1237,7 @@ sub onlyonearg {
   $arg = ':' . $arg if $arg =~ /\s/;
   $state .= " $arg";
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1227,6 +1256,7 @@ sub onlytwoargs {
   $two = ':' . $two if $two =~ /\s/;
   $state .= " $one $two";
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1253,6 +1283,7 @@ sub privandnotice {
   $state = uc $state;
   $state .= " $to :$message";
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1283,6 +1314,7 @@ sub register {
   # start hurling session references around at this point :)
 
   $kernel->post( $sender => 'irc_registered' => $self );
+  undef;
 }
 
 sub register_session {
@@ -1308,6 +1340,7 @@ sub register_session {
       $kernel->refcount_increment($sender->ID(), PCI_REFCOUNT_TAG);
     }
   }
+  undef;
 }
 
 # Tell the IRC session to go away.
@@ -1323,7 +1356,7 @@ sub shutdown {
   }
 
   #if ( $self->{sessions}->{ $_[SENDER] } ) {
-  #	$kernel->yield ( 'unregister_sessions' );
+  #$kernel->yield ( 'unregister_sessions' );
   #}
   
   # Delete all plugins that are loaded.
@@ -1340,6 +1373,7 @@ sub sl_login {
   my ($kernel, $self) = @_[KERNEL, OBJECT];
   my $arg = join '', @_[ARG0 .. $#_];
   $kernel->yield( 'sl_prioritized', PRI_LOGIN, $arg );
+  undef;
 }
 
 
@@ -1349,6 +1383,7 @@ sub sl_high {
   my ($kernel, $self) = @_[KERNEL, OBJECT];
   my $arg = join '', @_[ARG0 .. $#_];
   $kernel->yield( 'sl_prioritized', PRI_HIGH, $arg );
+  undef;
 }
 
 
@@ -1360,6 +1395,7 @@ sub sl {
   my $arg = join '', @_[ARG0 .. $#_];
 
   $kernel->yield( 'sl_prioritized', PRI_NORMAL, $arg );
+  undef;
 }
 
 
@@ -1406,6 +1442,7 @@ sub sl_prioritized {
     $self->{send_time} += 2 + length($msg) / 120;
     $self->{socket}->put($msg);
   }
+  undef;
 }
 
 # Send delayed lines to the ircd.  We manage a virtual "send time"
@@ -1429,6 +1466,7 @@ sub sl_delayed {
 
   $kernel->delay( sl_delayed => $self->{send_time} - $now - 10 )
     if @{$self->{send_queue}};
+  undef;
 }
 
 
@@ -1441,6 +1479,7 @@ sub spacesep {
   $state = uc $state;
   $state .= " $args" if defined $args;
   $kernel->yield( 'sl_prioritized', $pri, $state );
+  undef;
 }
 
 
@@ -1451,6 +1490,7 @@ sub topic {
 
   $chan .= " :$topic" if length $topic;
   $kernel->yield( 'sl_prioritized', PRI_NORMAL, "TOPIC $chan" );
+  undef;
 }
 
 
@@ -1464,39 +1504,24 @@ sub unregister {
     return;
   }
 
-  foreach (@events) {
+  $self->_unregister($session,$sender,@events);
+  undef;
+}
+
+sub _unregister {
+  my ($self,$session,$sender) = splice @_,0,3;
+
+  foreach (@_) {
     delete $self->{events}->{$_}->{$sender};
     if (--$self->{sessions}->{$sender}->{refcnt} <= 0) {
       delete $self->{sessions}->{$sender};
       unless ($session == $sender) {
-        $kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
+        $poe_kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
       }
     }
   }
+  undef;
 }
-
-sub unregister_sessions {
-  my ($kernel, $self, $session, $called_by) =
-    @_[KERNEL,  OBJECT, SESSION,  SENDER];
-
-  unless ($session eq $called_by) {
-    warn "unregister_sessions: Naughty. Naughty. Only I can call this event";
-    return;
-  }
-
-  foreach my $sender ( keys %{ $self->{sessions} } ) {
-    foreach ( keys %{ $self->{events} } ) {
-      delete $self->{events}->{$_}->{$sender};
-      if (--$self->{sessions}->{$sender}->{refcnt} <= 0) {
-        delete $self->{sessions}->{$sender};
-        unless ($session == $sender) {
-          $kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
-        }
-      }
-    }
-  }
-}
-
 
 # Asks the IRC server for some random information about particular nicks.
 sub userhost {
@@ -1513,6 +1538,7 @@ sub userhost {
     $kernel->yield( 'sl_prioritized', PRI_HIGH,
 		    "USERHOST " . join(' ', splice(@nicks, 0, 5)) );
   }
+  undef;
 }
 
 # Non-event methods
@@ -1542,6 +1568,17 @@ sub send_queue {
 	return scalar @{ $self->{send_queue} };
   }
   return 0;
+}
+
+sub raw_events {
+  my ($self) = shift;
+  my ($value) = shift;
+
+  unless ( defined ( $value ) ) {
+	return $self->{raw_events};
+  }
+
+  $self->{raw_events} = $value;
 }
 
 sub session_id {
@@ -1580,6 +1617,34 @@ sub connected {
   return $self->{connected};
 }
 
+sub compress_uplink {
+  my ($self,$value) = splice @_, 0, 2;
+  return unless $self->{can_do_zlib};
+  return $self->{uplink} unless defined $value;
+  if ( $value ) {
+	$self->{out_filter}->unshift( POE::Filter::Zlib->new() ) unless $self->{uplink};
+	$self->{uplink} = 1;
+  } else {
+	$self->{out_filter}->shift() if $self->{uplink};
+	$self->{uplink} = 0;
+  }
+  return $self->{uplink};
+}
+
+sub compress_downlink {
+  my ($self,$value) = splice @_, 0, 2;
+  return unless $self->{can_do_zlib};
+  return $self->{downlink} unless defined $value;
+  if ( $value ) {
+	$self->{srv_filter}->unshift( POE::Filter::Zlib->new() ) unless $self->{downlink};
+	$self->{downlink} = 1;
+  } else {
+	$self->{srv_filter}->shift() if $self->{uplink};
+	$self->{downlink} = 0;
+  }
+  return $self->{downlink};
+}
+
 # Automatically replies to a PING from the server. Do not confuse this
 # with CTCP PINGs, which are a wholly different animal that evolved
 # much later on the technological timeline.
@@ -1587,6 +1652,7 @@ sub irc_ping {
   my ($kernel, $arg) = @_[KERNEL, ARG0];
 
   $kernel->yield( 'sl_login', "PONG $arg" );
+  undef;
 }
 
 # NICK messages for the purposes of determining our current nickname
@@ -1597,6 +1663,17 @@ sub irc_nick {
   if ( $nick eq $self->{RealNick} ) {
 	$self->{RealNick} = $new;
   }
+  undef;
+}
+
+# accesses the ISupport plugin
+sub isupport {
+  my ($self) = shift;
+  return $self->{isupport}->isupport(@_);
+}
+
+sub isupport_dump_keys {
+  return $_[0]->{isupport}->isupport_dump_keys();
 }
 
 
@@ -1910,11 +1987,23 @@ Glues an irc bot to an IRC network, ie. deals with maintaining ircd connections.
 
 =item L<POE::Component::IRC::Plugin::BotTraffic>
 
-Under normal circumstances irc bots do not normal see the msgs and public msgs that they generate themselves. This plugin enables you to handle those events.
+Under normal circumstances irc bots do not normal the msgs and public msgs that they generate themselves. This plugin enables you to handle those events.
 
 =item L<POE::Component::IRC::Plugin::BotAddressed>
 
 Generates 'irc_bot_addressed' events whenever someone addresses your bot by name in a channel.
+
+=item L<POE::Component::IRC::Plugin::Console>
+
+See inside the component. See what events are being sent. Generate irc commands manually. A TCP based console.
+
+=item L<POE::Component::IRC::Plugin::Proxy>
+
+A lightweight IRC proxy/bouncer.
+
+=item L<POE::Component::IRC::Plugin::CTCP>
+
+Automagically generates replies to ctcp version, time and userinfo queries.
 
 =back
 
@@ -1924,9 +2013,12 @@ Generates 'irc_bot_addressed' events whenever someone addresses your bot by name
 
 =item spawn
 
-Takes a number of arguments. "alias", a name (kernel alias) that this
-instance of the component will be known by; "options", a hashref containing
-POE::Session options for the component's session. See 'connect()' for additional
+Takes a number of arguments: 
+
+	"alias", a name (kernel alias) that this instance will be known by;
+	"options", a hashref containing POE::Session options;
+
+See 'connect()' for additional
 arguments that this method accepts. All arguments are optional.
 
 =item new
@@ -1989,6 +2081,23 @@ representing the number of messages that are queued up waiting for dispatch to t
 Takes no arguments. Returns true or false depending on whether the component is currently
 connected to an IRC network or not.
 
+=item disconnect
+
+Takes no arguments. Terminates the socket connection disgracefully >;o]
+
+=item raw_events
+
+With no arguments, returns true or false depending on whether 'irc_raw' events are being 
+generated or not. Provide a true or false argument to enable or disable this feature accordingly.
+
+=item isupport
+
+Takes one argument, a server capability to query. Returns undef on failure or a value representing the applicable capability. A full list of capabilities is available at L<http://www.irc.org/tech_docs/005.html>.
+
+=item isupport_dump_keys
+
+Takes no arguments, returns a list of the available server capabilities keys, which can be used with isupport().
+
 =back
 
 =head1 INPUT
@@ -2046,7 +2155,7 @@ IRC traffic through a proxy server.  "Proxy"'s value should be the IP
 address or server name of the proxy.  "ProxyPort"'s value should be the
 port on the proxy to connect to.  C<connect()> will default to using the
 I<actual> IRC server's port if you provide a proxy but omit the proxy's
-port.
+port. SOCKS v4 supported.
 
 For those people who run bots behind firewalls and/or Network Address Translation
 there are two additional attributes for DCC. "DCCPorts", is an arrayref of ports
@@ -2596,6 +2705,10 @@ by the component from the IRC server, before it has been mangled by filters and 
 Sent once to the requesting session on registration ( see register() ). ARG0 is a reference to
 the component's object.
 
+=item irc_isupport
+
+Emitted by the first event after an irc_005, to indicate that isupport information has been gathered. ARG0 is the L<POE::Component::IRC::Plugin::ISupport|POE::Component::IRC::Plugin::ISupport> object.
+
 =item All numeric events (see RFC 1459)
 
 Most messages from IRC servers are identified only by three-digit
@@ -2607,7 +2720,7 @@ lists. Ack!) As an example, say you wanted to handle event 376
 (RPL_ENDOFMOTD, which signals the end of the MOTD message). You'd
 register for '376', and listen for 'irc_376' events. Simple, no? ARG0
 is the name of the server which sent the message. ARG1 is the text of
-the message.
+the message. ARG2 is an ARRAYREF of the parsed message.
 
 =back
 

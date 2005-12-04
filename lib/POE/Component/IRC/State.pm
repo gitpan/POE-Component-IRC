@@ -12,6 +12,7 @@ package POE::Component::IRC::State;
 use strict;
 use POE qw(Component::IRC::Plugin::Whois);
 use POE::Component::IRC::Constants;
+use POE::Component::IRC::Common qw(:ALL);
 use base qw(POE::Component::IRC);
 use vars qw($VERSION);
 
@@ -128,7 +129,6 @@ sub _create {
 				      sl_prioritized
 				      topic
 				      unregister
-				      unregister_sessions
 				      userhost ), ( map {( 'irc_' . $_ )} @{ $self->{IRC_EVTS} } ) ];
 
   $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close' };
@@ -139,36 +139,22 @@ sub _create {
 # Parse a message from the IRC server and generate the appropriate
 # event(s) for listening sessions.
 sub _parseline {
-  my ($session, $self, $line) = @_[SESSION, OBJECT, ARG0];
+  my ($session, $self, $ev) = @_[SESSION, OBJECT, ARG0];
   my (@events, @cooked);
 
-  $self->_send_event( 'irc_raw' => $line ) if ( $self->{raw_events} );
+  $self->_send_event( 'irc_raw' => $ev->{raw_line} ) if ( $self->{raw_events} );
 
-  # Feed the proper Filter object the raw IRC text and get the
-  # "cooked" events back for sending, then deliver each event. We
-  # handle CTCPs separately from normal IRC messages here, to avoid
-  # silly module dependencies later.
-
-  @cooked = ($line =~ tr/\001// ? @{$self->{ctcp_filter}->get( [$line] )}
-             : @{$self->{irc_filter}->get( [$line] )} );
-
-  foreach my $ev (@cooked) {
-    if ( $ev->{name} eq 'part' and not $self->{'dont_partfix'} ) {
-        (@{$ev->{args}}[1..2]) = split(/ /,$ev->{args}->[1],2);
-        $ev->{args}->[2] =~ s/^:// if ( defined ( $ev->{args}->[2] ) );
-    }
-    # If its 001 event grab the server name and stuff it into {INFO}
-    if ( $ev->{name} eq '001' ) {
+  # If its 001 event grab the server name and stuff it into {INFO}
+  if ( $ev->{name} eq '001' ) {
         $self->{INFO}->{ServerName} = $ev->{args}->[0];
-        # Kind of assuming that $line is a single line of IRC protocol.
-        $self->{RealNick} = ( split / /, $line )[2];
-    }
-    if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
-	push ( @{$ev->{args}}, [ $self->nick_channels( ( split( /!/, $ev->{args}->[0] ) )[0] ) ] );
-    }
-    $ev->{name} = 'irc_' . $ev->{name};
-    $self->_send_event( $ev->{name}, @{$ev->{args}} );
+        $self->{RealNick} = ( split / /, $ev->{raw_line} )[2];
   }
+  if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
+	push ( @{$ev->{args}}, [ $self->nick_channels( ( split( /!/, $ev->{args}->[0] ) )[0] ) ] );
+  }
+  $ev->{name} = 'irc_' . $ev->{name};
+  $self->_send_event( $ev->{name}, @{$ev->{args}} );
+  undef;
 }
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
@@ -177,18 +163,22 @@ sub _parseline {
 # Make sure we have a clean STATE when we first join the network and if we inadvertently get disconnected
 sub irc_001 {
   delete ( $_[OBJECT]->{STATE} );
+  undef;
 }
 
 sub irc_disconnected {
   delete ( $_[OBJECT]->{STATE} );
+  undef;
 }
 
 sub irc_error {
   delete ( $_[OBJECT]->{STATE} );
+  undef;
 }
 
 sub irc_socketerr {
   delete ( $_[OBJECT]->{STATE} );
+  undef;
 }
 
 # Channel JOIN messages
@@ -211,6 +201,7 @@ sub irc_join {
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS}->{ u_irc ( $channel ) } = '';
         $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $nick ) } = '';
   }
+  undef;
 }
 
 # Channel PART messages
@@ -236,6 +227,7 @@ sub irc_part {
                 delete ( $self->{STATE}->{Nicks}->{ $nick } );
         }
   }
+  undef;
 }
 
 # QUIT messages
@@ -251,6 +243,7 @@ sub irc_quit {
         }
         delete ( $self->{STATE}->{Nicks}->{ u_irc ( $nick ) } );
   }
+  undef;
 }
 
 # Channel KICK messages
@@ -274,6 +267,7 @@ sub irc_kick {
                 delete ( $self->{STATE}->{Nicks}->{ u_irc ( $nick ) } );
         }
   }
+  undef;
 }
 
 # NICK changes
@@ -297,6 +291,7 @@ sub irc_nick {
         }
         $self->{STATE}->{Nicks}->{ u_irc ( $new ) } = $record;
   }
+  undef;
 }
 
 # Channel MODE
@@ -371,6 +366,7 @@ sub irc_mode {
         delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} );
      }
   }
+  undef;
 }
 
 # RPL_WHOREPLY
@@ -399,6 +395,7 @@ sub irc_352 {
   if ( $status =~ /\*/ ) {
     $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{IRCop} = 1;
   }
+  undef;
 }
 
 #RPL_ENDOFWHO
@@ -417,6 +414,7 @@ sub irc_315 {
   } else {
 	$self->_send_event( 'irc_nick_sync', $channel );
   }
+  undef;
 }
 
 # RPL_CHANNELMODEIS
@@ -446,61 +444,7 @@ sub irc_324 {
 	delete ( $self->{CHANNEL_SYNCH}->{ u_irc ( $channel ) } );
 	$self->_send_event( 'irc_chan_sync', $channel );
   }
-}
-
-# Miscellaneous internal functions
-# Returns IRC uppercase keys given a nickname or channel. {}|^ are lowercase []\~ as per RFC2812
-sub u_irc {
-  my ($value) = shift || return undef;
-
-  $value =~ tr/a-z{}|^/A-Z[]\\~/;
-  return $value;
-}
-
-# Given mode arguments as @_ this function returns a hashref, which contains the split up modes and args.
-# Given @_ = ( '+ovb', 'lamebot', 'nickname', '*!*@*' ) 
-# Returns { modes => [ '+o', '+v', '+b' ], args => [ 'lamebot', 'nickname', '*!*@*' ] }
-sub parse_mode_line {
-  my ($hashref) = { };
-
-  my ($count) = 0;
-  foreach my $arg ( @_ ) {
-        if ( $arg =~ /^(\+|-)/ or $count == 0 ) {
-           my ($action) = '+';
-           foreach my $char ( split (//,$arg) ) {
-                if ( $char eq '+' or $char eq '-' ) {
-                   $action = $char;
-                } else {
-                   push ( @{ $hashref->{modes} }, $action . $char );
-                }
-           }
-         } else {
-                push ( @{ $hashref->{args} }, $arg );
-         }
-         $count++;
-  }
-  return $hashref;
-}
-
-sub parse_ban_mask {
-  my ($arg) = shift || return undef;
-
-  $arg =~ s/\x2a{2,}/\x2a/g;
-  my (@ban); my ($remainder);
-  if ( $arg !~ /\x21/ and $arg =~ /\x40/ ) {
-     $remainder = $arg;
-  } else {
-     ($ban[0],$remainder) = split (/\x21/,$arg,2);
-  }
-  $remainder =~ s/\x21//g if ( defined ( $remainder ) );
-  @ban[1..2] = split (/\x40/,$remainder,2) if ( defined ( $remainder ) );
-  $ban[2] =~ s/\x40//g if ( defined ( $ban[2] ) );
-  for ( my $i = 0; $i <= 2; $i++ ) {
-    if ( ( not defined ( $ban[$i] ) ) or $ban[$i] eq '' ) {
-       $ban[$i] = '*';
-    }
-  }
-  return $ban[0] . '!' . $ban[1] . '@' . $ban[2];
+  undef;
 }
 
 # Methods for STATE query

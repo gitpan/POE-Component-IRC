@@ -204,36 +204,22 @@ sub _create {
 }
 
 sub _parseline {
-  my ($session, $self, $line) = @_[SESSION, OBJECT, ARG0];
+  my ($session, $self, $ev) = @_[SESSION, OBJECT, ARG0];
   my (@events, @cooked);
 
-  $self->_send_event( 'irc_raw' => $line ) if ( $self->{raw_events} );
+  $self->_send_event( 'irc_raw' => $ev->{raw_line} ) if ( $self->{raw_events} );
 
-  # Feed the proper Filter object the raw IRC text and get the
-  # "cooked" events back for sending, then deliver each event. We
-  # handle CTCPs separately from normal IRC messages here, to avoid
-  # silly module dependencies later.
-
-  @cooked = ($line =~ tr/\001// ? @{$self->{ctcp_filter}->get( [$line] )}
-             : @{$self->{irc_filter}->get( [$line] )} );
-
-  foreach my $ev (@cooked) {
-    if ( $ev->{name} eq 'part' and not $self->{'dont_partfix'} ) {
-        (@{$ev->{args}}[1..2]) = split(/ /,$ev->{args}->[1],2);
-        $ev->{args}->[2] =~ s/^:// if ( defined ( $ev->{args}->[2] ) );
-    }
-    # If its 001 event grab the server name and stuff it into {INFO}
-    if ( $ev->{name} eq '001' ) {
+  # If its 001 event grab the server name and stuff it into {INFO}
+  if ( $ev->{name} eq '001' ) {
         $self->{INFO}->{ServerName} = $ev->{args}->[0];
-        # Kind of assuming that $line is a single line of IRC protocol.
-        $self->{RealNick} = ( split / /, $line )[2];
-    }
-    if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
-        push ( @{$ev->{args}}, [ $self->nick_channels( ( split( /!/, $ev->{args}->[0] ) )[0] ) ] );
-    }
-    $ev->{name} = 'irc_' . $ev->{name};
-    $self->_send_event( $ev->{name}, @{$ev->{args}} );
+        $self->{RealNick} = ( split / /, $ev->{raw_line} )[2];
   }
+  if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
+        push ( @{$ev->{args}}, [ $self->nick_channels( ( split( /!/, $ev->{args}->[0] ) )[0] ) ] );
+  }
+  $ev->{name} = 'irc_' . $ev->{name};
+  $self->_send_event( $ev->{name}, @{$ev->{args}} );
+  undef;
 }
 
 # Qnet extension to RPL_WHOIS
@@ -242,6 +228,7 @@ sub irc_330 {
   my ($nick,$account) = ( split / /, $_[ARG1] )[0..1];
 
   $self->{WHOIS}->{ $nick }->{account} = $account;
+  undef;
 }
 
 # Qnet extension RPL_WHOEXT
@@ -271,6 +258,7 @@ sub irc_354 {
   if ( $status =~ /\*/ ) {
     $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{IRCop} = 1;
   }
+  undef;
 }
 
 #RPL_ENDOFWHO
@@ -293,6 +281,7 @@ sub irc_315 {
            $self->_send_event( 'irc_nick_sync', $channel );
 	}
   }
+  undef;
 }
 
 # Channel JOIN messages
@@ -316,6 +305,7 @@ sub irc_join {
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS}->{ u_irc ( $channel ) } = '';
         $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $nick ) } = '';
   }
+  undef;
 }
 
 # Channel MODE
@@ -391,59 +381,7 @@ sub irc_mode {
         delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} );
      }
   }
-}
-
-sub u_irc {
-  my ($value) = shift || return undef;
-
-  $value =~ tr/a-z{}|^/A-Z[]\\~/;
-  return $value;
-}
-
-# Given mode arguments as @_ this function returns a hashref, which contains the split up modes and args.
-# Given @_ = ( '+ovb', 'lamebot', 'nickname', '*!*@*' )
-# Returns { modes => [ '+o', '+v', '+b' ], args => [ 'lamebot', 'nickname', '*!*@*' ] }
-sub parse_mode_line {
-  my ($hashref) = { };
-
-  my ($count) = 0;
-  foreach my $arg ( @_ ) {
-        if ( $arg =~ /^(\+|-)/ or $count == 0 ) {
-           my ($action) = '+';
-           foreach my $char ( split (//,$arg) ) {
-                if ( $char eq '+' or $char eq '-' ) {
-                   $action = $char;
-                } else {
-                   push ( @{ $hashref->{modes} }, $action . $char );
-                }
-           }
-         } else {
-                push ( @{ $hashref->{args} }, $arg );
-         }
-         $count++;
-  }
-  return $hashref;
-}
-
-sub parse_ban_mask {
-  my ($arg) = shift || return undef;
-
-  $arg =~ s/\x2a{2,}/\x2a/g;
-  my (@ban); my ($remainder);
-  if ( $arg !~ /\x21/ and $arg =~ /\x40/ ) {
-     $remainder = $arg;
-  } else {
-     ($ban[0],$remainder) = split (/\x21/,$arg,2);
-  }
-  $remainder =~ s/\x21//g if ( defined ( $remainder ) );
-  @ban[1..2] = split (/\x40/,$remainder,2) if ( defined ( $remainder ) );
-  $ban[2] =~ s/\x40//g if ( defined ( $ban[2] ) );
-  for ( my $i = 0; $i <= 2; $i++ ) {
-    if ( ( not defined ( $ban[$i] ) ) or $ban[$i] eq '' ) {
-       $ban[$i] = '*';
-    }
-  }
-  return $ban[0] . '!' . $ban[1] . '@' . $ban[2];
+  undef;
 }
 
 sub is_nick_authed {
