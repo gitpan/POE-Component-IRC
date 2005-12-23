@@ -32,7 +32,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.75';
+$VERSION = '4.76';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -206,6 +206,7 @@ sub _configure {
       $self->{'debug'} = $arg{'debug'};
       $self->{ircd_filter}->{DEBUG} = $arg{'debug'};
     }
+    $self->{plugin_debug} = $arg{'plugin_debug'} if exists $arg{'plugin_debug'};
     my ($dccport) = delete ( $arg{'dccports'} );
     $self->{'UseSSL'} = $arg{'usessl'} if exists $arg{'usessl'};
 
@@ -723,7 +724,13 @@ sub _stop {
 # The handler for commands which have N arguments, separated by commas.
 sub commasep {
   my ($kernel, $self, $state) = @_[KERNEL, OBJECT, STATE];
-  my $args = join ',', @_[ARG0 .. $#_];
+  my @args = @_[ARG0 .. $#_]; my $args;
+  if ( $state eq 'whois' and scalar @args > 1 ) {
+	$args = shift @args;
+	$args .= ' ' . join ',', @args;
+  } else {
+	$args = join ',', @args;
+  }
   my $pri = $self->{IRC_CMDS}->{$state}->[CMD_PRI];
 
   $state = uc $state;
@@ -1707,7 +1714,9 @@ sub plugin_del {
     return;
   }
 
-  return scalar $self->pipeline->remove($name);
+  my $return = scalar $self->pipeline->remove($name);
+  warn "$@\n" if $@;
+  return $return;
 }
 
 # Gets the plugin object
@@ -1833,7 +1842,9 @@ sub _plugin_process {
     my $ret = PCI_EAT_NONE;
 
     eval { $ret = $plugin->$sub($self, @args) };
+    warn "$sub call failed with $@\n" if $@ and $self->{plugin_debug};
     eval { $ret = $plugin->_default($self, $sub, @args) } if $@;
+    warn "_default call failed with $@\n" if $@ and $self->{plugin_debug};
 
     return $return if $ret == PCI_EAT_PLUGIN;
     $return = PCI_EAT_ALL if $ret == PCI_EAT_CLIENT;
@@ -1861,7 +1872,7 @@ POE::Component::IRC - a fully event-driven IRC client module.
   my ($ircserver) = 'irc.blahblahblah.irc';
   my ($port) = 6667;
 
-  my (@channels) = ( '#Blah', #Foo', '#Bar' );
+  my (@channels) = ( '#Blah', '#Foo', '#Bar' );
 
   my ($irc) = POE::Component::IRC->spawn( 
 	nick => $nickname,
@@ -2135,6 +2146,7 @@ connection are:
   "NATAddr", what other clients see as your IP address.
   "DCCPorts", an arrayref containing tcp ports that can be used for DCC sends.
   "Resolver", provide a POE::Component::Client::DNS object for the component to use.
+  "plugin_debug", set to some true value to print plugin debug info, default 0.
 
 C<connect()> will supply
 reasonable defaults for any of these attributes which are missing, so
@@ -2176,6 +2188,8 @@ dns lookups using it.
 
 'Resolver', requires a POE::Component::Client::DNS object. Useful when spawning multiple poco-irc sessions
 , saves the overhead of multiple dns sessions.
+
+'plugin_debug', setting to true enables plugin debug info. Plugins are processed inside an eval, so debugging them can be hard. This should help with that.
 
 =item ctcp and ctcpreply
 
