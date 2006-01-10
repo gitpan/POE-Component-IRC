@@ -32,7 +32,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.77';
+$VERSION = '4.78';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -523,10 +523,10 @@ sub __send_event {
 # Changed to a method by BinGOs, 21st January 2005.
 # Amended by BinGOs (2nd February 2005) use call to send events to *our* session first.
 sub _send_event  {
-  my ($self) = shift;
+  my $self = shift;
   my ($event, @args) = @_;
   my $kernel = $POE::Kernel::poe_kernel;
-  my ($session) = $kernel->get_active_session();
+  my $session = $kernel->get_active_session()->ID();
   my %sessions;
 
   # Let the plugin system process this
@@ -539,22 +539,16 @@ sub _send_event  {
   # 'irc_disconnected' events to every registered session regardless of whether
   # that session had registered from them or not.
   if ( $event =~ /connected$/ ) {
-    foreach (keys %{$self->{sessions}}) {
-      $kernel->post( $self->{sessions}->{$_}->{'ref'},
-		   $event, @args );
-    }
+    $kernel->post( $self->{sessions}->{$_}->{'ref'},
+		   $event, @args ) for keys %{ $self->{sessions} };
     return 1;
   }
 
-  foreach (values %{$self->{events}->{'irc_all'}},
-	   values %{$self->{events}->{$event}}) {
-    $sessions{$_} = $_;
-  }
+  $sessions{$_} = $_ for (values %{$self->{events}->{'irc_all'}}, values %{$self->{events}->{$event}});
+
   # Make sure our session gets notified of any requested events before any other bugger
-  $self->call( $event => @args ) if ( defined ( $sessions{$session} ) );
-  foreach (values %sessions) {
-    $kernel->post( $_, $event, @args ) unless ( $_ eq $session );
-  }
+  $self->call( $session => $event => @args ) if delete $sessions{$session};
+  $kernel->post( $_, $event, @args ) for values %sessions;
   undef;
 }
 
@@ -1304,14 +1298,15 @@ sub register {
     return;
   }
 
+  my $sender_id = $sender->ID();
   # FIXME: What "special" event names go here? (ie, "errors")
   # basic, dcc (implies ctcp), ctcp, oper ...what other categories?
   foreach (@events) {
     $_ = "irc_" . $_ unless /^_/;
-    $self->{events}->{$_}->{$sender} = $sender;
-    $self->{sessions}->{$sender}->{'ref'} = $sender;
-    unless ($self->{sessions}->{$sender}->{refcnt}++ or $session == $sender) {
-      $kernel->refcount_increment($sender->ID(), PCI_REFCOUNT_TAG);
+    $self->{events}->{$_}->{$sender_id} = $sender_id;
+    $self->{sessions}->{$sender}->{'ref'} = $sender_id;
+    unless ($self->{sessions}->{$sender_id}->{refcnt}++ or $session == $sender) {
+      $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
     }
   }
   # BINGOS:
@@ -1517,13 +1512,14 @@ sub unregister {
 
 sub _unregister {
   my ($self,$session,$sender) = splice @_,0,3;
+  my $sender_id = $sender->ID();
 
   foreach (@_) {
-    delete $self->{events}->{$_}->{$sender};
-    if (--$self->{sessions}->{$sender}->{refcnt} <= 0) {
-      delete $self->{sessions}->{$sender};
+    delete $self->{events}->{$_}->{$sender_id};
+    if (--$self->{sessions}->{$sender_id}->{refcnt} <= 0) {
+      delete $self->{sessions}->{$sender_id};
       unless ($session == $sender) {
-        $poe_kernel->refcount_decrement($sender->ID(), PCI_REFCOUNT_TAG);
+        $poe_kernel->refcount_decrement($sender_id, PCI_REFCOUNT_TAG);
       }
     }
   }
@@ -2683,6 +2679,11 @@ the clever, witty message they left behind on the way out.
 
 Sent when a connection couldn't be established to the IRC server. ARG0
 is probably some vague and/or misleading reason for what failed.
+
+=item irc_topic
+
+Sent when a channel topic is set or unset. ARG0 is the nick!hostmask of the sender. ARG1 is the channel affected. ARG2 will be either: a string if the topic is being set; or a zero-length string (ie. '') if the topic is being unset. Note: replies to queries about what a channel topic *is* (ie. TOPIC #channel) , are returned as numerics, not with this event.
+
 
 =item irc_whois
 
