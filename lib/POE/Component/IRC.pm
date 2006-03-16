@@ -32,7 +32,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.79';
+$VERSION = '4.80';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -46,8 +46,8 @@ $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 #	  $self->{IRC_CMDS} contains the traditional %irc_commands, mapping commands to events
 #		and the priority that the command has.
 
-my ($GOT_SSL);
-my ($GOT_CLIENT_DNS);
+my $GOT_SSL;
+my $GOT_CLIENT_DNS;
 
 # Check for SSL availability
 BEGIN {
@@ -69,13 +69,9 @@ BEGIN {
 }
 
 sub _create {
-  my ($package) = shift;
+  my $package = shift;
 
-  my $self = bless ( { }, $package );
-
-  #if ( $GOT_CLIENT_DNS ) {
-  #  POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
-  #}
+  my $self = bless { }, $package;
 
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
@@ -123,7 +119,7 @@ sub _create {
 
   $self->{IRC_EVTS} = [ qw(nick ping) ];
 
-  my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
+  my @event_map = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
 
   $self->{OBJECT_STATES_ARRAYREF} = [qw( _dcc_failed
 				      _dcc_read
@@ -168,14 +164,12 @@ sub _create {
 #	  _configure() deals with this.
 
 sub _configure {
-  my ($self) = shift;
-
-  my ($spawned) = 0;
-
-  my ($args) = shift;
+  my $self = shift;
+  my $spawned = 0;
+  my $args = shift;
 
   if ( defined ( $args ) and ref $args eq 'HASH' ) {
-    my (%arg) = %$args;
+    my %arg = %$args;
 
     if (exists $arg{'flood'} and $arg{'flood'}) {
       $self->{'dont_flood'} = 0;
@@ -207,7 +201,7 @@ sub _configure {
       $self->{ircd_filter}->{DEBUG} = $arg{'debug'};
     }
     $self->{plugin_debug} = $arg{'plugin_debug'} if exists $arg{'plugin_debug'};
-    my ($dccport) = delete ( $arg{'dccports'} );
+    my $dccport = delete $arg{'dccports'};
     $self->{'UseSSL'} = $arg{'usessl'} if exists $arg{'usessl'};
 
     if ( defined ( $dccport ) and ref ( $dccport ) eq 'ARRAY' ) {
@@ -224,7 +218,7 @@ sub _configure {
     $spawned = $arg{'CALLED_FROM_SPAWN'} if exists $arg{'CALLED_FROM_SPAWN'};
   }
 
-  if ( $spawned and ( not $self->{NoDNS} ) and $GOT_CLIENT_DNS and ( not $self->{resolver} ) ) {
+  if ( $spawned and !$self->{NoDNS} and $GOT_CLIENT_DNS and !$self->{resolver} ) {
 	$self->{resolver} = POE::Component::Client::DNS->spawn( Alias => "resolver" . $self->session_id() );
   }
 
@@ -276,7 +270,7 @@ sub _dcc_failed {
     $self->_send_event( 'irc_dcc_done', $id,
     @{$self->{dcc}->{$id}}{ qw(nick type port file size done listenport clientaddr) } );
     close $self->{dcc}->{$id}->{fh};
-    delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
+    delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID} if $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id};
   }
@@ -284,9 +278,9 @@ sub _dcc_failed {
   elsif ($errnum == 0 and
   $self->{dcc}->{$id}->{type} eq "CHAT") {
     $self->_send_event( 'irc_dcc_done', $id,
-    @{$self->{dcc}->{$id}}{ qw(nick type port file size done listenport clientaddr) } );
+    @{$self->{dcc}->{$id}}{ qw(nick type port done listenport clientaddr) } );
     close $self->{dcc}->{$id}->{fh};
-    delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
+    delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID} if $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id};
   }
@@ -392,7 +386,7 @@ sub _dcc_read {
 sub _dcc_timeout {
   my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
 
-  if (exists $self->{dcc}->{$id} and not $self->{dcc}->{$id}->{open}) {
+  if (exists $self->{dcc}->{$id} and !$self->{dcc}->{$id}->{open}) {
     $kernel->yield( '_dcc_failed', 'connection', 0,
 		    'DCC connection timed out', $id );
   }
@@ -499,7 +493,6 @@ sub _parseline {
   # If its 001 event grab the server name and stuff it into {INFO}
   if ( $ev->{name} eq '001' ) {
 	$self->{INFO}->{ServerName} = $ev->{args}->[0];
-	# Kind of assuming that $line is a single line of IRC protocol.
 	$self->{RealNick} = ( split / /, $ev->{raw_line} )[2];
   }
   $ev->{name} = 'irc_' . $ev->{name};
@@ -671,7 +664,7 @@ sub _start {
   if ( $alias ) {
      $kernel->alias_set($alias);
   } else {
-     $kernel->alias_set('PoCo-IRC-' . $session->ID() );
+     $kernel->alias_set("$self");
   }
 
   $kernel->yield( 'register', @{ $self->{IRC_EVTS} } );
@@ -691,7 +684,7 @@ sub _start {
   eval{ 
 	require POE::Filter::Zlib;
   };
-  $self->{can_do_zlib} = 1 unless ( $@ );
+  $self->{can_do_zlib} = 1 unless $@;
   $self->{SESSION_ID} = $session->ID();
 
   # Plugin 'irc_whois' and 'irc_whowas' support
@@ -759,7 +752,7 @@ sub connect {
   $self->_configure( \%arg );
 
   # try and use non-blocking resolver if needed
-  if ( $self->{resolver} && !($self->{'server'} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) && ( not $self->{'NoDNS'} ) ) {
+  if ( $self->{resolver} && $self->{'server'} !~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ && !$self->{'NoDNS'} ) {
     my $response = $self->{resolver}->resolve( event => "got_dns_response", host =>  $self->{'server'}, context => { } );
     if ( $response ) {
 	$kernel->yield( got_dns_response => $response );
@@ -767,11 +760,6 @@ sub connect {
   } else {
     $kernel->yield("do_connect");
   }
-
-  # Is the calling session registered or not.
-  #if ( not $self->{sessions}->{$sender} ) {
-  #	$kernel->call( $session => 'register_session' => $sender => 'all' );
-  #}
 
   $self->{RealNick} = $self->{nick};
   undef;
@@ -782,9 +770,7 @@ sub do_connect {
   my ($kernel, $self, $session, $args) = @_[KERNEL, OBJECT, SESSION];
 
   # Disconnect if we're already logged into a server.
-  if ($self->{'sock'}) {
-    $kernel->call( $session, 'quit' );
-  }
+  $kernel->call( $session, 'quit' ) if $self->{'sock'};
 
   $self->{'socketfactory'} =
     POE::Wheel::SocketFactory->new( SocketDomain   => AF_INET,
@@ -1653,8 +1639,7 @@ sub compress_downlink {
 # much later on the technological timeline.
 sub irc_ping {
   my ($kernel, $arg) = @_[KERNEL, ARG0];
-
-  $kernel->yield( 'sl_login', "PONG $arg" );
+  $kernel->yield( 'sl_login', "PONG :$arg" );
   undef;
 }
 
@@ -1861,16 +1846,19 @@ POE::Component::IRC - a fully event-driven IRC client module.
 
   # A simple Rot13 'encryption' bot
 
+  use strict;
+  use warnings;
   use POE qw(Component::IRC);
 
-  my ($nickname) = 'Flibble' . $$;
-  my ($ircname) = 'Flibble the Sailor Bot';
-  my ($ircserver) = 'irc.blahblahblah.irc';
-  my ($port) = 6667;
+  my $nickname = 'Flibble' . $$;
+  my $ircname = 'Flibble the Sailor Bot';
+  my $ircserver = 'irc.blahblahblah.irc';
+  my $port = 6667;
 
-  my (@channels) = ( '#Blah', '#Foo', '#Bar' );
+  my @channels = ( '#Blah', '#Foo', '#Bar' );
 
-  my ($irc) = POE::Component::IRC->spawn( 
+  # We create a new PoCo-IRC object and component.
+  my $irc = POE::Component::IRC->spawn( 
 	nick => $nickname,
 	server => $ircserver,
 	port => $port,
@@ -1881,37 +1869,47 @@ POE::Component::IRC - a fully event-driven IRC client module.
 	package_states => [
 		'main' => [ qw(_default _start irc_001 irc_public) ],
 	],
+	heap => { irc => $irc },
   );
 
   $poe_kernel->run();
   exit 0;
 
   sub _start {
-    $irc->yield( register => 'all' );
-    $irc->yield( connect => { } );
+    my ($kernel,$heap) = @_[KERNEL,HEAP];
+
+    # We get the session ID of the component from the object
+    # and register and connect to the specified server.
+    my $irc_session = $heap->{irc}->session_id();
+    $kernel->post( $irc_session => register => 'all' );
+    $kernel->post( $irc_session => connect => { } );
     undef;
   }
 
   sub irc_001 {
-    $irc->yield( join => $_ ) for @channels;
+    my ($kernel,$sender) = @_[KERNEL,SENDER];
+
+    # In any irc_* events SENDER will be the PoCo-IRC session
+    $kernel->post( $sender => join => $_ ) for @channels;
     undef;
   }
 
   sub irc_public {
-    my ($who,$where,$what) = @_[ARG0,ARG1,ARG2];
+    my ($kernel,$sender,$who,$where,$what) = @_[KERNEL,SENDER,ARG0,ARG1,ARG2];
     my $nick = ( split /!/, $who )[0];
     my $channel = $where->[0];
 
     if ( my ($rot13) = $what =~ /^rot13 (.+)/ ) {
 	$rot13 =~ tr[a-zA-Z][n-za-mN-ZA-M];
-	$irc->yield( privmsg => $channel => $rot13 );
+	$kernel->post( $sender => privmsg => $channel => "$nick: $rot13" );
     }
     undef;
   }
 
+  # We registered for all events, this will produce some debug info.
   sub _default {
     my ($event, $args) = @_[ARG0 .. $#_];
-    my (@output) = ( "$event: " );
+    my @output = ( "$event: " );
 
     foreach my $arg ( @$args ) {
         if ( ref($arg) eq 'ARRAY' ) {
@@ -1920,7 +1918,7 @@ POE::Component::IRC - a fully event-driven IRC client module.
                 push ( @output, "'$arg'" );
         }
     }
-    print STDOUT join( ' ', @output ) . "\n";
+    print STDOUT join ' ', @output, "\n";
     return 0;
   }
 
@@ -1936,48 +1934,41 @@ things by sending it events. That's all there is to it. Cool, no?
 [Note that using this module requires some familiarity with the
 details of the IRC protocol. I'd advise you to read up on the gory
 details of RFC 1459
-E<lt>http://cs-pub.bu.edu/pub/irc/support/rfc1459.txtE<gt> before you
+E<lt>http://www.faqs.org/rfcs/rfc1459.htmlE<gt> before you
 get started. Keep the list of server numeric codes handy while you
 program. Needless to say, you'll also need a good working knowledge of
 POE, or this document will be of very little use to you.]
 
-The old way:-
+The POE::Component::IRC distribution has a docs/ folder with a collection of
+salient documentation including the pertinent RFCs.
 
-So you want to write a POE program with POE::Component::IRC? Listen
-up. The short version is as follows: Create your session(s) and an
-alias for a new POE::Component::IRC client. (Conceptually, it helps if
-you think of them as little IRC clients.) In your session's _start
-handler, send the IRC client a 'register' event to tell it which IRC
-events you want to receive from it. Send it a 'connect' event at some
-point to tell it to join the server, and it should start sending you
-interesting events every once in a while. If you want to tell it to
-perform an action, like joining a channel and saying something witty,
-send it the appropriate events like so:
+POE::Component::IRC consists of a POE::Session that manages the IRC connection and 
+dispatches 'irc_' prefixed events to interested sessions and 
+an object that can be used to access additional information using methods.
 
-  $kernel->post( 'my client', 'join', '#perl' );
-  $kernel->post( 'my client', 'privmsg', '#perl', 'Pull my finger!' );
+Sessions register their interest in receiving 'irc_' events by sending 'register' to the component. One would usually do this in your _start handler. Your session will continue to receive events until you 'unregister'. The component will continue to stay around until you tell it not to with 'shutdown'.
 
-The new way:-
+The SYNOPSIS demonstrates a fairly basic bot.
 
-As of version 3.4, having to use an alias became optional. Using the 'spawn'
-method, creates a new component and returns an POE::Component::IRC object.
+=head1 Useful subclasses
 
-One can always get the session ID of the component using the 'session_id()'
-method of the object. Alternatively, one can post events using the object with
-the 'yield()' method.
+Included with POE::Component::IRC are a number of useful subclasses. As they are subclasses they support all the methods, etc. documented here and have additional methods and quirks which are documented separately:
 
-  my ($irc) = POE::Component::IRC->spawn() or die;
+=over
 
-  $irc->yield( 'register' => 'all' );
+=item L<POE::Component::IRC::State>
 
-  $irc->yield( 'connect',
-                { Nick     => 'Boolahman',
-                  Server   => 'irc-w.primenet.com',
-                  Port     => 6669,
-                  Username => 'quetzal',
-                  Ircname  => 'Ask me about my colon!', } );
+POE::Component::IRC::State provides all the functionality of POE::Component::IRC but also tracks IRC state entities such as nicks and channels.
 
-The long version is the rest of this document.
+=item L<POE::Component::IRC::Qnet>
+
+POE::Component::IRC::Qnet is POE::Component::IRC tweaked for use on Quakenet IRC network.
+
+=item L<POE::Component::IRC::Qnet::State>
+
+POE::Component::IRC::Qnet::State is a tweaked version of POE::Component::IRC::State for use on Quakenet IRC network. 
+
+=back
 
 =head1 The Plugin system
 
@@ -2039,6 +2030,8 @@ Use of this method will generate a warning. There are currently no plans to make
 
 =head1 METHODS
 
+These are methods supported by the POE::Component::IRC object. 
+
 =over
 
 =item server_name
@@ -2057,22 +2050,6 @@ Takes no arguments. Returns the ID of the component's session. Ideal for posting
 events to the component.
 
 $kernel->post( $irc->session_id() => 'mode' => $channel => '+o' => $dude );
-
-=item yield
-
-This method provides an alternative object based means of posting events to the component.
-First argument is the event to post, following arguments are sent as arguments to the resultant
-post.
-
-$irc->yield( 'mode' => $channel => '+o' => $dude );
-
-=item call
-
-This method provides an alternative object based means of calling events to the component.
-First argument is the event to call, following arguments are sent as arguments to the resultant
-call.
-
-$irc->call( 'mode' => $channel => '+o' => $dude );
 
 =item version
 
@@ -2105,11 +2082,29 @@ Takes one argument, a server capability to query. Returns undef on failure or a 
 
 Takes no arguments, returns a list of the available server capabilities keys, which can be used with isupport().
 
+=item yield
+
+This method provides an alternative object based means of posting events to the component.
+First argument is the event to post, following arguments are sent as arguments to the resultant
+post.
+
+$irc->yield( 'mode' => $channel => '+o' => $dude );
+
+=item call
+
+This method provides an alternative object based means of calling events to the component.
+First argument is the event to call, following arguments are sent as arguments to the resultant
+call.
+
+$irc->call( 'mode' => $channel => '+o' => $dude );
+
 =back
 
 =head1 INPUT
 
 How to talk to your new IRC component... here's the events we'll accept.
+These are events that are posted to the component, either via $poe_kernel->post() or via 
+the object method yield().
 
 =head2 Important Commands
 
@@ -2193,7 +2188,10 @@ Sends a CTCP query or response to the nick(s) or channel(s) which you
 specify. Takes 2 arguments: the nick or channel to send a message to
 (use an array reference here to specify multiple recipients), and the
 plain text of the message to send (the CTCP quoting will be handled
-for you).
+for you). The "/me" command in popular IRC clients is actually a CTCP action.
+
+   # Doing a /me 
+   $poe_kernel->post( $irc_session => ctcp => $channel => "ACTION dances." );
 
 =item dcc
 
@@ -2651,7 +2649,7 @@ message.
 =item irc_part
 
 Sent whenever someone leaves a channel that you're on. ARG0 is the
-person's nick!hostmask. ARG1 is the channel name.
+person's nick!hostmask. ARG1 is the channel name. ARG2 is the part message.
 
 =item irc_ping
 
@@ -2874,7 +2872,7 @@ Chris 'BinGOs' Williams E<lt>chris@bingosnet.co.uk<gt>
 
 =head1 AUTHOR
 
-Dennis Taylor, E<lt>dennis@funkplanet.comE<gt>
+Dennis Taylor.
 
 =head1 MAD PROPS
 
@@ -2898,5 +2896,7 @@ L<http://www.infobot.org/>,
 
 Some good examples reside in the POE cookbook which has a whole section devoted to
 IRC programming L<http://poe.perl.org/?POE_Cookbook>.
+
+The examples/ folder of this distribution.
 
 =cut
