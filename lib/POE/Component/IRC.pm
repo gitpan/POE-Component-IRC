@@ -32,7 +32,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.80';
+$VERSION = '4.81';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -125,6 +125,7 @@ sub _create {
 				      _dcc_read
 				      _dcc_timeout
 				      _dcc_up
+				      _delayed_cmd
 				      _parseline
 				      __send_event
 				      _sock_down
@@ -556,7 +557,7 @@ sub _sock_down {
 
   # Stop any delayed sends.
   $self->{send_queue} = [ ];
-  $_[HEAP]->{send_queue} = $self->{send_queue};
+  #$_[HEAP]->{send_queue} = $self->{send_queue};
   $self->{send_time}  = 0;
   $kernel->delay( sl_delayed => undef );
 
@@ -656,13 +657,14 @@ sub _start {
   # Send queue is used to hold pending lines so we don't flood off.
   # The count is used to track the number of lines sent at any time.
   $self->{send_queue} = [ ];
-  $_[HEAP]->{send_queue} = $self->{send_queue};
+  #$_[HEAP]->{send_queue} = $self->{send_queue};
   $self->{send_time}  = 0;
 
   $session->option( @options ) if @options;
 
   if ( $alias ) {
      $kernel->alias_set($alias);
+     $self->{alias} = $alias;
   } else {
      $kernel->alias_set("$self");
   }
@@ -1103,40 +1105,34 @@ sub kick {
 sub new {
   my ($package, $alias) = splice @_, 0, 2;
 
-  unless ($alias) {
-    croak "Not enough arguments to POE::Component::IRC::new()";
-  }
-
+  croak "Not enough arguments to POE::Component::IRC::new()" unless $alias;
   warn "Use of ->new() is deprecated, please use spawn()\n";
-
-  my ($self) = $package->spawn ( alias => $alias, options => { @_ } );
+  my $self = $package->spawn ( alias => $alias, options => { @_ } );
 
   return $self;
 }
 
 # Set up a new IRC component. New interface.
 sub spawn {
-  my ($package) = shift;
+  my $package = shift;
   croak "$package requires an even number of parameters" if @_ & 1;
 
   my %parms = @_;
+  $parms{ lc $_ } = delete $parms{$_} for keys %parms;
 
-  foreach my $key ( keys %parms ) {
-	$parms{ lc $key } = delete $parms{$key};
-  }
+  delete $parms{'options'} unless ref ( $parms{'options'} ) eq 'HASH';
 
-  delete ( $parms{'options'} ) unless ( ref ( $parms{'options'} ) eq 'HASH' );
+  my $self = $package->_create();
 
-  my ($self) = $package->_create();
-
-  my ($alias) = delete ( $parms{'alias'} );
+  my $alias = delete $parms{'alias'};
 
   POE::Session->create(
 		object_states => [
 		     $self => $self->{OBJECT_STATES_HASHREF},
 		     $self => $self->{OBJECT_STATES_ARRAYREF}, ],
 		( defined ( $parms{'options'} ) ? ( options => $parms{'options'} ) : () ),
-		args => [ $alias ] );
+		args => [ $alias ],
+		heap => $self, );
 
   $parms{'CALLED_FROM_SPAWN'} = 1;
   $self->_configure( \%parms );
@@ -1334,23 +1330,12 @@ sub register_session {
 # Tell the IRC session to go away.
 sub shutdown {
   my ($kernel, $self) = @_[KERNEL, OBJECT];
-
-  foreach ($kernel->alias_list( $_[SESSION] )) {
-    $kernel->alias_remove( $_ );
-  }
-
-  foreach (qw(socket sock socketfactory dcc wheelmap)) {
-    delete $self->{$_};
-  }
-
-  #if ( $self->{sessions}->{ $_[SENDER] } ) {
-  #$kernel->yield ( 'unregister_sessions' );
-  #}
-  
+  $kernel->alarm_remove_all();
+  $kernel->alias_remove( $_ ) for $kernel->alias_list( $_[SESSION] );
+  delete $self->{$_} for qw(socket sock socketfactory dcc wheelmap);
   # Delete all plugins that are loaded.
-  foreach my $plugin_alias ( keys %{ $self->plugin_list() } ) {
-	$self->plugin_del( $plugin_alias );
-  }
+  $self->plugin_del( $_ ) for keys %{ $self->plugin_list() };
+  $self->{resolver}->shutdown() if $self->{resolver};
   undef;
 }
 
@@ -1576,16 +1561,38 @@ sub session_id {
   return $self->{SESSION_ID};
 }
 
-sub yield {
-  my ($self) = shift;
+sub session_alias {
+  my $self = shift;
+  return $self->{alias};
+}
 
+sub yield {
+  my $self = shift;
   $poe_kernel->post( $self->session_id() => @_ );
 }
 
 sub call {
-  my ($self) = shift;
-
+  my $self = shift;
   $poe_kernel->call( $self->session_id() => @_ );
+}
+
+sub delay {
+  my $self = shift;
+  my $arrayref = shift || return;
+  unless ( ref $arrayref eq 'ARRAY' ) {
+	warn "First argument to delay() must be an ARRAYREF\n";
+	return;
+  }
+  $poe_kernel->call( $self->session_id() => '_delayed_cmd' => $arrayref => @_ );
+}
+
+sub _delayed_cmd {
+  my ($kernel,$self,$arrayref,$time) = @_[KERNEL,OBJECT,ARG0,ARG1];
+  return unless scalar @{ $arrayref };
+  return unless $time;
+  my $event = shift @{ $arrayref };
+  $kernel->delay_set( $event => $time => @{ $arrayref } );
+  undef;
 }
 
 sub _validate_command {
@@ -1646,11 +1653,8 @@ sub irc_ping {
 # NICK messages for the purposes of determining our current nickname
 sub irc_nick {
   my ($kernel,$self,$who,$new) = @_[KERNEL,OBJECT,ARG0,ARG1];
-  my ($nick) = ( split /!/, $who )[0];
-
-  if ( $nick eq $self->{RealNick} ) {
-	$self->{RealNick} = $new;
-  }
+  my $nick = ( split /!/, $who )[0];
+  $self->{RealNick} = $new if ( $nick eq $self->{RealNick} );
   undef;
 }
 
@@ -1889,6 +1893,11 @@ POE::Component::IRC - a fully event-driven IRC client module.
   sub irc_001 {
     my ($kernel,$sender) = @_[KERNEL,SENDER];
 
+    # Get the component's object at any time by accessing the heap of
+    # the SENDER
+    my $poco_object = $sender->get_heap();
+    print "Connected to ", $poco_object->server_name(), "\n";
+
     # In any irc_* events SENDER will be the PoCo-IRC session
     $kernel->post( $sender => join => $_ ) for @channels;
     undef;
@@ -2003,9 +2012,16 @@ A lightweight IRC proxy/bouncer.
 
 Automagically generates replies to ctcp version, time and userinfo queries.
 
+=item L<POE::Component::IRC::Plugin::PlugMan>
+
+An experimental Plugin Manager plugin.
+
 =back
 
 =head1 CONSTRUCTORS
+
+Both CONSTRUCTORS return an object. The object is also available within 'irc_' event handlers by using 
+$_[SENDER]->get_heap(). See also 'register' and 'irc_registered'.
 
 =over
 
@@ -2051,6 +2067,10 @@ events to the component.
 
 $kernel->post( $irc->session_id() => 'mode' => $channel => '+o' => $dude );
 
+=item session_alias
+
+Takes no arguments. Returns the session alias that has been set through spawn()'s alias argument. 
+
 =item version
 
 Takes no arguments. Returns the version number of the module.
@@ -2088,7 +2108,7 @@ This method provides an alternative object based means of posting events to the 
 First argument is the event to post, following arguments are sent as arguments to the resultant
 post.
 
-$irc->yield( 'mode' => $channel => '+o' => $dude );
+  $irc->yield( 'mode' => $channel => '+o' => $dude );
 
 =item call
 
@@ -2096,7 +2116,15 @@ This method provides an alternative object based means of calling events to the 
 First argument is the event to call, following arguments are sent as arguments to the resultant
 call.
 
-$irc->call( 'mode' => $channel => '+o' => $dude );
+  $irc->call( 'mode' => $channel => '+o' => $dude );
+
+=item delay
+
+This method provides a way of posting delayed events to the component. The first argument
+is an arrayref consisting of the delayed command to post and any command arguments. The 
+second argument is the time in seconds that one wishes to delay the command being posted.
+
+  $irc->delay( [ 'mode' => $channel => '+o' => $dude ], 60 );
 
 =back
 
@@ -2553,6 +2581,10 @@ listen for. FIXME: I'd really like to classify these somewhat
 suggestions for ways to make this easier on the user, if you can think
 of some.
 
+In your event handlers, $_[SENDER] is the particular component session that
+sent you the event. $_[SENDER]->get_heap() will retrieve the component's 
+object. Useful if you want on-the-fly access to the object and it's methods.
+
 =head2 Important Events
 
 =over
@@ -2733,7 +2765,8 @@ lists. Ack!) As an example, say you wanted to handle event 376
 (RPL_ENDOFMOTD, which signals the end of the MOTD message). You'd
 register for '376', and listen for 'irc_376' events. Simple, no? ARG0
 is the name of the server which sent the message. ARG1 is the text of
-the message. ARG2 is an ARRAYREF of the parsed message.
+the message. ARG2 is an ARRAYREF of the parsed message, so there is no
+need to parse ARG1 yourself.
 
 =back
 
@@ -2868,7 +2901,7 @@ L<http://rt.cpan.org/> to report any. Alternatively, email the current maintaine
 
 =head1 MAINTAINER
 
-Chris 'BinGOs' Williams E<lt>chris@bingosnet.co.uk<gt>
+Chris 'BinGOs' Williams E<lt>chris@bingosnet.co.ukE<gt>
 
 =head1 AUTHOR
 
