@@ -1,17 +1,17 @@
-use Test::More tests => 19;
+use Test::More tests => 12;
 
 BEGIN { use_ok('POE::Component::IRC::Test::Harness') };
-BEGIN { use_ok('POE::Component::IRC::State') };
+BEGIN { use_ok('POE::Component::IRC') };
 
 use POE qw(Wheel::SocketFactory);
 use Socket;
 use Data::Dumper;
 
 my $ircd = POE::Component::IRC::Test::Harness->spawn( Alias => 'ircd', Auth => 0, AntiFlood => 0, Debug => 0 );
-my $irc = POE::Component::IRC::State->spawn( options => { trace => 0 } );
+my $irc = POE::Component::IRC->spawn( options => { trace => 0 } );
 
 isa_ok ( $ircd, 'POE::Component::IRC::Test::Harness' );
-isa_ok ( $irc, 'POE::Component::IRC::State' );
+isa_ok ( $irc, 'POE::Component::IRC' );
 
 POE::Session->create(
 	inline_states => { _start => \&test_start, },
@@ -21,9 +21,7 @@ POE::Session->create(
 			 irc_registered 
 			 irc_connected 
 			 irc_001 
-			 irc_whois 
-			 irc_join
-			 irc_chan_sync
+			 irc_nick
 			 irc_error
 			 irc_disconnected
 	   )],
@@ -79,7 +77,7 @@ sub _config_ircd {
 
 sub irc_registered {
   my ($kernel,$object) = @_[KERNEL,ARG0];
-  isa_ok( $object, 'POE::Component::IRC::State' );
+  isa_ok( $object, 'POE::Component::IRC' );
   undef;
 }
 
@@ -94,39 +92,15 @@ sub irc_001 {
   pass( 'connect' );
   ok( $ircobj->server_name() eq 'poco.server.irc', "Server Name Test" );
   ok( $ircobj->nick_name() eq 'TestBot', "Nick Name Test" );
-  $ircobj->yield( 'whois' => 'TestBot' );
+  $ircobj->yield( 'nick' => 'TestBot2' );
   undef;
 }
 
-sub irc_whois {
-  my ($kernel,$sender,$whois) = @_[KERNEL,SENDER,ARG0];
-  ok( $whois->{nick} eq 'TestBot', "Whois hash test" );
-  $sender->get_heap()->yield( 'join' => '#testchannel' );
-  undef;
-}
-
-sub irc_join {
-  my ($kernel,$sender,$who,$where) = @_[KERNEL,SENDER,ARG0,ARG1];
-  my $nick = ( split /!/, $who )[0];
-  my $object = $sender->get_heap();
-  ok( $nick eq $object->nick_name(), "JOINER Test" );
-  ok( $where eq '#testchannel', "Joined Channel Test" );
-  #$object->yield( 'quit' );
-  undef;
-}
-
-sub irc_chan_sync {
-  my ($sender,$channel) = @_[SENDER,ARG0];
-  my $object = $sender->get_heap();
-  my $mynick = $object->nick_name();
-  my ($occupant) = $object->channel_list($channel);
-  ok( $occupant eq 'TestBot', "Channel Occupancy Test" );
-  ok( !$object->is_channel_mode_set( $channel, 't' ), "Channel Mode Set" );
-  ok( $object->is_channel_member($channel, $mynick ), "Is Channel Member" );
-  ok( $object->is_channel_operator($channel, $mynick ), "Is Channel Operator" );
-  ok( $object->ban_mask( $channel, $mynick ), "Ban Mask Test" );
-  warn "#Waiting 7 seconds for the dust to settle\n";
-  $object->delay( [ 'quit' ], 7 );
+sub irc_nick {
+  my ($sender,$newnick) = @_[SENDER,ARG1];
+  my $ircobj = $sender->get_heap();
+  ok( $ircobj->nick_name() eq $newnick, "Nick Name Test" );
+  $ircobj->yield( 'quit' );
   undef;
 }
 

@@ -10,126 +10,18 @@
 package POE::Component::IRC::Qnet;
 
 use strict;
+use warnings;
 use Carp;
-use POE;
-use POE::Component::IRC::Plugin::Whois;
-use POE::Component::IRC::Constants;
+use POE qw(Component::IRC::Constants);
 use vars qw($VERSION);
 use base qw(POE::Component::IRC);
 
-$VERSION = '1.1';
-
-my ($GOT_SSL);
-my ($GOT_CLIENT_DNS);
-
-BEGIN {
-    $GOT_CLIENT_DNS = 0;
-    eval {
-      require POE::Component::Client::DNS;
-      $GOT_CLIENT_DNS = 1;
-    };
-}
-
-BEGIN {
-    $GOT_SSL = 0;
-    eval {
-      require POE::Component::SSLify;
-      import POE::Component::SSLify qw( Client_SSLify );
-      $GOT_SSL = 1;
-    };
-}
+$VERSION = '1.3';
 
 sub _create {
-  my ($package) = shift;
+  my $self = shift;
 
-  my $self = bless ( { }, $package );
-
-  if ( $GOT_CLIENT_DNS ) {
-    POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
-  }
-
-  $self->{IRC_CMDS} =
-  { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
-    'restart'   => [ PRI_HIGH,   'noargs',        ],
-    'quit'      => [ PRI_NORMAL, 'oneoptarg',     ],
-    'version'   => [ PRI_HIGH,   'oneoptarg',     ],
-    'time'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'trace'     => [ PRI_HIGH,   'oneoptarg',     ],
-    'admin'     => [ PRI_HIGH,   'oneoptarg',     ],
-    'info'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'away'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'users'     => [ PRI_HIGH,   'oneoptarg',     ],
-    'locops'    => [ PRI_HIGH,   'oneoptarg',     ],
-    'operwall'  => [ PRI_HIGH,   'oneoptarg',     ],
-    'wallops'   => [ PRI_HIGH,   'oneoptarg',     ],
-    'motd'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'who'       => [ PRI_HIGH,   'oneoptarg',     ],
-    'nick'      => [ PRI_HIGH,   'onlyonearg',    ],
-    'oper'      => [ PRI_HIGH,   'onlytwoargs',   ],
-    'invite'    => [ PRI_HIGH,   'onlytwoargs',   ],
-    'squit'     => [ PRI_HIGH,   'onlytwoargs',   ],
-    'kill'      => [ PRI_HIGH,   'onlytwoargs',   ],
-    'privmsg'   => [ PRI_NORMAL, 'privandnotice', ],
-    'privmsglo' => [ PRI_NORMAL+1, 'privandnotice', ],
-    'privmsghi' => [ PRI_NORMAL-1, 'privandnotice', ],
-    'notice'    => [ PRI_NORMAL, 'privandnotice', ],
-    'noticelo'  => [ PRI_NORMAL+1, 'privandnotice', ],   
-    'noticehi'  => [ PRI_NORMAL-1, 'privandnotice', ],   
-    'join'      => [ PRI_HIGH,   'oneortwo',      ],
-    'summon'    => [ PRI_HIGH,   'oneortwo',      ],
-    'sconnect'  => [ PRI_HIGH,   'oneandtwoopt',  ],
-    'whowas'    => [ PRI_HIGH,   'oneandtwoopt',  ],
-    'stats'     => [ PRI_HIGH,   'spacesep',      ],
-    'links'     => [ PRI_HIGH,   'spacesep',      ],
-    'mode'      => [ PRI_HIGH,   'spacesep',      ],
-    'part'      => [ PRI_HIGH,   'commasep',      ],
-    'names'     => [ PRI_HIGH,   'commasep',      ],
-    'list'      => [ PRI_HIGH,   'commasep',      ],
-    'whois'     => [ PRI_HIGH,   'commasep',      ],
-    'ctcp'      => [ PRI_HIGH,   'ctcp',          ],
-    'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
-    'ping'      => [ PRI_HIGH,   'oneortwo',      ],
-    'pong'      => [ PRI_HIGH,   'oneortwo',      ],
-  };
-
-  $self->{IRC_EVTS} = [ qw(nick ping) ];
-
-  my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
-
-  $self->{OBJECT_STATES_ARRAYREF} = [qw( _dcc_failed
-				      _dcc_read
-				      _dcc_timeout
-				      _dcc_up
-				      _delayed_cmd
-				      _parseline
-				      __send_event
-				      _sock_down
-				      _sock_failed
-				      _sock_up
-				      _start
-				      _stop
-				      debug
-				      connect
-				      dcc
-				      dcc_accept
-				      dcc_resume
-				      dcc_chat
-				      dcc_close
-				      do_connect
-				      got_dns_response
-				      ison
-				      kick
-				      register
-				      shutdown
-				      sl
-				      sl_login
-				      sl_high
-                                      sl_delayed
-				      sl_prioritized
-				      topic
-				      unregister
-				      userhost ), ( map {( 'irc_' . $_ )} @{ $self->{IRC_EVTS} } ) ];
-
+  $self->SUPER::_create();
 
   # Stuff specific to IRC-Qnet
 
@@ -193,16 +85,13 @@ sub _create {
         requestowner
         );
 
-  my @qbot_map = map {('qbot_' . $_, 'qnet_bot_commands')} @qbot_commands;
-  my @lbot_map = map {('lbot_' . $_, 'qnet_bot_commands')} @lbot_commands;
-
-  $self->{OBJECT_STATES_HASHREF} = { @event_map, @qbot_map, @lbot_map, '_tryclose' => 'dcc_close' };
-
+  $self->{OBJECT_STATES_HASHREF}->{'qbot_' . $_} = 'qnet_bot_commands' for @qbot_commands;
+  $self->{OBJECT_STATES_HASHREF}->{'lbot_' . $_} = 'qnet_bot_commands' for @lbot_commands;
   $self->{server} = 'irc.quakenet.org';
   $self->{QBOT} = 'Q@Cserve.quakenet.org';
   $self->{LBOT} = 'L@lightweight.quakenet.org';
 
-  return $self;
+  return 1;
 }
 
 sub qnet_bot_commands {
@@ -210,23 +99,15 @@ sub qnet_bot_commands {
   my $message = join ' ', @_[ARG0 .. $#_];
   my $pri = $self->{IRC_CMDS}->{'privmsghi'}->[CMD_PRI];
   my $command = "PRIVMSG ";
-
   my ($target,$cmd) = split(/_/,$state);
-
-  SWITCH: {
-    if ( uc ( $target ) eq 'QBOT' ) {
-	$command .= join(' :',$self->{QBOT},uc($cmd));
-	last SWITCH;
-    }
-    $command .= join(' :',$self->{LBOT},uc($cmd));
-  }
-  $command = join(' ',$command,$message) if ( defined ( $message ) );
+  $command .= join(' :',$self->{uc $target},uc($cmd));
+  $command = join(' ',$command,$message) if defined ( $message );
   $kernel->yield( 'sl_prioritized', $pri, $command );
   undef;
 }
 
 sub service_bots {
-  my ($self) = shift;
+  my $self = shift;
   croak "Method requires an even number of parameters" if @_ % 2;
 
   my (%args) = @_;
@@ -248,23 +129,89 @@ POE::Component::IRC::Qnet - a fully event-driven IRC client module for Quakenet.
 
 =head1 SYNOPSIS
 
-  use POE::Component::IRC::Qnet;
+  use strict;
+  use warnings;
+  use POE qw(Component::IRC::Qnet);
 
-  # Do this when you create your sessions. 'my client' is just a
-  # kernel alias to christen the new IRC connection with.
-  my ($object) = POE::Component::IRC::Qnet->new('my client') or die "Oh noooo! $!";
+  my $nickname = 'Flibble' . $$;
+  my $ircname = 'Flibble the Sailor Bot';
+  my $port = 6667;
+  my $qauth = 'FlibbleBOT';
+  my $qpass = 'fubar';
 
-  # Do stuff like this from within your sessions. This line tells the
-  # connection named "my client" to send your session the following
-  # events when they happen.
-  $kernel->post('my client', 'register', qw(connected msg public cdcc cping));
-  # You can guess what this line does.
-  $kernel->post('my client', 'connect',
-	        { Nick     => 'Boolahman',
-		  Server   => 'irc-w.primenet.com',
-		  Port     => 6669,
-		  Username => 'quetzal',
-		  Ircname  => 'Ask me about my colon!', } );
+  my @channels = ( '#Blah', '#Foo', '#Bar' );
+
+  # We create a new PoCo-IRC object and component.
+  my $irc = POE::Component::IRC::Qnet->spawn( 
+        nick => $nickname,
+        port => $port,
+        ircname => $ircname,
+  ) or die "Oh noooo! $!";
+
+  POE::Session->create(
+        package_states => [
+                'main' => [ qw(_default _start irc_001 irc_public) ],
+        ],
+        heap => { irc => $irc },
+  );
+
+  $poe_kernel->run();
+  exit 0;
+
+  sub _start {
+    my ($kernel,$heap) = @_[KERNEL,HEAP];
+
+    # We get the session ID of the component from the object
+    # and register and connect to the specified server.
+    my $irc_session = $heap->{irc}->session_id();
+    $kernel->post( $irc_session => register => 'all' );
+    $kernel->post( $irc_session => connect => { } );
+    undef;
+  }
+
+  sub irc_001 {
+    my ($kernel,$sender) = @_[KERNEL,SENDER];
+
+    # Get the component's object at any time by accessing the heap of
+    # the SENDER
+    my $poco_object = $sender->get_heap();
+    print "Connected to ", $poco_object->server_name(), "\n";
+
+    # Lets authenticate with Quakenet's Q bot
+    $kernel->post( $sender => qbot_auth => $qauth => $qpass );
+
+    # In any irc_* events SENDER will be the PoCo-IRC session
+    $kernel->post( $sender => join => $_ ) for @channels;
+    undef;
+  }
+
+  sub irc_public {
+    my ($kernel,$sender,$who,$where,$what) = @_[KERNEL,SENDER,ARG0,ARG1,ARG2];
+    my $nick = ( split /!/, $who )[0];
+    my $channel = $where->[0];
+
+    if ( my ($rot13) = $what =~ /^rot13 (.+)/ ) {
+        $rot13 =~ tr[a-zA-Z][n-za-mN-ZA-M];
+        $kernel->post( $sender => privmsg => $channel => "$nick: $rot13" );
+    }
+    undef;
+  }
+
+  # We registered for all events, this will produce some debug info.
+  sub _default {
+    my ($event, $args) = @_[ARG0 .. $#_];
+    my @output = ( "$event: " );
+
+    foreach my $arg ( @$args ) {
+        if ( ref($arg) eq 'ARRAY' ) {
+                push( @output, "[" . join(" ,", @$arg ) . "]" );
+        } else {
+                push ( @output, "'$arg'" );
+        }
+    }
+    print STDOUT join ' ', @output, "\n";
+    return 0;
+  }
 
 =head1 DESCRIPTION
 
@@ -342,6 +289,7 @@ Dennis Taylor, E<lt>dennis@funkplanet.comE<gt>
 =head1 SEE ALSO
 
 L<POE::Component::IRC|POE::Component::IRC>
+
 L<http://www.quakenet.org/>
 
 =cut

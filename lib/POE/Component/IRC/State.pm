@@ -1,6 +1,6 @@
 # $Id: State.pm,v 1.4 2005/04/28 14:18:19 chris Exp $
 #
-# POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
+# POE::Component::IRC::State, by Chris Williams
 #
 # This module may be used, modified, and distributed under the same
 # terms as Perl itself. Please see the license that came with your Perl
@@ -10,206 +10,80 @@
 package POE::Component::IRC::State;
 
 use strict;
-use POE qw(Component::IRC::Plugin::Whois);
-use POE::Component::IRC::Constants;
+use warnings;
 use POE::Component::IRC::Common qw(:ALL);
+use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC);
 use vars qw($VERSION);
 
-$VERSION = '1.2';
-
-my $GOT_CLIENT_DNS;
-my $GOT_SSL;
-
-BEGIN {
-    $GOT_CLIENT_DNS = 0;
-    eval {
-      require POE::Component::Client::DNS;
-      $GOT_CLIENT_DNS = 1;
-    };
-}
-
-BEGIN {
-    $GOT_SSL = 0;
-    eval {
-      require POE::Component::SSLify;
-      import POE::Component::SSLify qw( Client_SSLify );
-      $GOT_SSL = 1;
-    };
-}
-
-sub _create {
-  my $package = shift;
-
-  my $self = bless ( { }, $package );
-
-  if ( $GOT_CLIENT_DNS ) {
-    POE::Component::Client::DNS->spawn( Alias => "irc_resolver" );
-  }
-
-  $self->{IRC_CMDS} =
-  { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
-    'restart'   => [ PRI_HIGH,   'noargs',        ],
-    'quit'      => [ PRI_NORMAL, 'oneoptarg',     ],
-    'version'   => [ PRI_HIGH,   'oneoptarg',     ],
-    'time'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'trace'     => [ PRI_HIGH,   'oneoptarg',     ],
-    'admin'     => [ PRI_HIGH,   'oneoptarg',     ],
-    'info'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'away'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'users'     => [ PRI_HIGH,   'oneoptarg',     ],
-    'locops'    => [ PRI_HIGH,   'oneoptarg',     ],
-    'operwall'  => [ PRI_HIGH,   'oneoptarg',     ],
-    'wallops'   => [ PRI_HIGH,   'oneoptarg',     ],
-    'motd'      => [ PRI_HIGH,   'oneoptarg',     ],
-    'who'       => [ PRI_HIGH,   'oneoptarg',     ],
-    'nick'      => [ PRI_HIGH,   'onlyonearg',    ],
-    'oper'      => [ PRI_HIGH,   'onlytwoargs',   ],
-    'invite'    => [ PRI_HIGH,   'onlytwoargs',   ],
-    'squit'     => [ PRI_HIGH,   'onlytwoargs',   ],
-    'kill'      => [ PRI_HIGH,   'onlytwoargs',   ],
-    'privmsg'   => [ PRI_NORMAL, 'privandnotice', ],
-    'privmsglo' => [ PRI_NORMAL+1, 'privandnotice', ],
-    'privmsghi' => [ PRI_NORMAL-1, 'privandnotice', ],
-    'notice'    => [ PRI_NORMAL, 'privandnotice', ],
-    'noticelo'  => [ PRI_NORMAL+1, 'privandnotice', ],   
-    'noticehi'  => [ PRI_NORMAL-1, 'privandnotice', ],   
-    'join'      => [ PRI_HIGH,   'oneortwo',      ],
-    'summon'    => [ PRI_HIGH,   'oneortwo',      ],
-    'sconnect'  => [ PRI_HIGH,   'oneandtwoopt',  ],
-    'whowas'    => [ PRI_HIGH,   'oneandtwoopt',  ],
-    'stats'     => [ PRI_HIGH,   'spacesep',      ],
-    'links'     => [ PRI_HIGH,   'spacesep',      ],
-    'mode'      => [ PRI_HIGH,   'spacesep',      ],
-    'part'      => [ PRI_HIGH,   'commasep',      ],
-    'names'     => [ PRI_HIGH,   'commasep',      ],
-    'list'      => [ PRI_HIGH,   'commasep',      ],
-    'whois'     => [ PRI_HIGH,   'commasep',      ],
-    'ctcp'      => [ PRI_HIGH,   'ctcp',          ],
-    'ctcpreply' => [ PRI_HIGH,   'ctcp',          ],
-    'ping'      => [ PRI_HIGH,   'oneortwo',      ],
-    'pong'      => [ PRI_HIGH,   'oneortwo',      ],
-  };
-
-  # We need to register additional events with ourselves.
-
-  $self->{IRC_EVTS} = [ qw(001 ping join part kick nick mode quit 352 324 315 disconnected socketerr error) ];
-
-  my (@event_map) = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
-
-  $self->{OBJECT_STATES_ARRAYREF} = [qw( _dcc_failed
-				      _dcc_read
-				      _dcc_timeout
-				      _dcc_up
-				      _delayed_cmd
-				      __send_event
-				      _parseline
-				      _sock_down
-				      _sock_failed
-				      _sock_up
-				      _start
-				      _stop
-				      debug
-				      connect
-				      dcc
-				      dcc_accept
-				      dcc_resume
-				      dcc_chat
-				      dcc_close
-				      do_connect
-				      got_dns_response
-				      ison
-				      kick
-				      register
-				      register_session
-				      shutdown
-				      sl
-				      sl_login
-				      sl_high
-                                      sl_delayed
-				      sl_prioritized
-				      topic
-				      unregister
-				      userhost ), ( map {( 'irc_' . $_ )} @{ $self->{IRC_EVTS} } ) ];
-
-  $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close' };
-
-  return $self;
-}
-
-# Parse a message from the IRC server and generate the appropriate
-# event(s) for listening sessions.
-sub _parseline {
-  my ($session, $self, $ev) = @_[SESSION, OBJECT, ARG0];
-  my (@events, @cooked);
-
-  $self->_send_event( 'irc_raw' => $ev->{raw_line} ) if ( $self->{raw_events} );
-
-  # If its 001 event grab the server name and stuff it into {INFO}
-  if ( $ev->{name} eq '001' ) {
-        $self->{INFO}->{ServerName} = $ev->{args}->[0];
-        $self->{RealNick} = ( split / /, $ev->{raw_line} )[2];
-  }
-  if ( $ev->{name} eq 'nick' or $ev->{name} eq 'quit' ) {
-	push ( @{$ev->{args}}, [ $self->nick_channels( ( split( /!/, $ev->{args}->[0] ) )[0] ) ] );
-  }
-  $ev->{name} = 'irc_' . $ev->{name};
-  $self->_send_event( $ev->{name}, @{$ev->{args}} );
-  undef;
-}
+$VERSION = '1.4';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
 
 # Make sure we have a clean STATE when we first join the network and if we inadvertently get disconnected
-sub irc_001 {
-  delete $_[OBJECT]->{STATE};
-  undef;
+sub S_001 {
+  delete $_[0]->{STATE};
+  return PCI_EAT_NONE;
 }
 
-sub irc_disconnected {
-  delete $_[OBJECT]->{STATE};
-  undef;
+sub S_disconnected {
+  my $self = shift;
+  my $nickinfo = $self->nick_info( $self->{RealNick} );
+  my $channels = $self->channels();
+  push @{ $_[$#_] }, $nickinfo, $channels;
+  delete $self->{STATE};
+  return PCI_EAT_NONE;
 }
 
-sub irc_error {
-  delete $_[OBJECT]->{STATE};
-  undef;
+sub S_error {
+  my $self = shift;
+  my $nickinfo = $self->nick_info( $self->{RealNick} );
+  my $channels = $self->channels();
+  push @{ $_[$#_] }, $nickinfo, $channels;
+  delete $self->{STATE};
+  return PCI_EAT_NONE;
 }
 
-sub irc_socketerr {
-  delete $_[OBJECT]->{STATE};
-  undef;
+sub S_socketerr {
+  my $self = shift;
+  my $nickinfo = $self->nick_info( $self->{RealNick} );
+  my $channels = $self->channels();
+  push @{ $_[$#_] }, $nickinfo, $channels;
+  delete $self->{STATE};
+  return PCI_EAT_NONE;
 }
 
 # Channel JOIN messages
-sub irc_join {
-  my ($kernel,$self,$who,$channel) = @_[KERNEL,OBJECT,ARG0,ARG1];
-  my $nick = ( split /!/, $who )[0];
-  my $userhost = ( split /!/, $who )[1];
+sub S_join {
+  my ($self,$irc) = splice @_, 0, 2;
+  my $nick = ( split /!/, ${ $_[0] } )[0];
+  my $userhost = ( split /!/, ${ $_[0] } )[1];
   my ($user,$host) = split(/\@/,$userhost);
+  my $channel = ${ $_[1] };
 
   if ( u_irc ( $nick ) eq u_irc ( $self->{RealNick} ) ) {
 	delete $self->{STATE}->{Chans}->{ u_irc ( $channel ) };
 	$self->{CHANNEL_SYNCH}->{ u_irc ( $channel ) } = { MODE => 0, WHO => 0 };
-        $kernel->yield ( 'who' => $channel );
-        $kernel->yield ( 'mode' => $channel );
+        $self->{STATE}->{Chans}->{ u_irc $channel } = { };
+        $self->yield ( 'who' => $channel );
+        $self->yield ( 'mode' => $channel );
   } else {
-        $kernel->yield ( 'who' => $nick );
+        $self->yield ( 'who' => $nick );
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{Nick} = $nick;
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{User} = $user;
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{Host} = $host;
         $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{CHANS}->{ u_irc ( $channel ) } = '';
         $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Nicks}->{ u_irc ( $nick ) } = '';
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # Channel PART messages
-sub irc_part {
-  my ($kernel,$self,$who) = @_[KERNEL,OBJECT,ARG0];
-  my $channel = u_irc $_[ARG1];
-  my $nick = u_irc ( ( split /!/, $who )[0] );
+sub S_part {
+  my ($self,$irc) = splice @_, 0, 2;
+  my $nick = u_irc ( ( split /!/, ${ $_[0] } )[0] );
+  my $channel = u_irc ${ $_[1] };
 
   if ( $nick eq u_irc ( $self->nick_name() ) ) {
         delete $self->{STATE}->{Nicks}->{ $nick }->{CHANS}->{ $channel };
@@ -228,13 +102,14 @@ sub irc_part {
                 delete $self->{STATE}->{Nicks}->{ $nick };
         }
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # QUIT messages
-sub irc_quit {
-  my ($kernel,$self,$who) = @_[KERNEL,OBJECT,ARG0];
-  my $nick = ( split /!/, $who )[0];
+sub S_quit {
+  my ($self,$irc) = splice @_, 0, 2;
+  my $nick = ( split /!/, ${ $_[0] } )[0];
+  push @{ $_[1] }, [ $self->nick_channels( $nick ) ];
 
   if ( u_irc ( $nick ) eq u_irc ( $self->{RealNick} ) ) {
         delete $self->{STATE};
@@ -244,12 +119,14 @@ sub irc_quit {
         }
         delete $self->{STATE}->{Nicks}->{ u_irc ( $nick ) };
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # Channel KICK messages
-sub irc_kick {
-  my ($kernel,$self,$channel,$nick) = @_[KERNEL,OBJECT,ARG1,ARG2];
+sub S_kick {
+  my ($self,$irc) = splice @_, 0, 2;
+  my $channel = ${ $_[1] };
+  my $nick = ${ $_[2] };
 
   if ( u_irc ( $nick ) eq u_irc ( $self->{RealNick} ) ) {
         delete $self->{STATE}->{Nicks}->{ u_irc $nick }->{CHANS}->{ u_irc $channel };
@@ -268,13 +145,15 @@ sub irc_kick {
                 delete $self->{STATE}->{Nicks}->{ u_irc $nick };
         }
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # NICK changes
-sub irc_nick {
-  my ($kernel,$self,$who,$new) = @_[KERNEL,OBJECT,ARG0,ARG1];
-  my $nick = ( split /!/, $who )[0];
+sub S_nick {
+  my ($self,$irc) = splice @_, 0, 2;
+  my $nick = ( split /!/, ${ $_[0] } )[0];
+  my $new = ${ $_[1] };
+  push @{ $_[2] }, [ $self->nick_channels( $nick ) ];
 
   if ( $nick eq $self->{RealNick} ) {
 	$self->{RealNick} = $new;
@@ -292,16 +171,19 @@ sub irc_nick {
         }
         $self->{STATE}->{Nicks}->{ u_irc $new } = $record;
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # Channel MODE
-sub irc_mode {
-  my ($kernel,$self,$who,$channel) = @_[KERNEL,OBJECT,ARG0,ARG1];
+sub S_mode {
+  my ($self,$irc) = splice @_, 0, 2;
+  my $who = ${ $_[0] };
+  my $channel = ${ $_[1] };
+  pop @_;
 
   # Do nothing if it is UMODE
   if ( u_irc ( $channel ) ne u_irc ( $self->{RealNick} ) ) {
-     my $parsed_mode = parse_mode_line( @_[ARG2 .. $#_] );
+     my $parsed_mode = parse_mode_line( @_[2 .. $#_] );
      while ( my $mode = shift ( @{ $parsed_mode->{modes} } ) ) {
         my ($arg);
         $arg = shift ( @{ $parsed_mode->{args} } ) if ( $mode =~ /^(\+[hovklbIeaqfL]|-[hovbIeaq])/ );
@@ -367,15 +249,15 @@ sub irc_mode {
         delete ( $self->{STATE}->{Chans}->{ u_irc ( $channel ) }->{Mode} );
      }
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # RPL_WHOREPLY
-sub irc_352 {
-  my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($first,$second) = split(/ :/,$_[ARG1]);
+sub S_352 {
+  my ($self,$irc) = splice @_, 0, 2;
+  my ($first,$second) = split(/ :/,${ $_[1] } );
   my ($channel,$user,$host,$server,$nick,$status) = split(/ /,$first);
-  my ($real) = substr($second,index($second," ")+1);
+  my $real = substr($second,index($second," ")+1);
 
   $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{Nick} = $nick;
   $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{User} = $user;
@@ -396,13 +278,13 @@ sub irc_352 {
   if ( $status =~ /\*/ ) {
     $self->{STATE}->{Nicks}->{ u_irc ( $nick ) }->{IRCop} = 1;
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 #RPL_ENDOFWHO
-sub irc_315 {
-  my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($channel) = ( split / :/, $_[ARG1] )[0];
+sub S_315 {
+  my ($self,$irc) = splice @_, 0, 2;
+  my ($channel) = ( split / :/, ${ $_[1] } )[0];
 
   # If it begins with #, &, + or ! its a channel apparently. RFC2812.
   if ( $channel =~ /^[\x23\x2B\x21\x26]/ ) {
@@ -415,13 +297,13 @@ sub irc_315 {
   } else {
 	$self->_send_event( 'irc_nick_sync', $channel );
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # RPL_CHANNELMODEIS
-sub irc_324 {
-  my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my (@args) = split( / /, $_[ARG1] );
+sub S_324 {
+  my ($self,$irc) = splice @_, 0, 2;
+  my (@args) = split( / /, ${ $_[1] } );
   my ($channel) = shift @args;
 
   my ($parsed_mode) = parse_mode_line( @args );
@@ -445,7 +327,7 @@ sub irc_324 {
 	delete ( $self->{CHANNEL_SYNCH}->{ u_irc ( $channel ) } );
 	$self->_send_event( 'irc_chan_sync', $channel );
   }
-  undef;
+  return PCI_EAT_NONE;
 }
 
 # Methods for STATE query
@@ -453,8 +335,8 @@ sub irc_324 {
 #
 
 sub _channel_sync {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
 
   unless ( $self->_channel_exists($channel) ) {
 	return 0;
@@ -469,8 +351,8 @@ sub _channel_sync {
 }
 
 sub _channel_sync_mode {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
 
   unless ( $self->_channel_exists($channel) ) {
 	return 0;
@@ -484,8 +366,8 @@ sub _channel_sync_mode {
 }
 
 sub _channel_sync_who {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
 
   unless ( $self->_channel_exists($channel) ) {
 	return 0;
@@ -499,8 +381,8 @@ sub _channel_sync_who {
 }
 
 sub _nick_exists {
-  my ($self) = shift;
-  my ($nick) = u_irc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $nick = u_irc ( $_[0] ) || return 0;
 
   if ( defined ( $self->{STATE}->{Nicks}->{ $nick } ) ) {
 	return 1;
@@ -509,8 +391,8 @@ sub _nick_exists {
 }
 
 sub _channel_exists {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
 
   if ( defined ( $self->{STATE}->{Chans}->{ $channel } ) ) {
 	return 1;
@@ -519,10 +401,10 @@ sub _channel_exists {
 }
 
 sub _nick_has_channel_mode {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
-  my ($flag) = ( split //, $_[2] )[0] || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
+  my $flag = ( split //, $_[2] )[0] || return 0;
 
   unless ( $self->is_channel_member($channel,$nick) ) {
 	return 0;
@@ -536,9 +418,9 @@ sub _nick_has_channel_mode {
 
 # Returns all the channels that the bot is on with an indication of whether it has operator, halfop or voice.
 sub channels {
-  my ($self) = shift;
-  my (%result);
-  my ($realnick) = u_irc ( $self->{RealNick} );
+  my $self = shift;
+  my %result;
+  my $realnick = u_irc $self->{RealNick};
 
   if ( $self->_nick_exists($realnick) ) {
 	foreach my $channel ( keys %{ $self->{STATE}->{Nicks}->{ $realnick }->{CHANS} } ) {
@@ -549,8 +431,8 @@ sub channels {
 }
 
 sub nicks {
-  my ($self) = shift;
-  my (@result);
+  my $self = shift;
+  my @result;
 
   foreach my $nick ( keys %{ $self->{STATE}->{Nicks} } ) {
 	push ( @result, $self->{STATE}->{Nicks}->{ $nick }->{Nick} );
@@ -559,8 +441,8 @@ sub nicks {
 }
 
 sub nick_info {
-  my ($self) = shift;
-  my ($nick) = u_irc ( $_[0] ) || return undef;
+  my $self = shift;
+  my $nick = u_irc ( $_[0] ) || return undef;
 
   unless ( $self->_nick_exists($nick) ) {
 	return undef;
@@ -578,8 +460,8 @@ sub nick_info {
 }
 
 sub nick_long_form {
-  my ($self) = shift;
-  my ($nick) = u_irc ( $_[0] ) || return undef;
+  my $self = shift;
+  my $nick = u_irc ( $_[0] ) || return undef;
 
   unless ( $self->_nick_exists($nick) ) {
 	return undef;
@@ -591,9 +473,9 @@ sub nick_long_form {
 }
 
 sub nick_channels {
-  my ($self) = shift;
-  my ($nick) = u_irc ( $_[0] ) || return ();
-  my (@result);
+  my $self = shift;
+  my $nick = u_irc ( $_[0] ) || return ();
+  my @result;
 
   unless ( $self->_nick_exists($nick) ) {
 	return @result;
@@ -606,9 +488,9 @@ sub nick_channels {
 }
 
 sub channel_list {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return undef;
-  my (@result);
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return undef;
+  my @result;
 
   unless ( $self->_channel_exists($channel) ) {
 	return undef;
@@ -622,8 +504,8 @@ sub channel_list {
 }
 
 sub is_operator {
-  my ($self) = shift;
-  my ($nick) = u_irc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $nick = u_irc ( $_[0] ) || return 0;
 
   unless ( $self->_nick_exists($nick) ) {
 	return 0;
@@ -636,9 +518,9 @@ sub is_operator {
 }
 
 sub is_channel_mode_set {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($mode) = ( split //, $_[1] )[0] || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $mode = ( split //, $_[1] )[0] || return 0;
 
   $mode =~ s/[^A-Za-z]//g;
 
@@ -653,8 +535,8 @@ sub is_channel_mode_set {
 }
 
 sub channel_limit {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return undef;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return undef;
 
   unless ( $self->_channel_exists($channel) ) {
 	return undef;
@@ -667,8 +549,8 @@ sub channel_limit {
 }
 
 sub channel_key {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return undef;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return undef;
 
   unless ( $self->_channel_exists($channel) ) {
 	return undef;
@@ -681,8 +563,8 @@ sub channel_key {
 }
 
 sub channel_modes {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return undef;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return undef;
 
   unless ( $self->_channel_exists($channel) ) {
 	return undef;
@@ -695,9 +577,9 @@ sub channel_modes {
 }
 
 sub is_channel_member {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
 
   unless ( $self->_channel_exists($channel) and $self->_nick_exists($nick) ) {
 	return 0;
@@ -710,9 +592,9 @@ sub is_channel_member {
 }
 
 sub is_channel_operator {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'o') ) {
 	return 0;
@@ -721,9 +603,9 @@ sub is_channel_operator {
 }
 
 sub has_channel_voice {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'v') ) {
 	return 0;
@@ -732,9 +614,9 @@ sub has_channel_voice {
 }
 
 sub is_channel_halfop {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'h') ) {
 	return 0;
@@ -743,9 +625,9 @@ sub is_channel_halfop {
 }
 
 sub is_channel_owner {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'q') ) {
         return 0;
@@ -754,9 +636,9 @@ sub is_channel_owner {
 }
 
 sub is_channel_admin {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return 0;
-  my ($nick) = u_irc ( $_[1] ) || return 0;
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return 0;
+  my $nick = u_irc ( $_[1] ) || return 0;
 
   unless ( $self->_nick_has_channel_mode($channel,$nick,'a') ) {
         return 0;
@@ -765,10 +647,10 @@ sub is_channel_admin {
 }
 
 sub ban_mask {
-  my ($self) = shift;
-  my ($channel) = u_irc ( $_[0] ) || return undef;
-  my ($mask) = parse_ban_mask ( $_[1] ) || return undef;
-  my (@result);
+  my $self = shift;
+  my $channel = u_irc ( $_[0] ) || return undef;
+  my $mask = parse_ban_mask ( $_[1] ) || return undef;
+  my @result;
 
   unless ( $self->_channel_exists($channel) ) {
 	return @result;
@@ -797,18 +679,93 @@ POE::Component::IRC::State - a fully event-driven IRC client module with channel
 
 =head1 SYNOPSIS
 
-  use POE::Component::IRC::State;
+  # A simple Rot13 'encryption' bot
 
-  my ($irc) = POE::Component::IRC::State->spawn() or die;
+  use strict;
+  use warnings;
+  use POE qw(Component::IRC::State);
 
-  $irc->yield( 'register' => 'all' );
+  my $nickname = 'Flibble' . $$;
+  my $ircname = 'Flibble the Sailor Bot';
+  my $ircserver = 'irc.blahblahblah.irc';
+  my $port = 6667;
 
-  $irc->yield( 'connect' => 
-		{ Nick     => 'Boolahman',
-                  Server   => 'irc-w.primenet.com',
-                  Port     => 6669,
-                  Username => 'quetzal',
-                  Ircname  => 'Ask me about my colon!', } );
+  my @channels = ( '#Blah', '#Foo', '#Bar' );
+
+  # We create a new PoCo-IRC object and component.
+  my $irc = POE::Component::IRC::State->spawn( 
+        nick => $nickname,
+        server => $ircserver,
+        port => $port,
+        ircname => $ircname,
+  ) or die "Oh noooo! $!";
+
+  POE::Session->create(
+        package_states => [
+                'main' => [ qw(_default _start irc_001 irc_public) ],
+        ],
+        heap => { irc => $irc },
+  );
+
+  $poe_kernel->run();
+  exit 0;
+
+  sub _start {
+    my ($kernel,$heap) = @_[KERNEL,HEAP];
+
+    # We get the session ID of the component from the object
+    # and register and connect to the specified server.
+    my $irc_session = $heap->{irc}->session_id();
+    $kernel->post( $irc_session => register => 'all' );
+    $kernel->post( $irc_session => connect => { } );
+    undef;
+  }
+
+  sub irc_001 {
+    my ($kernel,$sender) = @_[KERNEL,SENDER];
+
+    # Get the component's object at any time by accessing the heap of
+    # the SENDER
+    my $poco_object = $sender->get_heap();
+    print "Connected to ", $poco_object->server_name(), "\n";
+
+    # In any irc_* events SENDER will be the PoCo-IRC session
+    $kernel->post( $sender => join => $_ ) for @channels;
+    undef;
+  }
+
+  sub irc_public {
+    my ($kernel,$sender,$who,$where,$what) = @_[KERNEL,SENDER,ARG0,ARG1,ARG2];
+    my $nick = ( split /!/, $who )[0];
+    my $channel = $where->[0];
+
+    my $poco_object = $sender->get_heap();
+
+    if ( my ($rot13) = $what =~ /^rot13 (.+)/ ) {
+        # Only operators can issue a rot13 command to us.
+	return unless $poco_object->is_channel_operator( $channel, $nick );
+
+        $rot13 =~ tr[a-zA-Z][n-za-mN-ZA-M];
+        $kernel->post( $sender => privmsg => $channel => "$nick: $rot13" );
+    }
+    undef;
+  }
+
+  # We registered for all events, this will produce some debug info.
+  sub _default {
+    my ($event, $args) = @_[ARG0 .. $#_];
+    my @output = ( "$event: " );
+
+    foreach my $arg ( @$args ) {
+        if ( ref($arg) eq 'ARRAY' ) {
+                push( @output, "[" . join(" ,", @$arg ) . "]" );
+        } else {
+                push ( @output, "'$arg'" );
+        }
+    }
+    print STDOUT join ' ', @output, "\n";
+    return 0;
+  }
 
 =head1 DESCRIPTION
 

@@ -32,7 +32,7 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.81';
+$VERSION = '4.82';
 $REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
@@ -69,9 +69,7 @@ BEGIN {
 }
 
 sub _create {
-  my $package = shift;
-
-  my $self = bless { }, $package;
+  my $self = shift;
 
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
@@ -117,8 +115,6 @@ sub _create {
     'pong'      => [ PRI_HIGH,   'oneortwo',      ],
   };
 
-  $self->{IRC_EVTS} = [ qw(nick ping) ];
-
   my @event_map = map {($_, $self->{IRC_CMDS}->{$_}->[CMD_SUB])} keys %{ $self->{IRC_CMDS} };
 
   $self->{OBJECT_STATES_ARRAYREF} = [qw( _dcc_failed
@@ -154,11 +150,11 @@ sub _create {
 				      sl_prioritized
 				      topic
 				      unregister
-				      userhost ), ( map {( 'irc_' . $_ )} @{ $self->{IRC_EVTS} } ) ];
+				      userhost )];
 
   $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close' };
 
-  return $self;
+  return 1;
 }
 
 # BINGOS: the component can now get its configuration from either spawn() or connect()
@@ -280,7 +276,7 @@ sub _dcc_failed {
   $self->{dcc}->{$id}->{type} eq "CHAT") {
     $self->_send_event( 'irc_dcc_done', $id,
     @{$self->{dcc}->{$id}}{ qw(nick type port done listenport clientaddr) } );
-    close $self->{dcc}->{$id}->{fh};
+    #close $self->{dcc}->{$id}->{fh};
     delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID} if $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id}->{wheel};
     delete $self->{dcc}->{$id};
@@ -523,10 +519,20 @@ sub _send_event  {
   my $session = $kernel->get_active_session()->ID();
   my %sessions;
 
+  # BINGOS:
+  # I've moved these above the plugin system call to ensure that pesky plugins 
+  # don't eat the events before *our* session can process them. *sigh*
+
+  $sessions{$_} = $_ for (values %{$self->{events}->{'irc_all'}}, values %{$self->{events}->{$event}});
+
+  # Make sure our session gets notified of any requested events before any other bugger
+  $kernel->call( $session => $event => @args ) if delete $sessions{$session};
+
+  my @extra_args;
   # Let the plugin system process this
-  if ( $self->_plugin_process( 'SERVER', $event, \( @args ) ) == PCI_EAT_ALL ) {
-  	return 1;
-  }
+  return 1 if $self->_plugin_process( 'SERVER', $event, \( @args ), \@extra_args ) == PCI_EAT_ALL;
+
+  push @args, @extra_args if scalar @extra_args;
 
   # BINGOS:
   # We have a hack here, because the component used to send 'irc_connected' and
@@ -538,10 +544,6 @@ sub _send_event  {
     return 1;
   }
 
-  $sessions{$_} = $_ for (values %{$self->{events}->{'irc_all'}}, values %{$self->{events}->{$event}});
-
-  # Make sure our session gets notified of any requested events before any other bugger
-  $kernel->call( $session => $event => @args ) if delete $sessions{$session};
   $kernel->post( $_ => $event => @args ) for values %sessions;
   undef;
 }
@@ -667,9 +669,10 @@ sub _start {
      $self->{alias} = $alias;
   } else {
      $kernel->alias_set("$self");
+     $self->{alias} = "$self";
   }
 
-  $kernel->yield( 'register', @{ $self->{IRC_EVTS} } );
+  $kernel->yield( 'register', @{ $self->{IRC_EVTS} } ) if $self->{IRC_EVTS} and scalar @{ $self->{IRC_EVTS} };
   $self->{ircd_filter} = POE::Filter::IRCD->new( DEBUG => $self->{debug} );
   $self->{ircd_compat} = POE::Filter::IRC::Compat->new( DEBUG => $self->{debug} );
   $self->{ctcp_filter} = POE::Filter::CTCP->new();
@@ -714,12 +717,16 @@ sub _stop {
 sub commasep {
   my ($kernel, $self, $state) = @_[KERNEL, OBJECT, STATE];
   my @args = @_[ARG0 .. $#_]; my $args;
-  if ( $state eq 'whois' and scalar @args > 1 ) {
+
+  SWITCH: {
+    if ( $state eq 'whois' and scalar @args > 1 ) {
 	$args = shift @args;
 	$args .= ' ' . join ',', @args;
-  } else {
-	$args = join ',', @args;
+	last SWITCH;
+    }
+    $args = join ',', @args;
   }
+
   my $pri = $self->{IRC_CMDS}->{$state}->[CMD_PRI];
 
   $state = uc $state;
@@ -876,7 +883,7 @@ sub dcc {
     $self->{localaddr} = inet_aton( $self->{localaddr} );
   }
 
-  my ($bindport) = 0;
+  my $bindport = 0;
 
   if ( $self->{dcc_bind_port} ) {
 	$bindport = shift @{ $self->{dcc_bind_port} };
@@ -1122,7 +1129,8 @@ sub spawn {
 
   delete $parms{'options'} unless ref ( $parms{'options'} ) eq 'HASH';
 
-  my $self = $package->_create();
+  my $self = bless { }, $package;
+  $self->_create();
 
   my $alias = delete $parms{'alias'};
 
@@ -1518,26 +1526,21 @@ sub userhost {
 # Non-event methods
 
 sub version {
-  my ($self) = shift;
-
   return $VERSION;
 }
 
 sub server_name {
-  my ($self) = shift;
-
+  my $self = shift;
   return $self->{INFO}->{ServerName};
 }
 
 sub nick_name {
-  my ($self) = shift;
-
+  my $self = shift;
   return $self->{RealNick};
 }
 
 sub send_queue {
-  my ($self) = shift;
-
+  my $self = shift;
   if ( defined ( $self->{send_queue} ) and ref ( $self->{send_queue} ) eq 'ARRAY' ) {
 	return scalar @{ $self->{send_queue} };
   }
@@ -1545,19 +1548,14 @@ sub send_queue {
 }
 
 sub raw_events {
-  my ($self) = shift;
-  my ($value) = shift;
-
-  unless ( defined ( $value ) ) {
-	return $self->{raw_events};
-  }
-
+  my $self = shift;
+  my $value = shift;
+  return $self->{raw_events} unless defined $value;
   $self->{raw_events} = $value;
 }
 
 sub session_id {
-  my ($self) = shift;
-
+  my $self = shift;
   return $self->{SESSION_ID};
 }
 
@@ -1596,8 +1594,8 @@ sub _delayed_cmd {
 }
 
 sub _validate_command {
-  my ($self) = shift;
-  my ($cmd) = lc ( $_[0] ) || return 0;
+  my $self = shift;
+  my $cmd = lc ( $_[0] ) || return 0;
 
   foreach my $command ( keys %{ $self->{IRC_CMDS} } ) {
 	if ( $cmd eq $command ) {
@@ -1608,8 +1606,7 @@ sub _validate_command {
 }
 
 sub connected {
-  my ($self) = shift;
-
+  my $self = shift;
   return $self->{connected};
 }
 
@@ -1644,16 +1641,18 @@ sub compress_downlink {
 # Automatically replies to a PING from the server. Do not confuse this
 # with CTCP PINGs, which are a wholly different animal that evolved
 # much later on the technological timeline.
-sub irc_ping {
-  my ($kernel, $arg) = @_[KERNEL, ARG0];
-  $kernel->yield( 'sl_login', "PONG :$arg" );
+sub S_ping {
+  my ($self, $irc) = splice @_, 0, 2;
+  my $arg = ${ $_[0] };
+  $irc->yield( 'sl_login', "PONG :$arg" );
   undef;
 }
 
 # NICK messages for the purposes of determining our current nickname
-sub irc_nick {
-  my ($kernel,$self,$who,$new) = @_[KERNEL,OBJECT,ARG0,ARG1];
-  my $nick = ( split /!/, $who )[0];
+sub S_nick {
+  my ($self, $irc) = splice @_, 0, 2;
+  my $nick = ( split /!/, ${ $_[0] } )[0];
+  my $new = ${ $_[1] };
   $self->{RealNick} = $new if ( $nick eq $self->{RealNick} );
   undef;
 }
@@ -1668,6 +1667,9 @@ sub isupport_dump_keys {
   return $_[0]->{isupport}->isupport_dump_keys();
 }
 
+sub resolver {
+  return $_[0]->{resolver};
+}
 
 # accesses the plugin pipeline
 sub pipeline {
@@ -1819,7 +1821,10 @@ sub _plugin_process {
   my $sub = ($type eq 'SERVER' ? "S" : "U") . "_$event";
   my $return = PCI_EAT_NONE;
 
+  $self->$sub( $self, @args ) if $self->can($sub);
+
   for my $plugin (@{ $pipeline->{PIPELINE} }) {
+    next if $self eq $plugin;
     next
       unless $pipeline->{HANDLES}{$plugin}{$type}{$event}
       or $pipeline->{HANDLES}{$plugin}{$type}{all};
@@ -2126,6 +2131,11 @@ second argument is the time in seconds that one wishes to delay the command bein
 
   $irc->delay( [ 'mode' => $channel => '+o' => $dude ], 60 );
 
+=item resolver
+
+Returns a reference to the L<POE::Component::Client::DNS> object that is internally 
+created by the component.
+
 =back
 
 =head1 INPUT
@@ -2201,7 +2211,7 @@ Setting 'Raw' to true, will enable the component to send 'irc_raw' events to int
 and sessions. See below for more details on what a 'irc_raw' events is :)
 
 'NoDNS' has different results depending on whether it is set with spawn() or connect(). Setting it
-with spawn(), disables the creation of the POE::Component::Client::DNS completed. Setting it with
+with spawn(), disables the creation of the POE::Component::Client::DNS completely. Setting it with
 connect() on the other hand allows the PoCo-Client-DNS session to be spawned, but will disable any 
 dns lookups using it.
 
@@ -2919,12 +2929,23 @@ Further props to a few of the studly bughunters who made this module not
 suck: Abys <abys@web1-2-3.com>, Addi <addi@umich.edu>, ResDev
 <ben@reser.org>, and Roderick <roderick@argon.org>. Woohoo!
 
+Kudos to Apocalypse, <apocal@cpan.org>, for the plugin system and to
+Jeff 'japhy' Pinyan, <japhy@perlmonk.org>, for Pipeline.
+
+Thanks to the merry band of POE pixies from #PoE @ irc.perl.org,
+including ( but not limited to ), ketas, ct, dec, integral, webfox,
+immute, perigrin, paulv, alias.
+
 Check out the Changes file for further contributors.
 
 =head1 SEE ALSO
 
-RFC 1459 L<http://www.faqs.org/rfcs/rfc1459.html>, L<http://www.irchelp.org/>,
+RFC 1459 L<http://www.faqs.org/rfcs/rfc1459.html> 
+
+L<http://www.irchelp.org/>,
+
 L<http://poe.perl.org/>,
+
 L<http://www.infobot.org/>,
 
 Some good examples reside in the POE cookbook which has a whole section devoted to

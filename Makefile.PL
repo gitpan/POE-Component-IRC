@@ -13,6 +13,11 @@ the last test may take up to 40 seconds or so to complete.
 Please be patient while it does it's thing.
 ---------------------------------------------------------------
 
+---------------------------------------------------------------
+A lot of the tests make use of the loopback interface. If this
+is firewalled then these tests will fail. 
+---------------------------------------------------------------
+
 NOTICE
 
 WriteMakefile(
@@ -24,10 +29,11 @@ WriteMakefile(
 							  'POE::Component::Client::Ident' => 0.7,
 							  'Carp'   => 0,
 							  'Socket' => 0,
-							  'Date::Format' => 0,
+							  'POSIX' => 0,
 							 },
 			  'VERSION_FROM' => 'lib/POE/Component/IRC.pm', # finds $VERSION
 			  'dist' => { 'COMPRESS' => 'gzip --best' },
 			  'test' => { TESTS => 't/*.t t/*/*.t' },
+			  'clean' => { FILES => "README.send" },
 			 );
 
