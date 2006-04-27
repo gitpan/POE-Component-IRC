@@ -11,6 +11,7 @@
 
 package POE::Component::IRC;
 
+use 5.006;
 use strict;
 use warnings;
 use POE qw( Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
@@ -32,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.85';
-$REVISION = do {my@r=(q$Revision: 1.4 $=~/\d+/g);sprintf"%d."."%04d"x$#r,@r};
+$VERSION = '4.86';
+$REVISION = do {my@r=(q$Revision: 142 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -217,6 +218,7 @@ sub _configure {
 
   if ( $spawned and !$self->{NoDNS} and $GOT_CLIENT_DNS and !$self->{resolver} ) {
 	$self->{resolver} = POE::Component::Client::DNS->spawn( Alias => "resolver" . $self->session_id() );
+	$self->{mydns} = 1;
   }
 
   # Make sure that we have reasonable defaults for all the attributes.
@@ -1294,7 +1296,7 @@ sub register {
   foreach (@events) {
     $_ = "irc_" . $_ unless /^_/;
     $self->{events}->{$_}->{$sender_id} = $sender_id;
-    $self->{sessions}->{$sender}->{'ref'} = $sender_id;
+    $self->{sessions}->{$sender_id}->{'ref'} = $sender_id;
     unless ($self->{sessions}->{$sender_id}->{refcnt}++ or $session == $sender) {
       $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
     }
@@ -1338,12 +1340,13 @@ sub register_session {
 # Tell the IRC session to go away.
 sub shutdown {
   my ($kernel, $self) = @_[KERNEL, OBJECT];
+  $self->_unregister_sessions();
   $kernel->alarm_remove_all();
   $kernel->alias_remove( $_ ) for $kernel->alias_list( $_[SESSION] );
   delete $self->{$_} for qw(socket sock socketfactory dcc wheelmap);
   # Delete all plugins that are loaded.
   $self->plugin_del( $_ ) for keys %{ $self->plugin_list() };
-  $self->{resolver}->shutdown() if $self->{resolver};
+  $self->{resolver}->shutdown() if $self->{mydns} and $self->{resolver};
   undef;
 }
 
@@ -1503,6 +1506,18 @@ sub _unregister {
     }
   }
   undef;
+}
+
+sub _unregister_sessions {
+  my $self = shift;
+  my $poco_id = $self->session_id();
+  foreach my $session_id ( keys %{ $self->{sessions} } ) {
+     if (--$self->{sessions}->{$session_id}->{refcnt} <= 0) {
+        delete $self->{sessions}->{$session_id};
+	$poe_kernel->refcount_decrement($session_id, PCI_REFCOUNT_TAG) 
+		unless ( $session_id eq $poco_id );
+     }
+  }
 }
 
 # Asks the IRC server for some random information about particular nicks.
@@ -2021,6 +2036,10 @@ Automagically generates replies to ctcp version, time and userinfo queries.
 
 An experimental Plugin Manager plugin.
 
+=item L<POE::Component::IRC::Plugin::NickReclaim>
+
+Automagically deals with your nickname being in use and reclaiming it.
+
 =back
 
 =head1 CONSTRUCTORS
@@ -2143,6 +2162,20 @@ created by the component.
 How to talk to your new IRC component... here's the events we'll accept.
 These are events that are posted to the component, either via $poe_kernel->post() or via 
 the object method yield().
+
+So the following would be functionally equivalent:
+
+  sub irc_001 {
+    my ($kernel,$sender) = @_[KERNEL,SENDER];
+    my $irc = $sender->get_heap(); # obtain the poco's object
+
+    $irc->yield( privmsg => 'foo' => 'Howdy!' );
+    $kernel->post( $sender => privmsg => 'foo' => 'Howdy!' );
+    $kernel->post( $irc->session_id() => privmsg => 'foo' => 'Howdy!' );
+    $kernel->post( $irc->session_alias() => privmsg => 'foo' => 'Howdy!' );
+
+    undef;
+  }
 
 =head2 Important Commands
 

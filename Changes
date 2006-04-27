@@ -1,5 +1,21 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.86  Thu Apr 27 21:18:41 BST 2006
+    - POD fixes and perl dependency as pointed out by Alias.
+    - Tweak so that the poco only shuts down PoCo-Client-DNS
+      if we spawned it.
+    - Spotted a problem with register() it was still stashing
+      POE::Session refs. Bad BinGOs.
+    - shutdown() will unregister all registered sessions now.
+    - Code audits of State and Qnet::State. Lot's of cleanup.
+    - Changed Common.pm u_irc/l_irc to support a casemapping
+      argument, one may specify 'rfc1459', 'strict-rfc1459' or
+      'ascii'. Default is 'rfc1459'.
+    - Changed State and Qnet::State to use casemapping for 
+      generating unique state keys.
+    - Removed State::Lite. Deprecated.
+    - Online test reports the server connected to.
+
 4.85  Thu Apr 13 12:37:49 BST 2006
     - Numerous bug fixes to State and Qnet/State which were 
       causing terminations. Reported by dec.
