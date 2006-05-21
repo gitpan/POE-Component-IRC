@@ -13,42 +13,57 @@ use Socket;
 use Carp;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::Line Filter::IRCD Filter::Stackable);
 use POE::Component::IRC::Common qw(:ALL);
-use POE::Component::Client::DNS;
-use POE::Component::Client::Ident;
 
 use vars qw($VERSION);
 
-$VERSION = '0.2';
+$VERSION = '0.4';
 
 use constant PCSI_REFCOUNT_TAG => "P::C::S::I registered";
 
-our (@valid_commands) = qw(PASS NICK USER SERVER OPER QUIT SQUIT JOIN PART MODE TOPIC NAMES LIST INVITE KICK VERSION STATS LINKS TIME CONNECT TRACE ADMIN INFO WHO WHOIS WHOWAS KILL PING PONG ERROR AWAY REHASH RESTART SUMMON USERS WALLOPS USERHOST ISON MOTD LUSERS DIE);
+our @valid_commands = qw(PASS NICK USER SERVER OPER QUIT SQUIT JOIN PART MODE TOPIC NAMES LIST INVITE KICK VERSION STATS LINKS TIME CONNECT TRACE ADMIN INFO WHO WHOIS WHOWAS KILL PING PONG ERROR AWAY REHASH RESTART SUMMON USERS WALLOPS USERHOST ISON MOTD LUSERS DIE);
 
-our (@client_commands) = qw(PASS NICK USER QUIT JOIN NAMES PART MODE TOPIC KICK OPER SUMMON USERS WHO AWAY MOTD LUSERS VERSION INVITE USERHOST PING PONG WHOIS LIST ISON ADMIN INFO WHOWAS TIME WALLOPS STATS KILL);
+our @client_commands = qw(PASS NICK USER QUIT JOIN NAMES PART MODE TOPIC KICK OPER SUMMON USERS WHO AWAY MOTD LUSERS VERSION INVITE USERHOST PING PONG WHOIS LIST ISON ADMIN INFO WHOWAS TIME WALLOPS STATS KILL);
 
-our (@server_commands) = qw(WALLOPS);
+our @server_commands = qw(WALLOPS);
 
-our (@connection_commands) = qw(PASS NICK USER SERVER QUIT);
+our @connection_commands = qw(PASS NICK USER SERVER QUIT);
 
-our (@reserved_channels) = qw(&CONNECTIONS &STATE);
+our @reserved_channels = qw(&CONNECTIONS &STATE);
 
-our (@cmd_server) = map { 'cmd_server_' . $_ } qw (kick kill mode);
-our (%cmd_server) = map { ( 'server_' . $_ => 'cmd_input' ) } qw (kick kill mode);
+our @cmd_server = map { 'cmd_server_' . $_ } qw (kick kill mode);
+our %cmd_server = map { ( 'server_' . $_ => 'cmd_input' ) } qw (kick kill mode);
+
+our $GOT_IDENT;
+our $GOT_DNS;
+
+BEGIN: {
+	$GOT_IDENT = 0;
+	eval {
+	   require POE::Component::Client::Ident;
+	   $GOT_IDENT = 1;
+	};
+}
+
+BEGIN: {
+	$GOT_DNS = 0;
+	eval {
+	   require POE::Component::Client::DNS;
+	   $GOT_DNS = 1;
+	};
+}
 
 sub spawn {
-  my ($package) = shift;
+  my $package = shift;
   croak "$package requires an even number of parameters" if @_ % 2;
-  my (%args) = @_;
+  my %args = @_;
 
-  unless ( $args{'Alias'} ) {
-	croak "You must specify an Alias to $package->spawn";
-  }
+  croak "You must specify an Alias to $package->spawn" unless $args{Alias};
 
-  my ($self) = $package->new(@_);
+  my $self = $package->new(@_);
 
-  my (@object_client_handlers) = map { 'ircd_client_' . lc } @client_commands;
-  my (@object_server_handlers) = map { 'ircd_server_' . lc } @server_commands;
-  my (@object_connection_handlers) = map { 'ircd_connection_' . lc } @connection_commands;
+  my @object_client_handlers = map { 'ircd_client_' . lc } @client_commands;
+  my @object_server_handlers = map { 'ircd_server_' . lc } @server_commands;
+  my @object_connection_handlers = map { 'ircd_connection_' . lc } @connection_commands;
 
   POE::Session->create(
 	object_states => [
@@ -74,11 +89,11 @@ sub spawn {
 }
 
 sub new {
-  my ($package) = shift;
-  my (%args) = @_;
+  my $package = shift;
+  my %args = @_;
 
-  my ($self) = { };
-  $self->{Alias} = delete ( $args{'Alias'} );
+  my $self = { };
+  $self->{Alias} = delete $args{'Alias'};
   $self->{Debug} = 0;
   $self->{Debug} = $args{'Debug'} if ( defined ( $args{'Debug'} ) and $args{'Debug'} eq '1' );
   $self->{Config} = \%args;
@@ -161,8 +176,12 @@ sub ircd_start {
   $self->{Ident_Client} = 'poco_' . $self->{Alias} . '_ident';
   $self->{Resolver} = 'poco_' . $self->{Alias} . '_resolver';
 
-  POE::Component::Client::Ident->spawn ( $self->{Ident_Client} );
-  $self->{ $self->{Resolver} } = POE::Component::Client::DNS->spawn( Alias => $self->{Resolver}, Timeout => 10 );
+  if ( $GOT_DNS and $GOT_IDENT ) {
+    POE::Component::Client::Ident->spawn ( $self->{Ident_Client} );
+    $self->{ $self->{Resolver} } = POE::Component::Client::DNS->spawn( Alias => $self->{Resolver}, Timeout => 10 );
+  } else {
+    $self->{CANT_AUTH} = 1;
+  }
 
   $kernel->call ( $self->{Alias} => 'configure' );
   $kernel->delay ( 'poll_connections' => $self->lowest_ping_frequency() );
@@ -175,8 +194,10 @@ sub ircd_stop {
 sub ircd_shutdown {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
 
-  $kernel->call ( 'Ident-Client' => 'shutdown' ); 
-  $self->{ $self->{Resolver} }->shutdown();
+  unless ( $self->{CANT_AUTH} ) {
+    $kernel->call ( 'Ident-Client' => 'shutdown' ); 
+    $self->{ $self->{Resolver} }->shutdown();
+  }
 
   delete $self->{Clients};
   delete $self->{Listeners};
@@ -195,6 +216,7 @@ sub register {
   unless ($self->{sessions}->{$sender}->{refcnt}++ or $session == $sender) {
       $kernel->refcount_increment($sender->ID(), PCSI_REFCOUNT_TAG);
   }
+  undef;
 }
 
 sub unregister {
@@ -206,6 +228,7 @@ sub unregister {
         $kernel->refcount_decrement($sender->ID(), PCSI_REFCOUNT_TAG);
       }
   }
+  undef;
 }
 
 sub poll_connections {
@@ -236,11 +259,12 @@ sub poll_connections {
   #foreach my $server ( keys %{ $self->{Servers} } ) {
   #}
   $kernel->delay ( 'poll_connections' => $self->lowest_ping_frequency() );
+  undef;
 }
 
 sub configure {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($options);
+  my $options;
   
   if ( ref $_[ARG0] eq 'HASH' ) {
     $options = $_[ARG0];
@@ -304,7 +328,7 @@ sub configure {
 
 sub set_motd {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($options);
+  my $options;
   
   if ( ref $_[ARG0] eq 'ARRAY' ) {
     $options = $_[ARG0];
@@ -312,16 +336,17 @@ sub set_motd {
     $options = [ @_[ARG0 .. $#_] ];
   }
 
-  if ( scalar ( @{ $options } ) > 0 ) {
+  if ( scalar @{ $options } > 0 ) {
 	$self->{Config}->{MOTD} = $options;
   } else {
 	delete ( $self->{Config}->{MOTD} );
   }
+  undef;
 }
 
 sub add_listener {
   my ($kernel,$self,$sender) = @_[KERNEL,OBJECT,SENDER];
-  my ($params);
+  my $params;
 
   if ( ref $_[ARG0] eq 'HASH' ) {
      $params = $_[ARG0];
@@ -357,11 +382,12 @@ sub add_listener {
   if ( defined ( $params->{SuccessEvent} ) ) {
 	$kernel->post( $sender => $params->{SuccessEvent} => $params->{Port} );
   }
+  undef;
 }
 
 sub add_operator {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($params);
+  my $params;
 
   if ( ref $_[ARG0] eq 'HASH' ) {
      $params = $_[ARG0];
@@ -374,11 +400,12 @@ sub add_operator {
   }
 
   $self->{Operators}->{ $params->{UserName} } = $params;
+  undef;
 }
 
 sub add_i_line {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($params);
+  my $params;
 
   if ( ref $_[ARG0] eq 'HASH' ) {
      $params = $_[ARG0];
@@ -390,22 +417,24 @@ sub add_i_line {
     $params->{ $param } = '*' unless ( defined ( $params->{ $param } ) and $params->{ $param } ne '' );
   }
   push ( @{ $self->{I_Lines} }, $params );
+  undef;
 }
 
 sub accept_failed {
   my ($kernel,$self,$wheel_id) = @_[KERNEL,OBJECT,ARG3];
 
-  my ($port) = $self->{Listener_Wheels}->{$wheel_id};
+  my $port = $self->{Listener_Wheels}->{$wheel_id};
 
-  delete ( $self->{Listener_Wheels}->{$wheel_id} );
-  delete ( $self->{Listeners}->{$port} );
+  delete $self->{Listener_Wheels}->{$wheel_id};
+  delete $self->{Listeners}->{$port};
+  undef;
 }
 
 sub accept_new_connection {
   my ($kernel,$self,$socket,$peeraddr,$peerport,$wheel_id) = @_[KERNEL,OBJECT,ARG0 .. ARG3];
   $peeraddr = inet_ntoa($peeraddr);
 
-  my ($wheel) = POE::Wheel::ReadWrite->new (
+  my $wheel = POE::Wheel::ReadWrite->new (
 	Handle => $socket,
 	Filter => $self->{filter},
 	InputEvent => 'connection_input',
@@ -426,10 +455,11 @@ sub accept_new_connection {
   if ( defined ( $self->{Listeners}->{ $self->{Listener_Wheels}->{ $wheel_id } }->{PingFreq} ) ) {
 	$self->{Connections}->{ $wheel->ID() }->{PingFreq} = $self->{Listeners}->{ $self->{Listener_Wheels}->{ $wheel_id} }->{PingFreq};
   }
-  if ( $self->{Config}->{Auth} ) {
+  if ( !$self->{CANT_AUTH} and $self->{Config}->{Auth} ) {
 	$kernel->post ( $self->{Alias} => 'auth_client' => $wheel->ID() );
   }
   $self->send_output_to_channel( '&CONNECTIONS', { command => 'NOTICE', prefix => $self->server_name(), params => [ '&CONNECTIONS', "Connection from $peeraddr to " . $self->{Listener_Wheels}->{ $wheel_id } ] } );
+  undef;
 }
 
 sub connection_error {
@@ -447,8 +477,9 @@ sub connection_error {
 	$kernel->post ( $self->{Alias} => 'ircd_server_squit' => { command => 'SQUIT', params => [ $errstr ] } => $wheel_id );
 	last SWITCH;
     }
-    delete ( $self->{Connections}->{ $wheel_id } );
+    delete $self->{Connections}->{ $wheel_id };
   }
+  undef;
 }
 
 sub connection_input {
@@ -506,6 +537,7 @@ sub connection_input {
 	$self->send_output_to_client( $wheel_id, '421', $input->{command} );
     }
   }
+  undef;
 }
 
 sub client_dispatcher {
@@ -520,6 +552,7 @@ sub client_dispatcher {
 	$kernel->post( $self->{Alias} => 'ircd_client_' . lc ( $input->{command} ) => $input => $wheel_id );
     }
   }
+  undef;
 }
 
 sub client_ping {
@@ -538,6 +571,7 @@ sub client_ping {
     $self->{Clients}->{ $wheel_id }->{Wheel}->put( { command => 'PING', params => [ $self->{Config}->{ServerName} ] } );
     $self->{Clients}->{ $wheel_id }->{PING} = $kernel->delay_set ( 'client_ping' => $self->lowest_ping_frequency() => $wheel_id );
   }
+  undef;
 }
 
 sub connection_flushed {
@@ -561,6 +595,7 @@ sub connection_flushed {
 	last SWITCH;
     }
   }
+  undef;
 }
 
 sub auth_client {
@@ -586,6 +621,7 @@ sub auth_client {
   
   $kernel->post ( $self->{Ident_Client} => query => PeerAddr => $peeraddress, PeerPort => $peerport, SockAddr => $sockaddress, SockPort => $sockport, BuggyIdentd => 1, TimeOut => 10 );
   $self->{Ident_Lookups}->{ join(':',($peeraddress,$peerport,$sockaddress,$sockport)) } = $wheel_id;
+  undef;
 }
 
 sub ircd_connection_nick {
@@ -623,6 +659,7 @@ sub ircd_connection_nick {
     $self->{Connections}->{ $wheel_id }->{NickName} = u_irc ( $nickname );
     $self->{Connections}->{ $wheel_id }->{ProperNick} = $nickname;
   }
+  undef;
 }
 
 sub ircd_connection_user {
@@ -648,6 +685,7 @@ sub ircd_connection_user {
 	$kernel->post ( $self->{Alias} => 'auth_done' => $wheel_id );
     }
   }
+  undef;
 }
 
 sub ircd_connection_quit {
@@ -660,6 +698,7 @@ sub ircd_connection_quit {
     $self->{Connections}->{ $wheel_id }->{INVALID_PASSWORD} = 1;
     $self->{Connections}->{ $wheel_id }->{Wheel}->put( { command => 'ERROR', params => [ 'Closing Link: ' . $self->{Connections}->{ $wheel_id }->{ProperNick} . '[' . $self->{Connections}->{ $wheel_id }->{UserName} . '@' . $self->{Connections}->{ $wheel_id }->{PeerAddr} . '] (Quit: ' . $input->{params}->[0] . ')' ] } );
   }
+  undef;
 }
 
 sub ircd_connection_pass {
@@ -675,9 +714,11 @@ sub ircd_connection_pass {
     }
     $self->{Connections}->{ $wheel_id }->{GotPwd} = $input->{params}->[0];
   }
+  undef;
 }
 
 sub ircd_connection_server {
+  undef;
 }
 
 sub auth_done {
@@ -697,6 +738,7 @@ sub auth_done {
 	last SWITCH;
     }
   }
+  undef;
 }
 
 sub got_hostname_response {
@@ -736,6 +778,7 @@ sub got_hostname_response {
 	$kernel->post ( $self->{Alias} => 'auth_done' => $wheel_id );
     }
     }
+  undef;
 }
 
 sub got_ip_response {
@@ -780,6 +823,7 @@ sub got_ip_response {
 	$kernel->post ( $self->{Alias} => 'auth_done' => $wheel_id );
     }
     }
+  undef;
 }
 
 sub ident_client_reply {
@@ -799,6 +843,7 @@ sub ident_client_reply {
       $kernel->post ( $self->{Alias} => 'auth_done' => $wheel_id );
     }
   }
+  undef;
 }
 
 sub ident_client_error {
@@ -814,6 +859,7 @@ sub ident_client_error {
       $kernel->post ( $self->{Alias} => 'auth_done' => $wheel_id );
     }
   }
+  undef;
 }
 
 sub ircd_client_oper {
@@ -841,6 +887,7 @@ sub ircd_client_oper {
         $self->send_output_to_client( $wheel_id, { command => 'MODE', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $reply ] } );
     }
   }
+  undef;
 }
 
 sub ircd_client_nick {
@@ -861,6 +908,7 @@ sub ircd_client_nick {
 	}
     }
   }
+  undef;
 }
 
 sub ircd_client_user {
@@ -872,6 +920,7 @@ sub ircd_client_user {
     }
     $self->send_output_to_client($wheel_id,'462');
   }
+  undef;
 }
 
 sub ircd_client_pass {
@@ -883,6 +932,7 @@ sub ircd_client_pass {
     }
     $self->send_output_to_client($wheel_id,'462');
   }
+  undef;
 }
 
 sub ircd_client_part {
@@ -910,6 +960,7 @@ sub ircd_client_part {
       $self->state_channel_part($channel,$nickname);
     }
   }
+  undef;
 }
 
 sub ircd_client_quit {
@@ -936,6 +987,7 @@ sub ircd_client_quit {
   } else {
     delete ( $self->{Connections}->{ $wheel_id } );
   }
+  undef;
 }
 
 sub ircd_client_join {
@@ -1005,6 +1057,7 @@ sub ircd_client_join {
 	}
     }
   }
+  undef;
 }
 
 sub ircd_client_invite {
@@ -1050,6 +1103,7 @@ sub ircd_client_invite {
 	# TODO: forward INVITE to appropriate server.
     }
   }
+  undef;
 }
 
 sub ircd_client_kick {
@@ -1106,6 +1160,7 @@ sub ircd_client_kick {
 	}
     }
   }
+  undef;
 }
 
 sub ircd_client_names {
@@ -1151,6 +1206,7 @@ sub ircd_client_names {
 	  $self->send_output_to_client( $wheel_id, { command => '366', prefix => $self->server_name(), params => [ $nickname, $channel, 'End of NAMES list' ] } );
     }
   }
+  undef;
 }
 
 sub ircd_client_mode {
@@ -1264,6 +1320,7 @@ sub ircd_client_mode {
       $self->send_output_to_channel( $input->{params}->[0], { command => 'MODE', prefix => $self->nick_long_form($self->client_nickname($wheel_id)), params => [ $self->channel_name( $input->{params}->[0] ), unparse_mode_line ( $reply ) ] } ) if ( defined ( $reply ) );
     }
   }
+  undef;
 }
 
 sub ircd_client_topic {
@@ -1300,6 +1357,7 @@ sub ircd_client_topic {
     $self->state_topic_set_by( $input->{params}->[0], $self->client_nickname($wheel_id) );
     $self->send_output_to_channel( $input->{params}->[0], { command => 'TOPIC', prefix => $self->nick_long_form($nickname), params => [ $self->channel_name( $input->{params}->[0] ), ( $input->{params}->[1] ? $input->{params}->[1] : ':' ) ] } );
   }
+  undef;
 }
 
 sub ircd_client_o_cmds {
@@ -1323,6 +1381,7 @@ sub ircd_client_o_cmds {
 	$self->send_output_to_client( $wheel_id, { command => '382', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), 'ircd.conf :Rehashing' ] } );
     }
   }
+  undef;
 }
 
 sub sig_hup_rehash {
@@ -1375,6 +1434,7 @@ sub ircd_client_kill {
     }
     # Send KILL message to each connected server
   }
+  undef;
 }
 
 sub ircd_client_wallops {
@@ -1402,6 +1462,7 @@ sub ircd_client_wallops {
     }
     # TODO: Send WALLOPS to all connected servers.
   }
+  undef;
 }
 
 sub ircd_client_message {
@@ -1457,6 +1518,7 @@ sub ircd_client_message {
       }
     }
   }
+  undef;
 }
 
 sub ircd_client_summon {
@@ -1468,6 +1530,7 @@ sub ircd_client_summon {
     }
     $self->send_output_to_client($wheel_id,'445');
   }
+  undef;
 }
 
 sub ircd_client_users {
@@ -1479,6 +1542,7 @@ sub ircd_client_users {
     }
     $self->send_output_to_client($wheel_id,'446');
   }
+  undef;
 }
 
 sub ircd_client_who {
@@ -1530,6 +1594,7 @@ sub ircd_client_who {
     #RPL_ENDOFWHO
     $self->send_output_to_client( $wheel_id, { command => '315', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $input->{params}->[0], 'End of WHO list' ] } );
   }
+  undef;
 }
 
 sub ircd_client_whois {
@@ -1602,6 +1667,7 @@ sub ircd_client_whois {
     #RPL_ENDOFWHOIS
     $self->send_output_to_client( $wheel_id, { command => '318', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $endofwhois, 'End of WHOIS list' ] } );
   }
+  undef;
 }
 
 sub ircd_client_whowas {
@@ -1633,6 +1699,7 @@ sub ircd_client_whowas {
     #RPL_ENDOFWHOWAS
     $self->send_output_to_client( $wheel_id, { command => '369', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $input->{params}->[0], 'End of WHOWAS' ] } );
   }
+  undef;
 }
 
 sub ircd_client_away {
@@ -1662,6 +1729,7 @@ sub ircd_client_away {
     }
     $self->{State}->{by_nickname}->{ $nickname }->{Away} = $input->{params}->[0];
   }
+  undef;
 }
 
 sub ircd_client_motd {
@@ -1695,6 +1763,7 @@ sub ircd_client_motd {
     }
     # TODO: Pass MOTD request to target server to deal with.
   }
+  undef;
 }
 
 sub ircd_client_lusers {
@@ -1723,6 +1792,7 @@ sub ircd_client_lusers {
     my ($rpl_luserme) = 'I have ' . scalar ( keys %{ $self->{Clients} } ) . ' clients and ' . scalar ( keys %{ $self->{Servers} } ) . ' servers';
     $self->send_output_to_client( $wheel_id, { command => '255', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $rpl_luserme ] } );
   }
+  undef;
 }
 
 sub ircd_client_version {
@@ -1745,6 +1815,7 @@ sub ircd_client_version {
     }
     # TODO: Send VERSION request to the appropriate server
   }
+  undef;
 }
 
 sub ircd_client_time {
@@ -1767,6 +1838,7 @@ sub ircd_client_time {
     #RPL_TIME
     $self->send_output_to_client( $wheel_id, { command => '391', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $self->server_name(), $self->current_time() ] } );
   }
+  undef;
 }
 
 sub ircd_client_userhost {
@@ -1790,6 +1862,7 @@ sub ircd_client_userhost {
     }
     $self->send_output_to_client( $wheel_id, { command => '302', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), ( scalar ( @reply ) > 0 ? join(' ',@reply) : ':' ) ] } );
   }
+  undef;
 }
 
 sub ircd_client_ping {
@@ -1815,6 +1888,7 @@ sub ircd_client_ping {
     }
     $self->send_output_to_client( $wheel_id, { command => 'PONG', params => [ ( defined ( $input->{params}->[1] ) ? $input->{params}->[1] : $self->server_name() ), ':' . $input->{params}->[0] ] } );
   }
+  undef;
 }
 
 sub ircd_client_pong {
@@ -1840,6 +1914,7 @@ sub ircd_client_pong {
     }
     # TBH: We have already dealt with updating {SeenTraffic} in connection_input so nothing to do here.
   }
+  undef;
 }
 
 sub ircd_client_list {
@@ -1874,6 +1949,7 @@ sub ircd_client_list {
     #RPL_ENDOFLIST
     $self->send_output_to_client( $wheel_id, { command => '323', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), 'End of LIST' ] } );
   }
+  undef;
 }
 
 sub ircd_client_admin {
@@ -1906,6 +1982,7 @@ sub ircd_client_admin {
     #RPL_ADMINEMAIL
     $self->send_output_to_client( $wheel_id, { command => '259', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $self->{Config}->{Admin}->[2] ] } );
   }
+  undef;
 }
 
 sub ircd_client_stats {
@@ -1943,6 +2020,7 @@ sub ircd_client_stats {
     }
     $self->send_output_to_client( $wheel_id, { command => '219', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), $query, 'End of STATS report' ] } );
   }
+  undef;
 }
 
 sub ircd_client_info {
@@ -1969,6 +2047,7 @@ sub ircd_client_info {
     #RPL_ENDOFINFO
     $self->send_output_to_client( $wheel_id, { command => '374', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), 'End of INFO list' ] } );
   }
+  undef;
 }
 
 sub ircd_client_ison {
@@ -1992,6 +2071,7 @@ sub ircd_client_ison {
     }
     $self->send_output_to_client( $wheel_id, { command => '303', prefix => $self->server_name(), params => [ $self->client_nickname($wheel_id), ( scalar ( @reply ) > 0 ? join(' ',@reply) : ':' ) ] } );
   }
+  undef;
 }
 
 sub client_registered {
@@ -2032,10 +2112,12 @@ sub client_registered {
       # TODO: Announce new client to other servers.
     }
   }
+  undef;
 }
 
 sub server_registered {
   my ($kernel,$self,$wheel_id) = @_[KERNEL,OBJECT,ARG0];
+  undef;
 }
 
 sub ircd_server_wallops {
@@ -2049,14 +2131,15 @@ sub ircd_server_wallops {
     }
     # TODO: Send WALLOPS to all connected servers.
   }
+  undef;
 }
 
 # Our API with other sessions. So they can create nicks and interact with channels and stuff.
 
 sub validate_sender {
-  my ($self) = shift;
-  my ($sender) = shift || return 0;
-  my ($nickname) = u_irc ( shift ) || return 0;
+  my $self = shift;
+  my $sender = shift || return 0;
+  my $nickname = u_irc ( shift ) || return 0;
 
   if ( not defined ( $self->{Sessions}->{ $sender } ) ) {
 	return 0;
@@ -2086,6 +2169,7 @@ sub cmd_input {
 	last SWITCH;
     }
   }
+  undef;
 }
 
 sub cmd_server_mode {
@@ -2223,6 +2307,7 @@ sub cmd_server_mode {
     $reply .= ' ' . join(' ',@reply_args) if ( scalar ( @reply_args ) > 0 );
     $self->send_output_to_channel( $input->{params}->[0], { command => 'MODE', prefix => $self->server_name(), params => [ $self->channel_name( $input->{params}->[0] ), unparse_mode_line ( $reply ) ] } ) if ( defined ( $reply ) );
   }
+  undef;
 }
 
 sub cmd_server_kill {
@@ -2249,6 +2334,7 @@ sub cmd_server_kill {
     }
     # Send KILL message for client to each server connection we have defined.
   }
+  undef;
 }
 
 sub cmd_server_kick {
@@ -2292,6 +2378,7 @@ sub cmd_server_kick {
 	}
     }
   }
+  undef;
 }
 
 # Miscellaneous Subroutines
@@ -3350,9 +3437,9 @@ sub server_exists {
 }
 
 sub is_server_me {
-  my ($self) = shift;
-  my ($server) = u_irc ( $_[0] ) || return 0;
-  my ($client) = $_[1] || return 0;
+  my $self = shift;
+  my $server = u_irc ( $_[0] ) || return 0;
+  my $client = $_[1] || return 0;
 
   if ( not $self->client_exists( $client ) ) {
 	return 0;
@@ -3364,20 +3451,23 @@ sub is_server_me {
 }
 
 sub server_created {
-  my ($self) = shift;
+  my $self = shift;
 
   return strftime("%a %h %d %Y at %H:%M:%S %Z",localtime( $self->{StartTime} ) );
 }
 
 sub current_time {
-  my ($self) = shift;
-
-  return strftime("%A %B %e %Y -- %H:%M %z", localtime );
+  my $self = shift;
+  my $string = '%A %B %e %Y -- %H:%M %z';
+  if ( strftime("%z", localtime ) eq '%z' ) {
+  	$string = '%A %B %e %Y -- %H:%M %Z';
+  }
+  return strftime($string, localtime );
 }
 
 sub lowest_ping_frequency {
-  my ($self) = shift;
-  my ($return) = 60;
+  my $self = shift;
+  my $return = 60;
   
   foreach my $client ( keys %{ $self->{Clients} } ) {
 	if ( defined ( $self->{Clients}->{ $client }->{PingFreq} ) and $self->{Clients}->{ $client }->{PingFreq} < $return ) {

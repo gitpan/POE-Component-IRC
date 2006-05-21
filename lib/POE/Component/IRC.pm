@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.87';
-$REVISION = do {my@r=(q$Revision: 152 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '4.88';
+$REVISION = do {my@r=(q$Revision: 159 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -83,6 +83,7 @@ sub _create {
     'info'      => [ PRI_HIGH,   'oneoptarg',     ],
     'away'      => [ PRI_HIGH,   'oneoptarg',     ],
     'users'     => [ PRI_HIGH,   'oneoptarg',     ],
+    'lusers'    => [ PRI_HIGH,   'oneoptarg',     ],
     'locops'    => [ PRI_HIGH,   'oneoptarg',     ],
     'operwall'  => [ PRI_HIGH,   'oneoptarg',     ],
     'wallops'   => [ PRI_HIGH,   'oneoptarg',     ],
@@ -1131,7 +1132,7 @@ sub new {
   my ($package, $alias) = splice @_, 0, 2;
 
   croak "Not enough arguments to POE::Component::IRC::new()" unless $alias;
-  warn "Use of ->new() is deprecated, please use spawn()\n";
+  warn join ' ', "Use of $package->new() is deprecated, please use spawn(). Called from ", caller(), "\n";
   my $self = $package->spawn ( alias => $alias, options => { @_ } );
 
   return $self;
