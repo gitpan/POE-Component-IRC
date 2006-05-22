@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.89';
-$REVISION = do {my@r=(q$Revision: 163 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '4.90';
+$REVISION = do {my@r=(q$Revision: 165 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
