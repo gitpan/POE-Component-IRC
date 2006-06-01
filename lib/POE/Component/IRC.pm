@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.90';
-$REVISION = do {my@r=(q$Revision: 165 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '4.91';
+$REVISION = do {my@r=(q$Revision: 177 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -65,7 +65,9 @@ BEGIN {
 	$GOT_CLIENT_DNS = 0;
 	eval {
 		require POE::Component::Client::DNS;
-		$GOT_CLIENT_DNS = 1;
+		if ( $POE::Component::Client::DNS::VERSION >= 0.99 ) {
+			$GOT_CLIENT_DNS = 1;
+		}
 	};
 }
 
@@ -552,6 +554,12 @@ sub _send_event  {
   undef;
 }
 
+sub _sock_flush {
+  my ($kernel, $self) = @_[KERNEL, OBJECT];
+  return unless $self->{_shutdown};
+  delete $self->{'socket'};
+  undef;
+}
 
 # Internal function called when a socket is closed.
 sub _sock_down {
@@ -621,6 +629,7 @@ sub _sock_up {
       OutputFilter => $self->{out_filter},
       InputEvent   => '_parseline',
       ErrorEvent   => '_sock_down',
+      FlushedEvent => '_sock_flush',
     );
 
   if ($self->{'socket'}) {
@@ -1356,14 +1365,20 @@ sub register_session {
 
 # Tell the IRC session to go away.
 sub shutdown {
-  my ($kernel, $self) = @_[KERNEL, OBJECT];
+  my ($kernel, $self, $session) = @_[KERNEL, OBJECT, SESSION];
+  my $args;
+  $args = join '', @_[ARG0..$#_] if scalar @_[ARG0..$#_];
+  $args = ':' . $args if $args and $args =~ /\s/;
+  my $cmd = join ' ', 'QUIT', $args || '';
+  $self->{_shutdown} = 1;
   $self->_unregister_sessions();
   $kernel->alarm_remove_all();
   $kernel->alias_remove( $_ ) for $kernel->alias_list( $_[SESSION] );
-  delete $self->{$_} for qw(socket sock socketfactory dcc wheelmap);
+  delete $self->{$_} for qw(sock socketfactory dcc wheelmap);
   # Delete all plugins that are loaded.
   $self->plugin_del( $_ ) for keys %{ $self->plugin_list() };
   $self->{resolver}->shutdown() if $self->{mydns} and $self->{resolver};
+  $kernel->call( $session, 'sl_high', $cmd ) if $self->{socket};
   undef;
 }
 
@@ -2414,6 +2429,10 @@ waiting for you to call C<connect()> on them again to reconnect.
 to break backwards compatibility at this point.) You can send the IRC
 session a C<shutdown> event manually to make it delete itself.
 
+If you are connected, 'shutdown' will send a quit message to ircd and
+disconnect. If you provide an argument that will be used as the QUIT
+message.
+
 =item unregister
 
 Takes N arguments: a list of event names which you I<don't> want to
@@ -2857,6 +2876,12 @@ other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3 is the
 port number. For DCC SEND and GET connections, ARG4 will be the
 filename, ARG5 will be the file size, and ARG6 will be the number of
 bytes transferred. (ARG5 and ARG6 should always be the same.)
+
+=item irc_dcc_failed
+
+You get this event when a DCC connection fails for some reason. ARG0 
+will be the operation that failed, ARG1 is the error number, ARG2 is
+the description of the error and ARG3 the connection's magic cookie.
 
 =item irc_dcc_error
 

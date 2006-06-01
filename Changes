@@ -1,5 +1,36 @@
 Revision history for Perl extension POE::Component::IRC.
 
+4.91  Thu Jun 01 21:08:13 BST 2006
+    - Tweak to ::State to deal with ircds that don't report @+ 
+      status in WHO replies ( like unreal ). Thanks to Kinks
+      for reporting that.
+    - 'irc_dcc_failed' event was undocumented. Fixed.
+    - Switched the poco-client-dns checks to 'use', so as to
+      ensure that we only load >= 0.99.
+    - Amendments to shutdown so that it sends a quit message
+      to the ircd if we are connected.
+    - Amended Connector plugin so the lag is collected 
+      independent of what the ircd sends us back.
+    - Various changes to ::State in order to ensure full RFC
+      compliant channel mode support, including support
+      for channel access lists - Kinks
+    - Added ::State methods to return channel access lists:
+      channel_ban_list, channel_invex_list, channel_except_list - Kinks
+    - Using 'use' for the dns checks was fubar. Switched back 
+      to 'require' and test the VERSION instead.
+    - Changed the simpleclient.pl script to accept a filename as
+      a second argument to /dump_state command.
+    - Documentation tweaks to ::State by Kinks
+    - Channel topic support added to ::State. Added the method
+      channel_topic to return a hashref of topic data - Kinks
+    - Changed 'Time' keys for channel lists and topic to 'SetAt'
+    - Added irc_chan_mode event to ::State to allow everyone
+      to enjoy the mode parsing State does internally - Kinks
+    - Refactored ::Qnet::State subclass after all Kinks' 
+      changes to ::State.
+    - Refactored ::State slightly to use ARG2 for numerics 
+      handlers instead of trying to parse ARG1 ourselves. FTW.
+
 4.90  Mon May 22 13:23:09 BST 2006
     - Missed the Filter::Stackable in plugins Console and Proxy.
 

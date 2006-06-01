@@ -7,12 +7,12 @@ BEGIN: {
   $GOT_DNS = 0;
   eval { 
 	require POE::Component::Client::DNS;
-	$GOT_DNS = 1;
+	$GOT_DNS = 1 if $POE::Component::Client::DNS::VERSION >= 0.99;
   };
 }
 
 unless ( $GOT_DNS ) {
-  plan skip_all => "POE::Component::Client::DNS not installed";
+  plan skip_all => "POE::Component::Client::DNS 0.99 not installed";
 }
 
 plan tests => 6;

@@ -10,6 +10,7 @@ sub new {
   my $package = shift;
   my %parms = @_;
   $parms{ lc $_ } = delete $parms{$_} for keys %parms;
+  $parms{lag} = 0;
   my $self = bless \%parms, $package;
   return $self;
 }
@@ -73,11 +74,9 @@ sub S_socketerr {
 
 sub S_pong {
   my ($self,$irc) = splice @_, 0, 2;
-  my $reply = ${ $_[0] };
-
-  if ( $reply and $reply =~ /^[0-9]+$/ ) {
-	$self->{lag} = time() - $reply;
-  }
+  my $ping = shift @{ $self->{pings} };
+  return PCI_EAT_NONE unless $ping;
+  $self->{lag} = time() - $ping;
   $self->{seen_traffic} = 1;
   return PCI_EAT_NONE;
 }
@@ -103,6 +102,7 @@ sub _start {
 
 sub _start_ping {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
+  $self->{pings} = [ ];
   $kernel->delay( '_time_out' => undef );
   $kernel->delay( '_auto_ping' => $self->{delay} || 300 );
   undef;
@@ -110,9 +110,10 @@ sub _start_ping {
 
 sub _auto_ping {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-
   if ( !$self->{seen_traffic} ) {
-     $self->{irc}->yield( 'ping' => time() );
+     my $time = time();
+     $self->{irc}->yield( 'ping' => $time );
+     push @{ $self->{pings} }, $time;
   }
   $self->{seen_traffic} = 0;
   $kernel->yield( '_start_ping' );
@@ -121,6 +122,7 @@ sub _auto_ping {
 
 sub _stop_ping {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
+  delete $self->{pings};
   $kernel->delay( '_auto_ping' => undef );
   $kernel->delay( '_time_out' => undef );
   undef;
@@ -172,7 +174,7 @@ POE::Component::IRC::Plugin::Connector - A PoCo-IRC plugin that deals with the m
 
   POE::Session->create( 
 	package_states => [ 
-		'main' => [ qw(_start lag-o-meter) ],
+		'main' => [ qw(_start lag_o_meter) ],
 	],
   );
 
@@ -180,19 +182,24 @@ POE::Component::IRC::Plugin::Connector - A PoCo-IRC plugin that deals with the m
   exit 0;
 
   sub _start {
-
+    my ($kernel,$heap) = @_[KERNEL,HEAP];
     $irc->yield( register => 'all' );
 
-    $irc->plugin_add( 'Connector' => POE::Component::IRC::Plugin::Connector->new() );
+    $heap->{connector} = POE::Component::IRC::Plugin::Connector->new();
+
+    $irc->plugin_add( 'Connector' => $heap->{connector} );
 
     $irc->yield ( connect => { Nick => 'testbot', Server => 'someserver.com' } );
 
-    $_[KERNEL]->delay( 'lag-o-meter' => 60 );
+    $kernel->delay( 'lag_o_meter' => 60 );
+    undef;
   }
 
-  sub lagometer {
-    print STDERR "Time: " . time() . " Lag: " . $irc->lag() . "\n";
-    $_[KERNEL]->delay( 'lag-o-meter' => 60 );
+  sub lag_o_meter {
+    my ($kernel,$heap) = @_[KERNEL,HEAP];
+    print STDOUT "Time: " . time() . " Lag: " . $heap->{connector}->lag() . "\n";
+    $kernel->delay( 'lag_o_meter' => 60 );
+    undef;
   }
 
 =head1 DESCRIPTION
