@@ -16,7 +16,7 @@ use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC);
 use vars qw($VERSION);
 
-$VERSION = '1.7';
+$VERSION = '1.9';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
@@ -170,9 +170,7 @@ sub S_nick {
   my $unick = u_irc $nick, $mapping;
   my $unew = u_irc $new, $mapping;
 
-  if ( $nick eq $self->{RealNick} ) {
-	$self->{RealNick} = $new;
-  }
+  $self->{RealNick} = $new if $nick eq $self->{RealNick};
 
   if ( $unick eq $unew ) {
         # Case Change
@@ -198,7 +196,7 @@ sub S_chan_mode {
   pop @_;
   my $mode = ${ $_[2] };
   my $arg = ${ $_[3] };
-  return PCI_EAT_NONE unless $mode eq '+o' and $mynick = u_irc $arg, $mapping;
+  return PCI_EAT_NONE unless $mynick = u_irc( $arg, $mapping ) and $mode =~ /\+[qoah]/;
   my $excepts = $irc->isupport('EXCEPTS');
   my $invex = $irc->isupport('INVEX');
   $irc->yield ( 'mode' => $channel => $excepts ) if $excepts;
@@ -1112,16 +1110,16 @@ Sent whenever the component has completed synchronising a channel that it has jo
 
 =item irc_chan_sync_invex
 
-Sent whenever the component has synchronising a channel's INVEX ( invite list ). Usually triggered by the component being opped on a channel. ARG0 is the channel.
+Sent whenever the component has completed synchronising a channel's INVEX ( invite list ). Usually triggered by the component being opped on a channel. ARG0 is the channel.
 
 =item irc_chan_sync_excepts
 
-Sent whenever the component has synchronising a channel's EXCEPTS ( ban exemption list ). Usually triggered by the component being opped on a channel. ARG0 is the channel.
+Sent whenever the component has completed synchronising a channel's EXCEPTS ( ban exemption list ). Usually triggered by the component being opped on a channel. ARG0 is the channel.
 
 =item irc_nick_sync
 
 Sent whenever the component has completed synchronising a user who has joined a channel the component is on.
-ARG0 is the user's nickname and the channel they have joined.
+ARG0 is the user's nickname and ARG1 the channel they have joined.
 
 =item irc_chan_mode
 
