@@ -25,7 +25,6 @@ use POE::Component::IRC::Constants;
 use POE::Component::IRC::Pipeline;
 use Carp;
 use Socket;
-use Sys::Hostname;
 use File::Basename ();
 use Symbol;
 use Data::Dumper;
@@ -34,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.93';
-$REVISION = do {my@r=(q$Revision: 203 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '4.94';
+$REVISION = do {my@r=(q$Revision: 209 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -77,6 +76,7 @@ sub _create {
 
   $self->{IRC_CMDS} =
   { 'rehash'    => [ PRI_HIGH,   'noargs',        ],
+    'die'	=> [ PRI_HIGH,	 'noargs',	  ],
     'restart'   => [ PRI_HIGH,   'noargs',        ],
     'quit'      => [ PRI_NORMAL, 'oneoptarg',     ],
     'version'   => [ PRI_HIGH,   'oneoptarg',     ],
@@ -672,6 +672,11 @@ sub _start {
   my ($kernel, $session, $self, $alias) = @_[KERNEL, SESSION, OBJECT, ARG0];
   my @options = @_[ARG1 .. $#_];
 
+  $kernel->state( '_poco_irc_sig_register' => $self );
+  $kernel->sig( POCOIRC_REGISTER => '_poco_irc_sig_register' );
+  $kernel->state( '_poco_irc_sig_shutdown' => $self );
+  $kernel->sig( POCOIRC_SHUTDOWN => '_poco_irc_sig_shutdown' );
+
   # Send queue is used to hold pending lines so we don't flood off.
   # The count is used to track the number of lines sent at any time.
   $self->{send_queue} = [ ];
@@ -776,6 +781,11 @@ sub connect {
 
   $self->_configure( \%arg );
 
+  if ( $self->{resolver} and $self->{res_addresses} and scalar @{ $self->{res_addresses} } ) {
+	push @{ $self->{res_addresses} }, $self->{'server'};
+	$self->{'server'} = shift @{ $self->{res_addresses} };
+  }
+
   # try and use non-blocking resolver if needed
   if ( $self->{resolver} && $self->{'server'} !~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ && !$self->{'NoDNS'} ) {
     my $response = $self->{resolver}->resolve( event => "got_dns_response", host =>  $self->{'server'}, context => { } );
@@ -816,6 +826,7 @@ sub got_dns_response {
   my ($kernel, $self) = @_[KERNEL, OBJECT];
   my ($net_dns_packet) = $_[ARG0]->{response};
   my ($net_dns_errorstring) = $_[ARG0]->{error};
+  $self->{res_addresses} = [ ] unless $self->{res_addresses};
 
   unless(defined $net_dns_packet) {
     $self->_send_event( 'irc_socketerr', $net_dns_errorstring );
@@ -831,8 +842,13 @@ sub got_dns_response {
 
   foreach my $net_dns_answer (@net_dns_answers) {
     next unless $net_dns_answer->type eq "A";
+    push @{ $self->{res_addresses} }, $net_dns_answer->rdatastr;
+  }
 
-    $self->{'server'} = $net_dns_answer->rdatastr;
+  warn Dumper($self->{res_addresses});
+
+  if ( my $address = shift @{ $self->{res_addresses} } ) {
+    $self->{'server'} = $address;
     $kernel->yield("do_connect");
     return;
   }
@@ -1308,6 +1324,41 @@ sub privandnotice {
   undef;
 }
 
+sub _poco_irc_sig_shutdown {
+  my ($kernel,$self,$session,$signal) = @_[KERNEL,OBJECT,SESSION,ARG0];
+  $kernel->yield( 'shutdown', @_[ARG1..$#_] );
+  return 0;
+}
+
+sub _poco_irc_sig_register {
+  my ($kernel,$self,$session,$signal,$sender,@events) = @_[KERNEL,OBJECT,SESSION,ARG0..$#_];
+  return 0 unless $sender;
+  my $session_id = $session->ID();
+  my $sender_id;
+  if ( my $ref = $kernel->alias_resolve( $sender ) ) {
+	$sender_id = $ref->ID();
+  } else {
+	warn "Can\'t resolve $sender\n";
+	return 0;
+  }
+  unless (@events) {
+    warn "Signal POCOIRC: Not enough arguments";
+    return 0;
+  }
+
+  foreach (@events) {
+    $_ = "irc_" . $_ unless /^_/;
+    $self->{events}->{$_}->{$sender_id} = $sender_id;
+    $self->{sessions}->{$sender_id}->{'ref'} = $sender_id;
+    unless ($self->{sessions}->{$sender_id}->{refcnt}++ or $session_id == $sender_id) {
+      $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
+    }
+  }
+
+  $kernel->post( $sender_id => 'irc_registered' => $self );
+  
+  return 0;
+}
 
 # Ask P::C::IRC to send you certain events, listed in @events.
 sub register {
@@ -1373,6 +1424,8 @@ sub shutdown {
   $args = join '', @_[ARG0..$#_] if scalar @_[ARG0..$#_];
   $args = ':' . $args if $args and $args =~ /\s/;
   my $cmd = join ' ', 'QUIT', $args || '';
+  $kernel->signal( 'POCOIRC_REGISTER' );
+  $kernel->signal( 'POCOIRC_SHUTDOWN' );
   $self->{_shutdown} = 1;
   $self->_send_event( 'irc_shutdown', $_[SENDER]->ID() );
   $self->_unregister_sessions();
@@ -1987,6 +2040,116 @@ POE::Component::IRC - a fully event-driven IRC client module.
     return 0;
   }
 
+  # A Multiple Network Rot13 'encryption' bot
+
+  use strict;
+  use warnings;
+  use POE qw(Component::IRC);
+
+  my $nickname = 'Flibble' . $$;
+  my $ircname = 'Flibble the Sailor Bot';
+  my $port = 6667;
+
+  my $settings = { 
+	'server1.irc' => { port => 6667, channels => [ '#Foo' ], },
+	'server2.irc' => { port => 6668, channels => [ '#Bar' ], },
+	'server3.irc' => { port => 7001, channels => [ '#Baa' ], },
+  };
+
+  # We create a new PoCo-IRC objects and components.
+  foreach my $server ( keys %{ $settings } ) {
+	POE::Component::IRC->spawn( 
+		alias   => $server, 
+		nick    => $nickname,
+		ircname => $ircname,  
+	);
+  }
+
+  POE::Session->create(
+	package_states => [
+		'main' => [ qw(_default _start irc_registered irc_001 irc_public) ],
+	],
+	heap => { config => $settings },
+  );
+
+  $poe_kernel->run();
+  exit 0;
+
+  sub _start {
+    my ($kernel,$session) = @_[KERNEL,SESSION];
+
+    # Send a POCOIRC_REGISTER signal to all poco-ircs
+    $kernel->signal( $kernel, 'POCOIRC_REGISTER', $session->ID(), 'all' );
+
+    undef;
+  }
+
+  # We'll get one of these from each PoCo-IRC that we spawned above.
+  sub irc_registered {
+    my ($kernel,$heap,$sender,$irc_object) = @_[KERNEL,HEAP,SENDER,ARG0];
+
+    my $alias = $irc_object->session_alias();
+
+    my %conn_hash = (
+	server => $alias,
+	port   => $heap->{config}->{ $alias }->{port},
+    );
+
+    # In any irc_* events SENDER will be the PoCo-IRC session
+    $kernel->post( $sender, 'connect', \%conn_hash ); 
+
+    undef;
+  }
+
+  sub irc_001 {
+    my ($kernel,$heap,$sender) = @_[KERNEL,HEAP,SENDER];
+
+    # Get the component's object at any time by accessing the heap of
+    # the SENDER
+    my $poco_object = $sender->get_heap();
+    print "Connected to ", $poco_object->server_name(), "\n";
+
+    my $alias = $poco_object->session_alias();
+    my @channels = @{ $heap->{config}->{ $alias }->{channels} };
+
+    $kernel->post( $sender => join => $_ ) for @channels;
+
+    undef;
+  }
+
+  sub irc_public {
+    my ($kernel,$sender,$who,$where,$what) = @_[KERNEL,SENDER,ARG0,ARG1,ARG2];
+    my $nick = ( split /!/, $who )[0];
+    my $channel = $where->[0];
+
+    if ( my ($rot13) = $what =~ /^rot13 (.+)/ ) {
+	$rot13 =~ tr[a-zA-Z][n-za-mN-ZA-M];
+	$kernel->post( $sender => privmsg => $channel => "$nick: $rot13" );
+    }
+
+    if ( $what =~ /^!bot_quit$/ ) {
+	# Someone has told us to die =[
+	$kernel->signal( $kernel, 'POCOIRC_SHUTDOWN', "See you loosers" );
+    }
+    undef;
+  }
+
+  # We registered for all events, this will produce some debug info.
+  sub _default {
+    my ($event, $args) = @_[ARG0 .. $#_];
+    my @output = ( "$event: " );
+
+    foreach my $arg ( @$args ) {
+        if ( ref($arg) eq 'ARRAY' ) {
+                push( @output, "[" . join(" ,", @$arg ) . "]" );
+        } else {
+                push ( @output, "'$arg'" );
+        }
+    }
+    print STDOUT join ' ', @output, "\n";
+    return 0;
+  }
+
 =head1 DESCRIPTION
 
 POE::Component::IRC is a POE component (who'd have guessed?) which
@@ -2220,8 +2383,7 @@ So the following would be functionally equivalent:
 =item connect
 
 Takes one argument: a hash reference of attributes for the new
-connection (see the L<SYNOPSIS> section of this doc for an
-example). This event tells the IRC client to connect to a
+connection. This event tells the IRC client to connect to a
 new/different server. If it has a connection already open, it'll close
 it gracefully before reconnecting. Possible attributes for the new
 connection are:
@@ -2424,6 +2586,10 @@ trap. ARG0 is the components object. Useful if you want to bolt PoCo-IRC's
 new features such as Plugins into a bot coded to the older deprecated API.
 If you are using the new API, ignore this :)
 
+Registering with multiple component sessions can be tricky, especially if
+one wants to marry up sessions/objects, etc. Check 'SIGNALS' section of this
+documentation for an alternative method of registering with multiple poco-ircs.
+
 =item shutdown
 
 By default, POE::Component::IRC sessions never go away. Even after
@@ -2436,6 +2602,9 @@ session a C<shutdown> event manually to make it delete itself.
 If you are connected, 'shutdown' will send a quit message to ircd and
 disconnect. If you provide an argument that will be used as the QUIT
 message.
+
+Terminating multiple components can be tricky. Check the 'SIGNALS' section of
+this documentation for an alternative method of shutting down multiple poco-ircs.
 
 =item unregister
 
@@ -2628,12 +2797,17 @@ logged-on global opers.  This option is specific to EFNet.
 
 =item rehash
 
-Tells the IRC server you're connected to to rehash its configuration
+Tells the IRC server you're connected to, to rehash its configuration
 files. Only useful for IRCops. Takes no arguments.
+
+=item die
+
+Tells the IRC server you're connect to, to terminate. Only useful for
+IRCops, thank goodness. Takes no arguments. 
 
 =item restart
 
-Tells the IRC server you're connected to to shut down and restart itself.
+Tells the IRC server you're connected to, to shut down and restart itself.
 Only useful for IRCops, thank goodness. Takes no arguments.
 
 =item sconnect
@@ -2991,6 +3165,77 @@ about it. ARG0 is the text of the server's message.
        delete $_[OBJECT]->{cookies}->{$filename};
        #TODO beware a possible memory leak here...
     }# if($type eq 'ACCEPT')
+
+=back
+
+=head1 SIGNALS
+
+The component will handle a number of custom signals that you may send using 
+L<POE::Kernel> signal() method.
+
+=over
+
+=item POCOIRC_REGISTER
+
+Registering with multiple PoCo-IRC components has been a pita. Well, no more,
+using the power of L<POE::Kernel> signals.
+
+If the component receives a 'POCOIRC_REGISTER' signal it'll register the requesting
+session and trigger an 'irc_registered' event. From that event one can get all the 
+information necessary such as the poco-irc object and the SENDER session to do 
+whatever one needs to build a poco-irc dispatch table.
+
+The way the signal handler in PoCo-IRC is written also supports sending the 
+'POCOIRC_REGISTER' to multiple sessions simultaneously, by sending the signal to the 
+POE Kernel itself.
+
+Pass the signal your session, session ID or alias, and the IRC events ( as specified
+to 'register' ).
+
+To register with multiple PoCo-IRCs one can do the following in your session's _start
+handler:
+
+  sub _start {
+     my ($kernel,$session) = @_[KERNEL,SESSION];
+
+     # Registering with multiple pocoircs for 'all' IRC events
+     $kernel->signal( $kernel, 'POCOIRC_REGISTER', $session->ID(), 'all' );
+
+     undef;
+  }
+
+Each poco-irc will send your session an 'irc_registered' event:
+
+  sub irc_registered {
+     my ($kernel,$sender,$heap,$irc_object) = @_[KERNEL,SENDER,HEAP,ARG0];
+     
+     # Get the poco-irc session ID 
+     my $sender_id = $sender->ID();
+     
+     # Or it's alias
+     my $poco_alias = $irc_object->session_alias();
+
+     # Store it in our heap maybe
+     $heap->{irc_objects}->{ $sender_id } = $irc_object;
+
+     # Make the poco connect 
+     $irc_object->yield( connect => { } );
+
+     undef;
+  }
+
+=item POCOIRC_SHUTDOWN
+
+Telling multiple poco-ircs to shutdown was a pita as well. The same principle as
+with registering applies to shutdown too.
+
+Send a 'POCOIRC_SHUTDOWN' to the POE Kernel to terminate all the active poco-ircs
+simultaneously.
+
+  $poe_kernel->signal( $poe_kernel, 'POCOIRC_SHUTDOWN' );
+
+Any additional parameters passed to the signal will become your quit messages on 
+each IRC network.
 
 =back
 
