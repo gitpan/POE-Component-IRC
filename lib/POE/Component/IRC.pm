@@ -32,8 +32,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.95';
-$REVISION = do {my@r=(q$Revision: 212 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '4.96';
+$REVISION = do {my@r=(q$Revision: 222 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -41,8 +41,6 @@ $REVISION = do {my@r=(q$Revision: 212 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 #		the same name, gets passed to POE::Session->create as $self => [ ];
 #	  $self->{OBJECT_STATES_HASHREF} contains event mappings to methods, where the
 #		event and the method have diferent names.
-#	  $self->{IRC_EVTS} is an array of IRC events that the component will register to
-#		receive from itself. Should be specified without the 'irc_' prefix.
 #	  $self->{IRC_CMDS} contains the traditional %irc_commands, mapping commands to events
 #		and the priority that the command has.
 
@@ -668,7 +666,7 @@ sub _sock_up {
 
 # Set up the component's IRC session.
 sub _start {
-  my ($kernel, $session, $self, $alias) = @_[KERNEL, SESSION, OBJECT, ARG0];
+  my ($kernel, $session, $sender, $self, $alias) = @_[KERNEL, SESSION, SENDER, OBJECT, ARG0];
   my @options = @_[ARG1 .. $#_];
 
   $kernel->state( '_poco_irc_sig_register' => $self );
@@ -692,7 +690,6 @@ sub _start {
      $self->{alias} = "$self";
   }
 
-  $kernel->yield( 'register', @{ $self->{IRC_EVTS} } ) if $self->{IRC_EVTS} and scalar @{ $self->{IRC_EVTS} };
   $self->{ircd_filter} = POE::Filter::IRCD->new( DEBUG => $self->{debug} );
   $self->{ircd_compat} = POE::Filter::IRC::Compat->new( DEBUG => $self->{debug} );
   $self->{ctcp_filter} = POE::Filter::CTCP->new();
@@ -717,6 +714,15 @@ sub _start {
 
   $self->{isupport} = POE::Component::IRC::Plugin::ISupport->new();
   $self->plugin_add( 'ISupport' . $self->{SESSION_ID}, $self->{isupport} );
+
+  if ( $kernel != $sender ) {
+    my $sender_id = $sender->ID;
+    $self->{events}->{'irc_all'}->{$sender_id} = $sender_id;
+    $self->{sessions}->{$sender_id}->{'ref'} = $sender_id;
+    $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
+    $kernel->post( $sender, 'irc_registered', $self );
+  }
+
   return 1;
 }
 
@@ -2377,6 +2383,40 @@ So the following would be functionally equivalent:
 
 =over
 
+=item register
+
+Takes N arguments: a list of event names that your session wants to
+listen for, minus the "irc_" prefix. So, for instance, if you just
+want a bot that keeps track of which people are on a channel, you'll
+need to listen for JOINs, PARTs, QUITs, and KICKs to people on the
+channel you're in. You'd tell POE::Component::IRC that you want those
+events by saying this:
+
+  $kernel->post( 'my client', 'register', qw(join part quit kick) );
+
+Then, whenever people enter or leave a channel your bot is on (forcibly
+or not), your session will receive events with names like "irc_join",
+"irc_kick", etc., which you can use to update a list of people on the
+channel.
+
+Registering for C<'all'> will cause it to send all IRC-related events to
+you; this is the easiest way to handle it. See the test script for an
+example.
+
+Registering will generate an 'irc_registered' event that your session can
+trap. ARG0 is the components object. Useful if you want to bolt PoCo-IRC's
+new features such as Plugins into a bot coded to the older deprecated API.
+If you are using the new API, ignore this :)
+
+Registering with multiple component sessions can be tricky, especially if
+one wants to marry up sessions/objects, etc. Check 'SIGNALS' section of this
+documentation for an alternative method of registering with multiple poco-ircs.
+
+Starting with version 4.96, if you spawn the component from inside another POE
+session, the component will automatically register that session as wanting 'all'
+irc events. That session will receive an 'irc_registered' event indicating that
+the component is up and ready to go.
+
 =item connect
 
 Takes one argument: a hash reference of attributes for the new
@@ -2551,41 +2591,36 @@ you specify. Takes 2 arguments: the nick or channel to send a message
 to (use an array reference here to specify multiple recipients), and
 the text of the message to send.
 
+To send IRC colours wrap the text you want coloured with \x03 followed
+by the colour code, your text and a \x03 to switch back.
+
+  $kernel->post( $sender => privmsg => $channel => "Foo \x034bar\x03" );
+
+The colour codes are:
+
+    1 - Black
+    2 - Navy Blue
+    3 - Green
+    4 - Red
+    5 - Brown
+    6 - Purple
+    7 - Olive
+    8 - Yellow
+    9 - Lime Green
+    10 - Teal
+    11 - Aqua Light
+    12 - Royal Blue
+    13 - Hot Pink
+    14 - Dark Gray
+    15 - Light Gray
+    16 - White 
+
 =item quit
 
 Tells the IRC server to disconnect you. Takes one optional argument:
 some clever, witty string that other users in your channels will see
 as you leave. You can expect to get an C<irc_disconnect> event shortly
 after sending this.
-
-=item register
-
-Takes N arguments: a list of event names that your session wants to
-listen for, minus the "irc_" prefix. So, for instance, if you just
-want a bot that keeps track of which people are on a channel, you'll
-need to listen for JOINs, PARTs, QUITs, and KICKs to people on the
-channel you're in. You'd tell POE::Component::IRC that you want those
-events by saying this:
-
-  $kernel->post( 'my client', 'register', qw(join part quit kick) );
-
-Then, whenever people enter or leave a channel your bot is on (forcibly
-or not), your session will receive events with names like "irc_join",
-"irc_kick", etc., which you can use to update a list of people on the
-channel.
-
-Registering for C<'all'> will cause it to send all IRC-related events to
-you; this is the easiest way to handle it. See the test script for an
-example.
-
-Registering will generate an 'irc_registered' event that your session can
-trap. ARG0 is the components object. Useful if you want to bolt PoCo-IRC's
-new features such as Plugins into a bot coded to the older deprecated API.
-If you are using the new API, ignore this :)
-
-Registering with multiple component sessions can be tricky, especially if
-one wants to marry up sessions/objects, etc. Check 'SIGNALS' section of this
-documentation for an alternative method of registering with multiple poco-ircs.
 
 =item shutdown
 
@@ -2992,6 +3027,7 @@ keys:
   'server', their server ( might not be useful on some networks );
   'oper', whether they are an IRCop, contains the IRC operator string if they are, 
           undef if they aren't.
+  'actually', some ircds report the users actual ip address, that'll be here;
 
 On Freenode if the user has identified with NICKSERV there will be an additional key:
 
@@ -3248,6 +3284,14 @@ Chris 'BinGOs' Williams E<lt>chris@bingosnet.co.ukE<gt>
 =head1 AUTHOR
 
 Dennis Taylor.
+
+=head1 LICENCE
+
+Copyright (c) Dennis Taylor and Chris Williams
+
+This module may be used, modified, and distributed under the same
+terms as Perl itself. Please see the license that came with your Perl
+distribution for details.
 
 =head1 MAD PROPS
 
