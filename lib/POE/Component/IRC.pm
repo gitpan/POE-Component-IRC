@@ -32,8 +32,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '4.96';
-$REVISION = do {my@r=(q$Revision: 222 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '4.97';
+$REVISION = do {my@r=(q$Revision: 226 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -155,7 +155,7 @@ sub _create {
 				      unregister
 				      userhost )];
 
-  $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close' };
+  $self->{OBJECT_STATES_HASHREF} = { @event_map, '_tryclose' => 'dcc_close', 'quote' => 'sl' };
 
   return 1;
 }
@@ -1219,6 +1219,7 @@ sub oneandtwoopt {
   my $arg = join '', @_[ARG0 .. $#_];
   my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
+  $state = 'connect' if $state eq 'sconnect';
   $state = uc $state;
   if (defined $arg) {
     $arg = ':' . $arg if $arg =~ /\s/;
@@ -2724,7 +2725,7 @@ for. If called without any channel names, it'll tell you the nicks of
 everyone on the IRC network. This is a really big list, so don't do
 this much.
 
-=item sl
+=item quote
 
 Sends a raw line of text to the server. Takes one argument: a string
 of a raw IRC command to send to the server. It is more optimal to use
