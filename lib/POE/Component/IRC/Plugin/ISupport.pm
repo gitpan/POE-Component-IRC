@@ -5,7 +5,7 @@ use warnings;
 
 use POE::Component::IRC::Plugin qw(:ALL);
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 sub new {
   return bless { }, shift;
@@ -88,8 +88,9 @@ sub S_005 {
         }
       }
       elsif ($key eq 'PREFIX') {
-        my ($k, $v) = $val =~ /\(([^)]+)\)(.*)/;
-        @{ $support->{$key} }{split //, $k} = split //, $v;
+        if ( my ($k, $v) = $val =~ /\(([^)]+)\)(.*)/ ) {
+          @{ $support->{$key} }{split //, $k} = split //, $v;
+	}
       }
       elsif ($key eq 'SILENCE') {
         $support->{$key} = length($val) ? $val : 'off';
