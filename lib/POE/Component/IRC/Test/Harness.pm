@@ -16,7 +16,7 @@ use POE::Component::IRC::Common qw(:ALL);
 
 use vars qw($VERSION);
 
-$VERSION = '0.4';
+$VERSION = '0.5';
 
 use constant PCSI_REFCOUNT_TAG => "P::C::S::I registered";
 
