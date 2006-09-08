@@ -32,8 +32,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.01';
-$REVISION = do {my@r=(q$Revision: 239 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.02';
+$REVISION = do {my@r=(q$Revision: 242 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -1405,8 +1405,8 @@ sub shutdown {
   $args = join '', @_[ARG0..$#_] if scalar @_[ARG0..$#_];
   $args = ':' . $args if $args and $args =~ /\s/;
   my $cmd = join ' ', 'QUIT', $args || '';
-  $kernel->signal( 'POCOIRC_REGISTER' );
-  $kernel->signal( 'POCOIRC_SHUTDOWN' );
+  $kernel->sig( 'POCOIRC_REGISTER' );
+  $kernel->sig( 'POCOIRC_SHUTDOWN' );
   $self->{_shutdown} = 1;
   $self->_send_event( 'irc_shutdown', $_[SENDER]->ID() );
   $self->_unregister_sessions();
