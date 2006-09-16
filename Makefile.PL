@@ -1,8 +1,7 @@
 # $Id: Makefile.PL,v 3.9 2005/04/14 19:23:16 chris Exp $
 
-use ExtUtils::MakeMaker;
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
+#use ExtUtils::MakeMaker;
+use inc::Module::Install;
 
 my $GOT_DNS;
 
@@ -31,6 +30,9 @@ is firewalled then these tests will fail.
 NOTICE
 
 _no_dns() unless $GOT_DNS;
+
+license 'perl';
+author 'Chris Williams <chris@bingosnet.co.uk>';
 
 WriteMakefile(
 			  'NAME'	=> 'POE::Component::IRC',
