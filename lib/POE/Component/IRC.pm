@@ -32,8 +32,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.17';
-$REVISION = do {my@r=(q$Revision: 281 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.18';
+$REVISION = do {my@r=(q$Revision: 285 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -1631,11 +1631,9 @@ sub spacesep {
 
 # Set or query the current topic on a channel.
 sub topic {
-  my ($kernel, $chan) = @_[KERNEL, ARG0];
+  my ($kernel,$chan,@args) = @_[KERNEL,ARG0,ARG1..$#_];
   my $topic; 
-  if ( scalar @_[ARG1 .. $#_] ) {
-	$topic = join '', @_[ARG1 .. $#_];
-  }
+  $topic = join '', @args if scalar @args;
 
   if ( defined $topic ) {
      $chan .= " :";
