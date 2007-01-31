@@ -32,8 +32,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.18';
-$REVISION = do {my@r=(q$Revision: 285 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.19';
+$REVISION = do {my@r=(q$Revision: 287 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -2037,10 +2037,10 @@ sub _plugin_process {
 
     if ( $plugin->can($sub) ) {
       eval { $ret = $plugin->$sub($self,@args) };
-      warn "$sub call failed with $@\n" if $@ and $self->{plugin_debug};
+      warn "$sub call failed with '$@'\n" if $@ and $self->{plugin_debug};
     } elsif ( $plugin->can('_default') ) {
       eval { $ret = $plugin->_default($self,$sub,@args) };
-      warn "_default call failed with $@\n" if $@ and $self->{plugin_debug};
+      warn "_default call failed with '$@'\n" if $@ and $self->{plugin_debug};
     }
 
     return $return if $ret == PCI_EAT_PLUGIN;
