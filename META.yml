@@ -2,7 +2,6 @@ author: Chris Williams <chris@bingosnet.co.uk>
 distribution_type: module
 generated_by: Module::Install version 0.64
 license: perl
-module_name: POE::Component::IRC
 name: POE-Component-IRC
 no_index: 
   directory: 
@@ -15,4 +14,5 @@ requires:
   POSIX: 0
   Socket: 0
   warnings: 0
-version: 5.19
+tests: t/*.t t/*/*.t
+version: 5.20
