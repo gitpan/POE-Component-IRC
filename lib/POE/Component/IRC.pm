@@ -23,6 +23,7 @@ use POE::Component::IRC::Plugin::Whois;
 use POE::Component::IRC::Plugin::ISupport;
 use POE::Component::IRC::Constants;
 use POE::Component::IRC::Pipeline;
+use POE::Component::IRC::Common qw(:ALL);
 use Carp;
 use Socket;
 use File::Basename ();
@@ -32,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.22';
-$REVISION = do {my@r=(q$Revision: 293 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.23';
+$REVISION = do {my@r=(q$Revision: 305 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -46,6 +47,7 @@ $REVISION = do {my@r=(q$Revision: 293 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 my $GOT_SSL;
 my $GOT_CLIENT_DNS;
+my $GOT_SOCKET6;
 
 # Check for SSL availability
 BEGIN {
@@ -65,6 +67,16 @@ BEGIN {
 		if ( $POE::Component::Client::DNS::VERSION >= 0.99 ) {
 			$GOT_CLIENT_DNS = 1;
 		}
+	};
+}
+
+# Check if we have Socket6
+BEGIN {
+	$GOT_SOCKET6 = 0;
+	eval {
+		require Socket6;
+		import Socket6;
+		$GOT_SOCKET6 = 1;
 	};
 }
 
@@ -141,6 +153,7 @@ sub _create {
 				      dcc_resume
 				      dcc_chat
 				      dcc_close
+				      _resolve_addresses
 				      _do_connect
 				      _send_login
 				      _got_dns_response
@@ -203,6 +216,9 @@ sub _configure {
     $self->{'socks_proxy'} = $arg{'socks_proxy'} if exists $arg{'socks_proxy'};
     $self->{'socks_port'} = $arg{'socks_port'} if exists $arg{'socks_port'};
     $self->{'socks_id'} = $arg{'socks_id'} if exists $arg{'socks_id'};
+    $self->{'useipv6'} = $arg{'useipv6'} if exists $arg{'useipv6'};
+    warn "'useipv6' specified, but Socket6 isn't loaded\n" 
+	if $self->{'useipv6'} and !$GOT_SOCKET6;
 
     if (exists $arg{'debug'}) {
       $self->{'debug'} = $arg{'debug'};
@@ -619,7 +635,14 @@ sub _sock_up {
   delete $self->{'socketfactory'};
 
   # Remember what IP address we're connected through, for multihomed boxes.
-  $self->{'localaddr'} = (unpack_sockaddr_in( getsockname $socket ))[1];
+  my $localaddr;
+  if ( $GOT_SOCKET6 ) {
+    eval {
+	$localaddr = (unpack_sockaddr_in6( getsockname $socket ))[1];
+    };
+  }
+  $localaddr = (unpack_sockaddr_in( getsockname $socket ))[1] unless $localaddr;
+  $self->{'localaddr'} = $localaddr;
 
   if ( $self->{socks_proxy} ) {
     $self->{'socket'} = new POE::Wheel::ReadWrite
@@ -635,7 +658,7 @@ sub _sock_up {
 	return;
     }
     my $packet;
-    if ( $self->{server} =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ ) {
+    if ( irc_ip_is_ipv4( $self->{server} ) ) {
       # SOCKS 4
       $packet = pack ('CCn', 4, 1, $self->{port}) .
 	inet_aton($self->{server}) . ( $self->{socks_id} || '' ) . (pack 'x');
@@ -872,9 +895,7 @@ sub connect {
     }
   }
 
-  foreach my $key ( keys %arg ) {
-	$arg{ lc $key } = delete $arg{$key};
-  }
+  $arg{ lc $_ } = delete $arg{$_} for keys %arg;
 
   $self->_configure( \%arg );
 
@@ -884,12 +905,10 @@ sub connect {
   }
 
   # try and use non-blocking resolver if needed
-  if ( $self->{resolver} && $self->{'server'} !~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/ && !$self->{'NoDNS'} ) {
-    my $response = $self->{resolver}->resolve( event => "_got_dns_response", host =>  $self->{'server'}, context => { } );
-    if ( $response ) {
-	$kernel->yield( _got_dns_response => $response );
-    }
-  } else {
+  if ( $self->{resolver} && !irc_ip_get_version( $self->{'server'} ) && !$self->{'NoDNS'} ) {
+    $kernel->yield( _resolve_addresses => $self->{'server'}, ( $GOT_SOCKET6 ? 'AAAA' : 'A' ) );
+  } 
+  else {
     $kernel->yield("_do_connect");
   }
 
@@ -897,18 +916,63 @@ sub connect {
   undef;
 }
 
+sub _resolve_addresses {
+  my ($kernel,$self,$hostname,$type) = @_[KERNEL,OBJECT,ARG0..ARG1];
+  my $response = $self->{resolver}->resolve( 
+	event => '_got_dns_response', 
+	host => $hostname,
+	type => $type, 
+	context => { }, 
+  );
+  $kernel->yield( _got_dns_response => $response ) if $response;
+  return;
+}
+
 # open the connection
 sub _do_connect {
   my ($kernel,$self,$session) = @_[KERNEL,OBJECT,SESSION];
+  my $domain = AF_INET;
 
   # Disconnect if we're already logged into a server.
   $kernel->call( $session, 'quit' ) if $self->{'socket'};
 
   $self->{socks_port} = 1080 if $self->{socks_proxy} and !$self->{socks_port};
 
+  if ( $self->{socks_proxy} and irc_ip_is_ipv6( $self->{socks_proxy} ) ) {
+	unless ( $GOT_SOCKET6 ) {
+	   warn "IPv6 address specified for 'socks_proxy' but Socket6 not found\n";
+	   return;
+	}
+	$domain = AF_INET6;
+  }
+  elsif ( $self->{proxy} and irc_ip_is_ipv6( $self->{proxy} ) ) {
+	unless ( $GOT_SOCKET6 ) {
+	   warn "IPv6 address specified for 'proxy' but Socket6 not found\n";
+	   return;
+	}
+	$domain = AF_INET6;
+  }
+  elsif ( $self->{server} and irc_ip_is_ipv6( $self->{server} ) ) {
+	unless ( $GOT_SOCKET6 ) {
+	   warn "IPv6 address specified for 'server' but Socket6 not found\n";
+	   return;
+	}
+	$domain = AF_INET6;
+  }
+  elsif ( $self->{localaddr} and irc_ip_is_ipv6( $self->{localaddr} ) ) {
+	unless ( $GOT_SOCKET6 ) {
+	   warn "IPv6 address specified for 'localaddr' but Socket6 not found\n";
+	   return;
+	}
+	$domain = AF_INET6;
+  }
+  elsif ( $self->{useipv6} and $GOT_SOCKET6 ) {
+  	$domain = AF_INET6;
+  }
+
   $self->{'socketfactory'} =
   POE::Wheel::SocketFactory->new( 
-	SocketDomain   => AF_INET,
+	SocketDomain   => $domain,
 	SocketType     => SOCK_STREAM,
 	SocketProtocol => 'tcp',
 	RemoteAddress  => $self->{socks_proxy} || $self->{'proxy'} || $self->{'server'},
@@ -924,25 +988,31 @@ sub _do_connect {
 # got response from POE::Component::Client::DNS
 sub _got_dns_response {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-  my ($net_dns_packet) = $_[ARG0]->{response};
-  my ($net_dns_errorstring) = $_[ARG0]->{error};
-  $self->{res_addresses} = [ ] unless $self->{res_addresses};
+  my $type = uc $_[ARG0]->{type};
+  my $net_dns_packet = $_[ARG0]->{response};
+  my $net_dns_errorstring = $_[ARG0]->{error};
+  $self->{res_addresses} = [ ];
 
-  unless(defined $net_dns_packet) {
+  unless(defined $net_dns_packet and $type eq 'AAAA') {
     $self->_send_event( 'irc_socketerr', $net_dns_errorstring );
     return;
   }
 
   my @net_dns_answers = $net_dns_packet->answer;
 
-  unless (@net_dns_answers) {
+  unless (@net_dns_answers and $type eq 'AAAA') {
     $self->_send_event( 'irc_socketerr', "Unable to resolve $self->{'server'}");
     return;
   }
 
   foreach my $net_dns_answer (@net_dns_answers) {
-    next unless $net_dns_answer->type eq "A";
+    next unless $net_dns_answer->type =~ /^A/;
     push @{ $self->{res_addresses} }, $net_dns_answer->rdatastr;
+  }
+
+  if ( !scalar @{ $self->{res_addresses} } and $type eq 'AAAA') {
+    $kernel->yield( _resolve_addresses => $self->{'server'}, 'A' );
+    return;
   }
 
   if ( my $address = shift @{ $self->{res_addresses} } ) {
@@ -2568,6 +2638,7 @@ connection are:
   "socks_proxy", specify a SOCKS4/SOCKS4a proxy to use.
   "socks_port", the SOCKS port to use, defaults to 1080 if not specified.
   "socks_id", specify a SOCKS user_id. Default is none.
+  "useipv6", force the use of IPv6 for connections.
 
 C<connect()> will supply
 reasonable defaults for any of these attributes which are missing, so
@@ -2614,6 +2685,9 @@ dns lookups using it.
 
 SOCKS4 proxy support is provided by 'socks_proxy', 'socks_port' and 'socks_id' parameters. If something goes wrong
 with the SOCKS connection you should get a warning on STDERR. This is fairly experimental currently.
+
+IPv6 support is available for connecting to IPv6 enabled ircds ( it won't work for DCC though ).
+L<Socket6> is required to be installed. If you have L<Socket6> and L<POE::Component::Client::DNS> installed and specify a hostname that resolves to an IPv6 address then IPv6 support is automagically enabled. If you specify an ipv6 'localaddr' then IPv6 is enabled. You may also force the component to use IPv6 by setting 'useipv6'
 
 =item ctcp and ctcpreply
 
