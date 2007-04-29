@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.24';
-$REVISION = do {my@r=(q$Revision: 307 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.25';
+$REVISION = do {my@r=(q$Revision: 309 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -906,7 +906,7 @@ sub connect {
 
   # try and use non-blocking resolver if needed
   if ( $self->{resolver} && !irc_ip_get_version( $self->{'server'} ) && !$self->{'NoDNS'} ) {
-    $kernel->yield( _resolve_addresses => $self->{'server'}, ( $self->{useipv6} and $GOT_SOCKET6 ? 'AAAA' : 'A' ) );
+    $kernel->yield( _resolve_addresses => $self->{'server'}, ( $self->{useipv6} && $GOT_SOCKET6 ? 'AAAA' : 'A' ) );
   } 
   else {
     $kernel->yield("_do_connect");
