@@ -1,7 +1,9 @@
 --- 
 author: Chris Williams <chris@bingosnet.co.uk>
+build_requires: 
+  Test::More: 0.47
 distribution_type: module
-generated_by: Module::Install version 0.65
+generated_by: Module::Install version 0.67
 license: perl
 meta-spec: 
   url: http://module-build.sourceforge.net/META-spec-v1.3.html
@@ -19,4 +21,4 @@ requires:
   Socket: 0
   warnings: 0
 tests: t/*.t t/*/*.t
-version: 5.30
+version: 5.31_01
