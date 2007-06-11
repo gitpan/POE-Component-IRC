@@ -1,19 +1,19 @@
---- 
-author: Chris Williams <chris@bingosnet.co.uk>
-build_requires: 
+---
+author: 'Chris Williams <chris@bingosnet.co.uk>'
+build_requires:
   Test::More: 0.47
 distribution_type: module
 generated_by: Module::Install version 0.67
 license: perl
-meta-spec: 
+meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.3.html
   version: 1.3
 name: POE-Component-IRC
-no_index: 
-  directory: 
+no_index:
+  directory:
     - inc
     - t
-requires: 
+requires:
   Carp: 0
   POE: 0.3202
   POE::Filter::IRCD: 1.7
@@ -21,4 +21,4 @@ requires:
   Socket: 0
   warnings: 0
 tests: t/*.t t/*/*.t
-version: 5.31_04
+version: 5.31_05
