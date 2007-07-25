@@ -1,4 +1,5 @@
 --- 
+abstract: a fully event-driven IRC client module.
 author: Chris Williams <chris@bingosnet.co.uk>
 build_requires: 
   Test::More: 0.47
@@ -21,4 +22,4 @@ requires:
   Socket: 0
   warnings: 0
 tests: t/*.t t/*/*.t
-version: 5.33_01
+version: 5.34
