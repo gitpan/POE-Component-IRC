@@ -23,4 +23,4 @@ requires:
   Socket: 0
   warnings: 0
 tests: t/*.t t/*/*.t
-version: 5.46
+version: 5.48
