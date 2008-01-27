@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.52';
-$REVISION = do {my@r=(q$Revision: 363 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.54';
+$REVISION = do {my@r=(q$Revision: 373 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -2403,6 +2403,10 @@ A number of useful plugins have made their way into the core distribution:
 
 =over 
 
+=item L<POE::Component::IRC::Plugin::AutoJoin>
+
+Keeps you on your favorite channels throughout reconnects and even kicks.
+
 =item L<POE::Component::IRC::Plugin::Connector>
 
 Glues an irc bot to an IRC network, ie. deals with maintaining ircd connections.
@@ -2418,6 +2422,18 @@ Generates 'irc_bot_addressed' events whenever someone addresses your bot by name
 =item L<POE::Component::IRC::Plugin::Console>
 
 See inside the component. See what events are being sent. Generate irc commands manually. A TCP based console.
+
+=item L<POE::Component::IRC::Plugin::FollowTail>
+
+Follow the tail of an ever-growing file.
+
+=item L<POE::Component::IRC::Plugin::Logger>
+
+Log public and private messages to disk.
+
+=item L<POE::Component::IRC::Plugin::NickServID>
+
+Identify with FreeNode's NickServ when needed.
 
 =item L<POE::Component::IRC::Plugin::Proxy>
 
