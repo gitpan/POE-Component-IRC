@@ -1,5 +1,15 @@
 Revision history for Perl extension POE::Component::IRC.
 
+5.56  Thu Jan 31 12:30:25 GMT 2008
+    - AutoJoin.pm: Silence some warnings (Hinrik)
+    - Logger.pm: Add SortByDate argument to rotate logs (Hinrik)
+    - Logger.pm: output something in English for every channel mode change (Hinrik)
+    - Logger.pm: made the ACTION syntax distinct from the MODE syntax
+      to allow for sane parsing of log files (Hinrik)
+    - Fix bug causing NickReclaim plugin to only try to reclaim once (Hinrik)
+    - Fix NICK/QUIT logging in Logger plugin (Hinrik)
+    - Minor improvement and documentation update to BotAddressed plugin (Hinrik)
+
 5.54  Sun Jan 27 09:21:27 GMT 2008
     - Hinrik added numerous groovey plugins. Hinrik++
 

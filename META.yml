@@ -21,6 +21,5 @@ requires:
   POE::Filter::IRCD: 1.7
   POSIX: 0
   Socket: 0
-  warnings: 0
 tests: t/*.t t/*/*.t
-version: 5.54
+version: 5.56
