@@ -40,7 +40,7 @@ sub S_public {
   my $channel = ${ $_[1] }->[0];
   my $what = ${ $_[2] };
   my $mynick = $irc->nick_name();
-  my ($cmd) = $what =~ m/^\s*\Q$mynick\E[\:\,\;\.]?\s*(.*)$/i;
+  my ($cmd) = $what =~ m/^\s*\Q$mynick\E[\:\,\;\.\~]?\s*(.*)$/i;
 
   if (defined $cmd) {
     $irc->_send_event( ( $self->{event} || 'irc_bot_addressed' ) => $who => [ $channel ] => $cmd );
@@ -59,7 +59,7 @@ __END__
 
 =head1 NAME
 
-POE::Component::IRC::Plugin::BotAddressed - A POE::Component::IRC plugin that generates an 'irc_bot_addressed', 'irc_bot_mentioned' or 'irc_bot_mentioned_action' event if its name comes up in channel discussion.
+POE::Component::IRC::Plugin::BotAddressed - A PoCo-IRC plugin that generates an 'irc_bot_addressed', 'irc_bot_mentioned' or 'irc_bot_mentioned_action' event if its name comes up in channel discussion.
 
 =head1 SYNOPSIS
 

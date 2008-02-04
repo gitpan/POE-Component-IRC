@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.56';
-$REVISION = do {my@r=(q$Revision: 397 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.58';
+$REVISION = do {my@r=(q$Revision: 405 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -2417,7 +2417,7 @@ Under normal circumstances irc bots do not normal the msgs and public msgs that 
 
 =item L<POE::Component::IRC::Plugin::BotAddressed>
 
-Generates 'irc_bot_addressed' events whenever someone addresses your bot by name in a channel.
+Generates 'irc_bot_addressed' / 'irc_bot_mentioned' / 'irc_bot_mentioned_action' events whenever your bot's name comes up in channel discussion.
 
 =item L<POE::Component::IRC::Plugin::Console>
 

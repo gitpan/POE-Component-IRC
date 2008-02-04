@@ -15,6 +15,7 @@ sub new {
     
     # the $irc->nick_name() and offending nickname will be...
     #...the same on start, thus won't change
+    $args{_claims} = 0;
     $args{_did_start} = 0;
     
     return bless \%args, $package;
@@ -123,7 +124,7 @@ __END__
 
 =head1 NAME
 
-POE::Component::IRC::Plugin::NickReclaim - a plugin for reclaiming nickname.
+POE::Component::IRC::Plugin::NickReclaim - A PoCo-IRC plugin for reclaiming nickname.
 
 =head1 SYNOPSIS
 
