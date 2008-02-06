@@ -8,10 +8,10 @@ use Encode::Guess;
 use Fcntl;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Plugin::BotTraffic;
-use POE::Component::IRC::Common qw( l_irc parse_user );
+use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting );
 use POSIX qw(strftime);
 
-my $VERSION = '1.2';
+my $VERSION = '1.3';
 
 sub new {
     my ($package, %self) = @_;
@@ -99,7 +99,7 @@ sub PCI_register {
             return $line;
         },
         quit         => sub {
-            my ($nick, $userhost, $chan, $msg) = @_;
+            my ($nick, $userhost, $msg) = @_;
             my $line = "<-- $nick ($userhost) quits";
             $line .= " ($msg)" if $msg ne '';
             return $line;
@@ -127,7 +127,8 @@ sub S_001 {
 
 sub S_332 {
     my ($self, $irc) = splice @_, 0, 2;
-    my ($chan, $topic) = @{ ${ $_[2] } };
+    my $chan = ${ $_[2] }->[0];
+    my $topic = $self->_normalize( ${ $_[2] }->[1] );
     # only log this if we were just joining the channel
     $self->_log_entry($chan, topic_is => $chan, $topic) if !$irc->channel_list($chan);
     return PCI_EAT_NONE;
@@ -146,7 +147,7 @@ sub S_chan_mode {
     my ($self, $irc) = splice @_, 0, 2;
     my $nick = parse_user(${ $_[0] });
     my $chan = ${ $_[1] };
-    my ($mode) = ${ $_[2] };
+    my $mode = ${ $_[2] };
     my $arg = ${ $_[3] };
     $self->_log_entry($chan, $mode => $nick, $arg);
     return PCI_EAT_NONE;
@@ -156,7 +157,7 @@ sub S_ctcp_action {
     my ($self, $irc) = splice @_, 0, 2;
     my $sender = parse_user(${ $_[0] });
     my $recipients = ${ $_[1] };
-    my $msg = ${ $_[2] };
+    my $msg = $self->_normalize( ${ $_[2] } );
     for my $recipient (@{ $recipients }) {
         $self->_log_entry($recipient, action => $sender, $msg);
     }
@@ -166,7 +167,7 @@ sub S_ctcp_action {
 sub S_bot_ctcp_action {
     my ($self, $irc) = splice @_, 0, 2;
     my $recipients = ${ $_[0] };
-    my $msg = ${ $_[1] };
+    my $msg = $self->_normalize( ${ $_[1] } );
     for my $recipient (@{ $recipients }) {
         $self->_log_entry($recipient, action => $irc->nick_name(), $msg);
     }
@@ -176,7 +177,7 @@ sub S_bot_ctcp_action {
 sub S_bot_msg {
     my ($self, $irc) = splice @_, 0, 2;
     my $recipients = ${ $_[0] };
-    my $msg = ${ $_[1] };
+    my $msg = $self->_normalize( ${ $_[1] } );
     for my $recipient (@{ $recipients }) {
         $self->_log_entry($recipient, privmsg => $irc->nick_name(), $msg);
     }
@@ -186,7 +187,7 @@ sub S_bot_msg {
 sub S_bot_public {
     my ($self, $irc) = splice @_, 0, 2;
     my $channels = ${ $_[0] };
-    my $msg = ${ $_[1] };
+    my $msg = $self->_normalize( ${ $_[1] } );
     for my $chan (@{ $channels }) {
         $self->_log_entry($chan, privmsg => $irc->nick_name(), $msg);
     }
@@ -206,7 +207,7 @@ sub S_kick {
     my $kicker = parse_user(${ $_[0] });
     my $chan = ${ $_[1] };
     my $victim = ${ $_[2] };
-    my $msg = ${ $_[3] };
+    my $msg = $self->_normalize( ${ $_[3] } );
     $self->_log_entry($chan, kick => $kicker, $victim, $chan, $msg);
     return PCI_EAT_NONE;
 }
@@ -214,7 +215,7 @@ sub S_kick {
 sub S_msg {
     my ($self, $irc) = splice @_, 0, 2;
     my $sender = parse_user(${ $_[0] });
-    my $msg = ${ $_[2] };
+    my $msg = $self->_normalize( ${ $_[2] } );
     $self->_log_entry($sender, privmsg => $sender, $msg);
     return PCI_EAT_NONE;
 }
@@ -234,7 +235,7 @@ sub S_part {
     my ($self, $irc) = splice @_, 0, 2;
     my ($parter, $user, $host) = parse_user(${ $_[0] });
     my $chan = ${ $_[1] };
-    my $msg = ${ $_[2] };
+    my $msg = $self->_normalize( ${ $_[2] } );
     $self->_log_entry($chan, part => $parter, "$user\@$host", $chan, $msg);
     return PCI_EAT_NONE;
 }
@@ -243,7 +244,7 @@ sub S_public {
     my ($self, $irc) = splice @_, 0, 2;
     my $sender = parse_user(${ $_[0] });
     my $channels = ${ $_[1] };
-    my $msg = ${ $_[2] };
+    my $msg = $self->_normalize( ${ $_[2] } );
     for my $chan (@{ $channels }) {
         $self->_log_entry($chan, privmsg => $sender, $msg);
     }
@@ -253,7 +254,7 @@ sub S_public {
 sub S_quit {
     my ($self, $irc) = splice @_, 0, 2;
     my ($quitter, $user, $host) = parse_user(${ $_[0] });
-    my $msg = ${ $_[1] };
+    my $msg = $self->_normalize( ${ $_[1] } );
     my $channels = @{ $_[2] }[0];
     for my $chan (@{ $channels }) {
         $self->_log_entry($chan, quit => $quitter, "$user\@$host", $msg);
@@ -265,7 +266,7 @@ sub S_topic {
     my ($self, $irc) = splice @_, 0, 2;
     my $changer = parse_user(${ $_[0] });
     my $chan = ${ $_[1] };
-    my $new_topic = ${ $_[2] };
+    my $new_topic = $self->_normalize( ${ $_[2] } );
     $self->_log_entry($chan, topic_change => $changer, $new_topic);
     return PCI_EAT_NONE;
 }
@@ -274,13 +275,12 @@ sub _log_entry {
     my ($self, $context, $type, @args) = @_;
     my ($date, $time) = split / /, (strftime '%F %T', localtime);
     $context = l_irc $context, $self->{irc}->isupport('CASEMAPPING');
-    @args = map { $self->_to_utf8($_) } @args;
 
     return unless $context =~ /^[#&+!]/ && $self->{Public} or $context !~ /^[#&+!]/ && $self->{Private};
     return unless defined $self->{Format}->{$type};
     
     my $log_file;
-    if ($self->{SortByDate}) {
+    if ($self->{Sort_by_date}) {
         if (! -d $self->{Path} . "/$context") {
             mkdir $self->{Path} . "/$context", $self->{dir_perm} or croak "Couldn't create directory " . $self->{Path} . "/$context: $!; aborted";
         }
@@ -295,7 +295,7 @@ sub _log_entry {
         $self->{logging}->{$context} = 1;
     }
     my $line = "$time " . $self->{Format}->{$type}->(@args);
-    $line = "$date $line" unless $self->{SortByDate};
+    $line = "$date $line" unless $self->{Sort_by_date};
     print $log_file "$line\n";
 }
 
@@ -307,15 +307,12 @@ sub _open_log {
     return $log;
 }
 
-sub _to_utf8 {
+sub _normalize {
     my ($self, $line) = @_;
-    my $decoder = guess_encoding($line, 'utf8');
-    if (ref $decoder) {
-        $line = $decoder->decode($line);
-    }
-    else {
-        $line = decode('cp1252', $line);
-    }
+    my $utf8 = guess_encoding($line, 'utf8');
+    $line = decode('cp1252', $line) unless ref $utf8;
+    $line = strip_color($line) if $self->{Strip_color};
+    $line = strip_formatting($line) if $self->{Strip_formatting};
     return $line;
 }
 
@@ -339,10 +336,10 @@ logs public and private messages to disk.
 =head1 DESCRIPTION
 
 POE::Component::IRC::Plugin::Logger is a L<POE::Component::IRC|POE::Component::IRC> plugin.
-It logs messages and CTCP ACTIONs to either #some_channel.log or some_nickname.log in the supplied path.
-It tries to detect UTF-8 encoding of every message or else falls back to
-CP1252, like irssi (and, supposedly, mIRC) does by default. The default log format is similar to xchat's,
-except that it's sane and parsable.
+It logs messages and CTCP ACTIONs to either C<#some_channel.log> or C<some_nickname.log> in the supplied path.
+It tries to detect UTF-8 encoding of every message or else falls back to CP1252, like irssi
+(and, supposedly, mIRC) does by default. Resulting log files will be UTF-8 encoded. The default
+log format is similar to xchat's, except that it's sane and parsable.
 
 This plugin requires the IRC component to be L<POE::Component::IRC::State|POE::Component::IRC::State>
 or a subclass thereof. It also requires a L<POE::Component::IRC::Plugin::BotTraffic|POE::Component::IRC::Plugin::BotTraffic>
@@ -362,9 +359,13 @@ Arguments:
 
 'Public', whether or not to log public messages. Defaults to 1.
 
-'SortByDate', whether or not to split log files by date, i.e. C<#channel/YYYY-MM-DD.log>
+'Sort_by_date', whether or not to split log files by date, i.e. C<#channel/YYYY-MM-DD.log>
 instead of C<#channel.log>. If enabled, the date will be omitted from the timestamp.
 Defaults to 0.
+
+'Strip_color', whether or not to strip all color codes from messages. Defaults to 0.
+
+'Strip_formatting', whether or not to strip all formatting codes from messages. Defaults to 0.
 
 'Restricted', set this to 1 if you want to all directories/files to be created without
 read permissions for other users (i.e. 700 for dirs and 600 for files). Defaults to 0.
