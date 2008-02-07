@@ -8,8 +8,9 @@ Exporter::export_ok_tags( 'ALL' );
 
 use strict;
 use warnings;
+use vars qw($VERSION);
 
-my $VERSION = '5.14';
+$VERSION = '5.14';
 my $ERROR;
 my $ERRNO;
 
@@ -19,7 +20,9 @@ use constant {
     BOLD        => "\x02",
     UNDERLINE   => "\x1f",
     REVERSE     => "\x16",
-    # colors
+    ITALIC      => "\x1d",
+    FIXED       => "\x11",
+    # mIRC colors
     NO_COLOR    => "\x03",
     WHITE       => "\x0300",
     BLACK       => "\x0301",
@@ -166,25 +169,28 @@ sub parse_user {
 
 sub has_color {
     my $string = shift;
-    return 1 if $string =~ /\x03/;
+    return 1 if $string =~ /[\x03\x04]/;
     return 0;
 }
 
 sub has_formatting {
     my $string = shift;
-    return 1 if $string =~/[\x0f\x02\x1f\x16]/;
+    return 1 if $string =~/[\x0f\x02\x1f\x16\x1d\x11]/;
     return 0;
 }
 
 sub strip_color {
     my $string = shift;
+    # mIRC colors
     $string =~ s/\x03(?:\d{1,2}(?:,\d{1,2})?)?//g;
+    # RGB colors supported by some clients
+    $string =~ s/\x04[0-9a-f]{0,6}//ig;
     return $string;
 }
 
 sub strip_formatting {
     my $string = shift;
-    $string =~ s/[\x0f\x02\x1f\x16]//g;
+    $string =~ s/[\x0f\x02\x1f\x16\x1d\x11]//g;
     return $string;
 }
 
@@ -349,6 +355,10 @@ POE::Component::IRC::Common - provides a set of common functions for the L<POE::
 
   if ( matches_mask( $full_banmask, 'stalin!joe@kremlin.ru' ) ) {
 	print "EEK!";
+  }
+  
+  if ( has_color($message) ) {
+    print 'COLOR CODE ALERT!";
   }
 
   my $results_hashref = matches_mask_array( \@masks, \@items_to_match_against );

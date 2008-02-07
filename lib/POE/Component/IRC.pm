@@ -33,8 +33,8 @@ use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS);
 # Load the plugin stuff
 use POE::Component::IRC::Plugin qw( :ALL );
 
-$VERSION = '5.60';
-$REVISION = do {my@r=(q$Revision: 417 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.62';
+$REVISION = do {my@r=(q$Revision: 431 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 # BINGOS: I have bundled up all the stuff that needs changing for inherited classes
 # 	  into _create. This gets called from 'spawn'.
@@ -2810,6 +2810,10 @@ the details anyhow.
 
 Allows you to change your nickname. Takes exactly one argument: the
 new username that you'd like to be known as.
+
+=item nickserv
+
+Talks to FreeNode's NickServ. Takes any number of arguments.
 
 =item notice
 
