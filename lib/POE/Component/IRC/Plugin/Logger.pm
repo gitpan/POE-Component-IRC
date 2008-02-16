@@ -12,7 +12,7 @@ use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formattin
 use POSIX qw(strftime);
 use vars qw($VERSION);
 
-$VERSION = '1.3';
+$VERSION = '1.4';
 
 sub new {
     my ($package, %self) = @_;
@@ -80,12 +80,6 @@ sub PCI_register {
         '-s'         => sub { my ($nick) = @_;                   "--- $nick disables secret channel status" },
         '+t'         => sub { my ($nick) = @_;                   "--- $nick enables topic protection" },
         '-t'         => sub { my ($nick) = @_;                   "--- $nick disables topic protection" },
-        '+a'         => sub { my ($nick) = @_;                   "--- $nick enables anonymous channel status" },
-        '-a'         => sub { my ($nick) = @_;                   "--- $nick disables anonymous channel status" },
-        '+q'         => sub { my ($nick) = @_;                   "--- $nick enables quiet channel status" },
-        '-q'         => sub { my ($nick) = @_;                   "--- $nick disables quiet channel status" },
-        '+r'         => sub { my ($nick) = @_;                   "--- $nick enables channel registered status" },
-        '-r'         => sub { my ($nick) = @_;                   "--- $nick disables channel registered status" },
         nick_change  => sub { my ($old_nick, $new_nick) = @_;    "--- $old_nick is now known as $new_nick" },
         topic_is     => sub { my ($chan, $topic) = @_;           "--- Topic for $chan is: $topic" },
         topic_set_by => sub { my ($chan, $nick, $date) = @_;     "--- Topic for $chan was set by $nick at $date" },
@@ -124,6 +118,7 @@ sub PCI_unregister {
 sub S_001 {
     my ($self, $irc) = splice @_, 0, 2;
     $self->{logging} = { };
+		return PCI_EAT_NONE;
 }
 
 sub S_332 {
@@ -311,7 +306,7 @@ sub _open_log {
 sub _normalize {
     my ($self, $line) = @_;
     my $utf8 = guess_encoding($line, 'utf8');
-    $line = decode('cp1252', $line) unless ref $utf8;
+    $line = ref $utf8 ? decode('utf8', $line) : decode('cp1252', $line);
     $line = strip_color($line) if $self->{Strip_color};
     $line = strip_formatting($line) if $self->{Strip_formatting};
     return $line;

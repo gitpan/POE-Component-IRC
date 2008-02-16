@@ -1,5 +1,17 @@
 Revision history for Perl extension POE::Component::IRC.
 
+5.64  Sat Feb 16 07:55:34 GMT 2008
+    - Logger.pm: Fix regression regarding utf8 detection (Hinrik)
+    - Logger.pm: Don't log channel modes which have different meanings
+      depending on the IRC network we're on. (Hinrik)
+    - NickServID: Tweak it a little (Hinrik)
+    - Add optional Test::Perl::Critic test to detect risky code.
+      Currently 466 violations in about 16k lines of code, whee! (Hinrik)
+    - ISupport.pm: Fix bug in CHANLIMIT handling (Hinrik)
+    - Logger.pm: Missing S_001 return value (Hinrik)
+    - Compat.pm: Fix missing raw_line (Hinrik)
+    - Filter/CTCP.pm: Stop using POE::Filter::IRC (Hinrik)
+
 5.62  Thu Feb  7 16:31:03 GMT 2008
     - IRC.pm: Document the nickserv command (Hinrik)
     - Common.pm: Show some example usage of has_color() (Hinrik)

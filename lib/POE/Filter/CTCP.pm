@@ -12,18 +12,14 @@ package POE::Filter::CTCP;
 use strict;
 use Carp;
 use File::Basename ();
-use POE::Filter::IRC;
 use vars qw($VERSION);
 
-$VERSION = '5.00';
+$VERSION = '5.1';
 
 # Create a new, empty POE::Filter::CTCP object.
 sub new {
-  my $class = shift;
-  my %args = @_;
-
-  my $self = { 'irc_filter' => POE::Filter::IRC->new() };
-  bless $self, $class;
+  my ($class, %args) = @_;
+  return bless \%args, $class;
 }
 
 
@@ -63,7 +59,6 @@ sub get {
 						      addr => $3,
 						      port => $4,
 						    }, $basename, $5 ],
-			 raw_line => $line,
 		       };
 
       } else {
@@ -80,7 +75,6 @@ sub get {
       $text = $1 . ':' . join '', @$text;
       $text =~ s/\cP/^P/g;
       warn "CTCP: $text\n" if $self->{'debug'};
-      push @$events, @{$self->{irc_filter}->get( [$text] )};
     }
   }
 
@@ -219,7 +213,7 @@ POE::Filter::CTCP -- A POE-based parser for the IRC protocol (CTCP).
 
 =head1 SYNOPSIS
 
-  my $filter = POE::Filter::IRC->new();
+  my $filter = POE::Filter::CTCP->new();
   my @events = @{$filter->get( [ @lines ] )};
   my @msgs = @{$filter->put( [ @messages ] )};
 
