@@ -1,4 +1,4 @@
-use Test::More tests => 29;
+use Test::More tests => 30;
 use_ok("POE::Filter::IRC");
 use_ok("POE::Filter::IRC::Compat");
 use_ok("POE::Filter::CTCP");
@@ -28,3 +28,4 @@ use_ok("POE::Component::IRC::Plugin::CycleEmpty");
 use_ok("POE::Component::IRC::Plugin::BotTraffic");
 use_ok("POE::Component::IRC::Plugin::BotAddressed");
 use_ok("POE::Component::IRC::Plugin::AutoJoin");
+use_ok("POE::Component::IRC::Plugin::BotCommand");

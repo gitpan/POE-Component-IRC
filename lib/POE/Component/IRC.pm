@@ -18,7 +18,7 @@ use Carp;
 use File::Basename ();
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
            Filter::Line Filter::Stream Filter::Stackable);
-use POE::Filter::CTCP;
+#use POE::Filter::CTCP;
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
 use POE::Component::IRC::Common qw(:ALL);
@@ -30,8 +30,8 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS $GOT_SOCKET6);
 
-$VERSION = '5.68';
-$REVISION = do {my@r=(q$Revision: 460 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.70';
+$REVISION = do {my@r=(q$Revision: 537 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 BEGIN {
     eval {
@@ -177,7 +177,7 @@ sub _configure {
     if ($self->{debug}) {
         $self->{ircd_filter}->debug(1);
         $self->{ircd_compat}->debug(1);
-        $self->{ctcp_filter}->debug(1);
+#        $self->{ctcp_filter}->debug(1);
     }
     
     if ($self->{useipv6} && !$GOT_SOCKET6) {
@@ -195,6 +195,7 @@ sub _configure {
     }
     
     $self->{port} = 6667 if !$self->{port};
+    $self->{msg_length} = 450 if !defined $self->{msg_length};
   
     if ($self->{localaddr} && $self->{localport}) {
         $self->{localaddr} .= ':' . $self->{localport};
@@ -322,7 +323,7 @@ sub debug {
     $self->{debug} = $switch;
     $self->{ircd_filter}->debug( $switch );
     $self->{ircd_compat}->debug( $switch );
-    $self->{ctcp_filter}->debug( $switch );
+#    $self->{ctcp_filter}->debug( $switch );
     return;
 }
 
@@ -496,7 +497,7 @@ sub _parseline {
 
     return if !$ev->{name};
 
-    $self->_send_event( 'irc_raw' => $ev->{raw_line} ) if $self->{raw};
+    $self->_send_event(irc_raw => $ev->{raw_line} ) if $self->{raw};
 
     # If its 001 event grab the server name and stuff it into {INFO}
     if ( $ev->{name} eq '001' ) {
@@ -846,7 +847,7 @@ sub _start {
 
     $self->{ircd_filter} = POE::Filter::IRCD->new(debug => $self->{debug});
     $self->{ircd_compat} = POE::Filter::IRC::Compat->new(debug => $self->{debug});
-    $self->{ctcp_filter} = POE::Filter::CTCP->new(debug => $self->{debug});
+#    $self->{ctcp_filter} = POE::Filter::CTCP->new(debug => $self->{debug});
     
     my $srv_filters = [
         POE::Filter::Line->new(
@@ -1069,7 +1070,7 @@ sub ctcp {
     }
 
     # CTCP-quote the message text.
-    ($message) = @{$self->{ctcp_filter}->put([ $message ])};
+    ($message) = @{$self->{ircd_compat}->put([ $message ])};
 
     # Should we send this as a CTCP request or reply?
     $state = $state eq 'ctcpreply' ? 'notice' : 'privmsg';
@@ -1713,7 +1714,11 @@ sub sl_prioritized {
 
     my $now = time();
     $self->{send_time} = $now if $self->{send_time} < $now;
-
+    
+    if (bytes::length($msg) > $self->{msg_length} - bytes::length($self->nick_name())) {
+        $msg = bytes::substr($msg, 0, $self->{msg_length} - bytes::length($self->nick_name()));
+    }
+    
     if (@{ $self->{send_queue} }) {
         my $i = @{ $self->{send_queue} };
         $i-- while ($i && $priority < $self->{send_queue}->[$i-1]->[MSG_PRI]);
@@ -2269,7 +2274,7 @@ POE::Component::IRC - a fully event-driven IRC client module.
 
      # retrieve our component's object from the heap where we stashed it
      my $irc = $heap->{irc};
-     
+
      $irc->yield( register => 'all' );
      $irc->yield( connect => { } );
      return;
@@ -2335,7 +2340,7 @@ get started. Keep the list of server numeric codes handy while you
 program. Needless to say, you'll also need a good working knowledge of
 POE, or this document will be of very little use to you.]
 
-The POE::Component::IRC distribution has a docs/ folder with a collection of
+The POE::Component::IRC distribution has a F<docs/> folder with a collection of
 salient documentation including the pertinent RFCs.
 
 POE::Component::IRC consists of a POE::Session that manages the IRC connection
@@ -2349,6 +2354,9 @@ The component will continue to stay around until you tell it not to with
 C<shutdown>.
 
 The SYNOPSIS demonstrates a fairly basic bot.
+
+See L<POE::Component::IRC::Cookbook|POE::Component::IRC::Cookbook> for more
+examples.
 
 =head2 Useful subclasses
 
@@ -2371,15 +2379,15 @@ network.
 =item L<POE::Component::IRC::Qnet::State|POE::Component::IRC::Qnet::State>
 
 POE::Component::IRC::Qnet::State is a tweaked version of POE::Component::IRC::State
-for use on Quakenet IRC network. 
+for use on the Quakenet IRC network. 
 
 =back
 
 =head2 The Plugin system
 
 As of 3.7, PoCo-IRC sports a plugin system. The documentation for it can be
-read by looking at L<POE::Component::IRC::Plugin|POE::Component::IRC::Plugin>. That is not a subclass, just
-a placeholder for documentation!
+read by looking at L<POE::Component::IRC::Plugin|POE::Component::IRC::Plugin>.
+That is not a subclass, just a placeholder for documentation!
 
 A number of useful plugins have made their way into the core distribution:
 
@@ -2402,6 +2410,10 @@ they generate themselves. This plugin enables you to handle those events.
 
 Generates C<irc_bot_addressed> / C<irc_bot_mentioned> / C<irc_bot_mentioned_action>
 events whenever your bot's name comes up in channel discussion.
+
+=item L<POE::Component::IRC::Plugin::BotCommand|POE::Component::IRC::Plugin::BotCommand>
+
+Provides an easy way to handle commands issued to your bot.
 
 =item L<POE::Component::IRC::Plugin::Console|POE::Component::IRC::Plugin::Console>
 
@@ -2447,7 +2459,7 @@ to gain ops.
 
 Both CONSTRUCTORS return an object. The object is also available within 'irc_'
 event handlers by using 
-$_[SENDER]->get_heap(). See also C<register> and C<irc_registered>.
+C<< $_[SENDER]->get_heap() >>. See also C<register> and C<irc_registered>.
 
 =over
 
@@ -2495,6 +2507,19 @@ below).
 'Resolver', provide a L<POE::Component::Client::DNS|POE::Component::Client::DNS>
 object for the component to use.
 
+'msg_length', the maximum length of IRC messages, in bytes. Default is 450.
+The IRC component shortens all messages longer than this value minus the length
+of your current nickname. IRC only allows raw protocol lines messages that are
+512 bytes or shorter, including the trailing "\r\n". This is most relevant to
+long PRIVMSGs. The IRC component can't be sure how long your user@host mask
+will be every time you send a message, considering that most networks mangle
+the 'user' part and some even replace the whole string (think FreeNode cloaks).
+If you have an unusually long user@host mask you might want to decrease this
+value if you're prone to sending long messages. Conversely, if you have an
+unusually short one, you can increase this value if you want to be able to
+send as long a message as possible. Be careful though, increase it too much and
+the IRC server might disconnect you with a "Request too long" message. 
+
 'plugin_debug', set to some true value to print plugin debug info, default 0.
 
 'socks_proxy', specify a SOCKS4/SOCKS4a proxy to use.
@@ -2512,7 +2537,7 @@ All the above options may be supplied to C<connect> input event as well.
 
 If the component finds that L<POE::Component::Client::DNS|POE::Component::Client::DNS>
 is installed it will use that to resolve the server name passed. Disable this
-behaviour if you like, by passing: NoDNS => 1.
+behaviour if you like, by passing: C<NoDNS => 1>.
 
 Additionally there is a "Flood" parameter.  When true, it disables the
 component's flood protection algorithms, allowing it to send messages
@@ -2530,7 +2555,7 @@ support.
 
 For those people who run bots behind firewalls and/or Network Address
 Translation there are two additional attributes for DCC. "DCCPorts", is an
-arrayref of ports to use when initiating DCC, using dcc(). "NATAddr", is the
+arrayref of ports to use when initiating DCC, using C<dcc()>. "NATAddr", is the
 NAT'ed IP address that your bot is hidden behind, this is sent whenever you
 do DCC.
 
@@ -2602,7 +2627,7 @@ events to the component.
 =item C<session_alias>
 
 Takes no arguments. Returns the session alias that has been set through
-spawn()'s alias argument. 
+C<spawn()>'s alias argument. 
 
 =item C<version>
 
@@ -2638,7 +2663,7 @@ available at L<http://www.irc.org/tech_docs/005.html>.
 =item C<isupport_dump_keys>
 
 Takes no arguments, returns a list of the available server capabilities keys,
-which can be used with isupport().
+which can be used with C<isupport()>.
 
 =item C<yield>
 
@@ -2666,13 +2691,13 @@ wishes to delay the command being posted.
 
  my $alarm_id = $irc->delay( [ mode => $channel => '+o' => $dude ], 60 );
 
-Returns an alarm ID that can be used with delay_remove() to cancel the delayed
+Returns an alarm ID that can be used with C<delay_remove()> to cancel the delayed
 event. This will be undefined if something went wrong.
 
 =item C<delay_remove>
 
 This method removes a previously scheduled delayed event from the component.
-Takes one argument, the alarm_id that was returned by a delay() method call.
+Takes one argument, the C<alarm_id> that was returned by a C<delay()> method call.
 
  my $arrayref = $irc->delay_remove( $alarm_id );
 
@@ -2691,7 +2716,7 @@ object used by the plugin system.
 =item C<send_event>
 
 Sends an event through the components event handling system. These will get
-processed by  plugins then by registered sessions. First argument is the event
+processed by plugins then by registered sessions. First argument is the event
 name, followed by any parameters for that event.
 
 =back
@@ -2700,7 +2725,7 @@ name, followed by any parameters for that event.
 
 How to talk to your new IRC component... here's the events we'll accept.
 These are events that are posted to the component, either via
-$poe_kernel->post() or via the object method yield().
+C<< $poe_kernel->post() >> or via the object method C<yield()>.
 
 So the following would be functionally equivalent:
 
@@ -2771,45 +2796,6 @@ for you). The "/me" command in popular IRC clients is actually a CTCP action.
 
  # Doing a /me 
  $irc->yield(ctcp => $channel => 'ACTION dances.');
-
-=item C<dcc>
-
-Send a DCC SEND or CHAT request to another person. Takes at least two
-arguments: the nickname of the person to send the request to and the
-type of DCC request (SEND or CHAT). For SEND requests, be sure to add
-a third argument for the filename you want to send. Optionally, you
-can add a fourth argument for the DCC transfer blocksize, but the
-default of 1024 should usually be fine.
-
-Incidentally, you can send other weird nonstandard kinds of DCCs too;
-just put something besides 'SEND' or 'CHAT' (say, 'FOO') in the type
-field, and you'll get back C<irc_dcc_foo> events when activity happens
-on its DCC connection.
-
-If you are behind a firewall or Network Address Translation, you may want to
-consult C<connect> for some parameters that are useful with this command.
-
-=item C<dcc_accept>
-
-Accepts an incoming DCC connection from another host. First argument:
-the magic cookie from an C<irc_dcc_request> event. In the case of a DCC
-GET, the second argument can optionally specify a new name for the
-destination file of the DCC transfer, instead of using the sender's name
-for it. (See the C<irc_dcc_request> section below for more details.)
-
-=item C<dcc_chat>
-
-Sends lines of data to the person on the other side of a DCC CHAT
-connection. Takes any number of arguments: the magic cookie from an
-C<irc_dcc_start> event, followed by the data you wish to send. (It'll be
-chunked into lines by a L<POE::Filter::Line|POE::Filter::Line> for you,
-don't worry.)
-
-=item C<dcc_close>
-
-Terminates a DCC SEND or GET connection prematurely, and causes DCC CHAT
-connections to close gracefully. Takes one argument: the magic cookie
-from an C<irc_dcc_start> or C<irc_dcc_request> event.
 
 =item C<join>
 
@@ -2890,12 +2876,20 @@ waiting for you to call C<connect> on them again to reconnect.
 to break backwards compatibility at this point.) You can send the IRC
 session a C<shutdown> event manually to make it delete itself.
 
-If you are connected, 'shutdown' will send a quit message to ircd and
+If you are connected, C<shutdown> will send a quit message to ircd and
 disconnect. If you provide an argument that will be used as the QUIT
 message.
 
 Terminating multiple components can be tricky. Check the 'SIGNALS' section of
 this documentation for an alternative method of shutting down multiple poco-ircs.
+
+=item C<topic>
+
+Retrieves or sets the topic for particular channel. If called with just
+the channel name as an argument, it will ask the server to return the
+current topic. If called with the channel name and a string, it will
+set the channel topic to that string. Supply an empty string to unset a
+channel topic.
 
 =item C<unregister>
 
@@ -2934,6 +2928,51 @@ server will note that you're now away from your machine or otherwise
 preoccupied, and pass your message along to anyone who tries to
 communicate with you. When sent without arguments, it tells the server
 that you're back and paying attention.
+
+=item C<dcc>
+
+Send a DCC SEND or CHAT request to another person. Takes at least two
+arguments: the nickname of the person to send the request to and the
+type of DCC request (SEND or CHAT). For SEND requests, be sure to add
+a third argument for the filename you want to send. Optionally, you
+can add a fourth argument for the DCC transfer blocksize, but the
+default of 1024 should usually be fine.
+
+Incidentally, you can send other weird nonstandard kinds of DCCs too;
+just put something besides 'SEND' or 'CHAT' (say, 'FOO') in the type
+field, and you'll get back C<irc_dcc_foo> events when activity happens
+on its DCC connection.
+
+If you are behind a firewall or Network Address Translation, you may want to
+consult C<connect> for some parameters that are useful with this command.
+
+=item C<dcc_accept>
+
+Accepts an incoming DCC connection from another host. First argument:
+the magic cookie from an C<irc_dcc_request> event. In the case of a DCC
+GET, the second argument can optionally specify a new name for the
+destination file of the DCC transfer, instead of using the sender's name
+for it. (See the C<irc_dcc_request> section below for more details.)
+
+=item C<dcc_resume>
+
+Resumes a DCC SEND file transfer. First argument: the magic cookie from an
+C<irc_dcc_request> event. The second argument is the name of the file to which
+you want to write. The third argument is the size from which will be resumed.
+
+=item C<dcc_chat>
+
+Sends lines of data to the person on the other side of a DCC CHAT
+connection. Takes any number of arguments: the magic cookie from an
+C<irc_dcc_start> event, followed by the data you wish to send. (It'll be
+chunked into lines by a L<POE::Filter::Line|POE::Filter::Line> for you,
+don't worry.)
+
+=item C<dcc_close>
+
+Terminates a DCC SEND or GET connection prematurely, and causes DCC CHAT
+connections to close gracefully. Takes one argument: the magic cookie
+from an C<irc_dcc_start> or C<irc_dcc_request> event.
 
 =item C<info>
 
@@ -3005,14 +3044,6 @@ Asks the server what time it thinks it is, which it will return in a
 human-readable form. Takes one optional argument: a server name to
 query. If not supplied, defaults to current server.
 
-=item C<topic>
-
-Retrieves or sets the topic for particular channel. If called with just
-the channel name as an argument, it will ask the server to return the
-current topic. If called with the channel name and a string, it will
-set the channel topic to that string. Supply an empty string to unset a
-channel topic.
-
 =item C<trace>
 
 If you pass a server name or nick along with this request, it asks the
@@ -3077,7 +3108,7 @@ pings automatically. Don't worry about it.
 =item C<locops>
 
 Opers-only command. This one sends a message to all currently
-logged-on local-opers (+l).  This option is specific to EFNet.
+logged-on local-opers (+l). This option is specific to EFNet.
 
 =item C<oper>
 
@@ -3088,7 +3119,7 @@ server. Takes 2 arguments: your username and your password.
 =item C<operwall>
 
 Opers-only command. This one sends a message to all currently
-logged-on global opers.  This option is specific to EFNet.
+logged-on global opers. This option is specific to EFNet.
 
 =item C<rehash>
 
@@ -3140,9 +3171,9 @@ listen for. FIXME: I'd really like to classify these somewhat
 suggestions for ways to make this easier on the user, if you can think
 of some.
 
-In your event handlers, $_[SENDER] is the particular component session that
-sent you the event. $_[SENDER]->get_heap() will retrieve the component's 
-object. Useful if you want on-the-fly access to the object and it's methods.
+In your event handlers, C<$_[SENDER]> is the particular component session that
+sent you the event. C<< $_[SENDER]->get_heap() >> will retrieve the component's 
+object. Useful if you want on-the-fly access to the object and its methods.
 
 =head2 Important Events
 
@@ -3162,9 +3193,9 @@ anything back to the server.
 =item C<irc_ctcp>
 
 C<irc_ctcp> events are generated upon receipt of CTCP messages, in addition to
-the C<irc_ctcp_*> events mentioned below.  They are identical in every way to
+the C<irc_ctcp_*> events mentioned below. They are identical in every way to
 these, with one difference: instead of the * being in the method name, it
-is prepended to the argument list.  For example, if someone types C</ctcp
+is prepended to the argument list. For example, if someone types C</ctcp
 Flibble foo bar>, an C<irc_ctcp> event will be sent with C<foo> as ARG0,
 and the rest as given below.
 
@@ -3329,19 +3360,19 @@ Similar to the above, except some keys will be missing.
 
 =item C<irc_raw>
 
-Enabled by passing 'Raw' => 1 to C<spawn()> or C<connect>, ARG0 is the raw IRC
+Enabled by passing C<Raw => 1> to C<spawn()> or C<connect>, ARG0 is the raw IRC
 string received by the component from the IRC server, before it has been
 mangled by filters and such like.
 
 =item C<irc_registered>
 
-Sent once to the requesting session on registration ( see register() ). ARG0
+Sent once to the requesting session on registration ( see C<register> ). ARG0
 is a reference tothe component's object.
 
 =item C<irc_shutdown>
 
 Sent to all registered sessions when the component has been asked to
-shutdown(). ARG0 will be the session ID of the requesting session.
+C<shutdown>. ARG0 will be the session ID of the requesting session.
 
 =item C<irc_isupport>
 
@@ -3360,7 +3391,7 @@ parameters are the arguments that were passed to C<delay()>.
 
 Emitted when a delayed command is successfully removed. ARG0 will be the
 alarm_id that was removed. Subsequent parameters are the arguments that were
-passed to delay().
+passed to C<delay()>.
 
 =item C<irc_socks_failed>
 
@@ -3470,55 +3501,12 @@ and ARG5 will be the file size.
 A weird, non-RFC-compliant message from an IRC server. Don't worry
 about it. ARG0 is the text of the server's message.
 
-=item C<dcc_resume>
-
- # bboetts puny try to get dcc resume implemented in this great module:
- # ARG0 is the well known 'magic cookie' (as in dcc_send etc.)
- # ARG1 is the (eventually new) name of the file
- # ARG2 is the size from which will be resumed
- # usage and example:
-
- sub irc_dcc_request {
-     my ($kernel, $nick, $type, $port, $magic, $filename, $size) =
-         @_[KERNEL, ARG0 .. ARG5];
-
-     print "DCC $type request from $nick on port $port\n";
-     if ($args->{type} =~ /SEND/i) {
-         $nick = ($nick =~ /^([^!]+)/);
-         $nick =~ s/\W//;
-         if (my $filesize = -s "$1.$filename") {
-             $kernel->post('test', 'dcc_resume', $magic, "$1.$filename", "$filesize" );
-             # don't forget to save the cookie, it holds the address of
-             # the counterpart which won't be in the server response!!
-             $args->{heap}->{cookies}->{$args->{file}} = $args->{magic};
-         }
-         else {
-             $kernel->post( 'test', 'dcc_accept', $magic, "$1.$filename" );
-         }
-     }
-     elsif ($args->{type} =~ /ACCEPT/i) {
-         $kernel->post( $args->{context}, 'dcc_accept', $magic, $filename);
-     }
- }
- 
- # you need a counter part in irc_dcc_request():
-
- if ($type eq 'ACCEPT') {
-     # the args are in wrong order and missing shift the args 1 up
-     $magic->{port} = $magic->{addr};
-
-     my $altcookie = $_[OBJECT]->{cookies}->{$filename};
-     $magic->{addr} = $altcookie->{addr};
-     delete $_[OBJECT]->{cookies}->{$filename};
-     # TODO beware a possible memory leak here...
- }
-
 =back
 
 =head1 SIGNALS
 
 The component will handle a number of custom signals that you may send using 
-L<POE::Kernel|POE::Kernel> signal() method.
+L<POE::Kernel|POE::Kernel> C<signal()> method.
 
 =over
 
@@ -3537,7 +3525,7 @@ C<POCOIRC_REGISTER> to multiple sessions simultaneously, by sending the signal
 to the POE Kernel itself.
 
 Pass the signal your session, session ID or alias, and the IRC events (as
-specified to 'register').
+specified to C<register>).
 
 To register with multiple PoCo-IRCs one can do the following in your session's
 _start handler:
@@ -3555,10 +3543,10 @@ Each poco-irc will send your session an C<irc_registered> event:
 
  sub irc_registered {
      my ($kernel, $sender, $heap, $irc_object) = @_[KERNEL, SENDER, HEAP, ARG0];
-     
+
      # Get the poco-irc session ID 
      my $sender_id = $sender->ID();
-     
+
      # Or it's alias
      my $poco_alias = $irc_object->session_alias();
 
@@ -3592,9 +3580,11 @@ A few have turned up in the past and they are sure to again. Please use
 L<http://rt.cpan.org/> to report any. Alternatively, email the current
 maintainer.
 
-=head1 MAINTAINER
+=head1 MAINTAINERS
 
-Chris 'BinGOs' Williams <chris@bingosnet.co.uk>
+Chris C<BinGOs> Williams <chris@bingosnet.co.uk>
+
+Hinrik Örn Sigurðsson <hinrik.sig@gmail.com>
 
 =head1 AUTHOR
 
@@ -3602,7 +3592,7 @@ Dennis Taylor.
 
 =head1 LICENCE
 
-Copyright (c) Dennis Taylor and Chris Williams
+Copyright (c) Dennis Taylor and Chris Williams and Hinrik Örn Sigurðsson
 
 This module may be used, modified, and distributed under the same
 terms as Perl itself. Please see the license that came with your Perl
@@ -3611,7 +3601,7 @@ distribution for details.
 =head1 MAD PROPS
 
 The maddest of mad props go out to Rocco "dngor" Caputo
-E<lt>troc@netrus.netE<gt>, for inventing something as mind-bogglingly
+<troc@netrus.net>, for inventing something as mind-bogglingly
 cool as POE, and to Kevin "oznoid" Lenzo E<lt>lenzo@cs.cmu.eduE<gt>,
 for being the attentive parent of our precocious little infobot on
 #perl.

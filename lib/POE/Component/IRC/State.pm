@@ -19,13 +19,6 @@ use vars qw($VERSION);
 
 $VERSION = '2.50';
 
-sub _configure {
-    my ($self, @args) = @_;
-    $self->SUPER::_configure(@args);
-    $self->{awaypoll} = 300 unless defined $self->{awaypoll};
-    return;
-}
-
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
 
@@ -264,26 +257,14 @@ sub S_221 {
 
 # RPL_UNAWAY
 sub S_305 {
-    my ($self,$irc) = splice @_, 0, 2;
-    my $nick = $irc->nick_name();
-    
-    if ($self->{STATE}->{away}) {
-        $self->yield(irc_user_back => $nick, [ $self->nick_channels( $nick ) ] );
-    }
-    
+    my ($self, $irc) = splice @_, 0, 2;
     $self->{STATE}->{away} = 0;
     return PCI_EAT_NONE;
 }
 
 # RPL_NOWAWAY
 sub S_306 {
-    my ($self,$irc) = splice @_, 0, 2;
-    my $nick = $irc->nick_name();
-    
-    if (!$self->{STATE}->{away}) {
-        $self->yield(irc_user_away => $nick, [ $self->nick_channels( $nick ) ] );
-    }
-    
+    my ($self, $irc) = splice @_, 0, 2;
     $self->{STATE}->{away} = 1;
     return PCI_EAT_NONE;
 }
@@ -409,13 +390,15 @@ sub S_352 {
 
     my $mapping = $irc->isupport('CASEMAPPING');
     my ($channel,$user,$host,$server,$nick,$status,$rest) = @{ ${ $_[2] } };
-    my $real = substr($rest, index($rest, ' ') + 1);
+    $rest =~ s/^://;
+    my ($hops, $real) = split /\s/, $rest, 2;
     my $unick = u_irc $nick, $mapping;
     my $uchan = u_irc $channel, $mapping;
 
     $self->{STATE}->{Nicks}->{ $unick }->{Nick} = $nick;
     $self->{STATE}->{Nicks}->{ $unick }->{User} = $user;
     $self->{STATE}->{Nicks}->{ $unick }->{Host} = $host;
+    $self->{STATE}->{Nicks}->{ $unick }->{Hops} = $hops;
     $self->{STATE}->{Nicks}->{ $unick }->{Real} = $real;
     $self->{STATE}->{Nicks}->{ $unick }->{Server} = $server;
     
@@ -1143,9 +1126,8 @@ take the same arguments as L<POE::Component::IRC|POE::Component::IRC> does, as
 well as an additional one:
 
 'AwayPoll', the interval (in seconds) in which to poll (i.e. C<WHO #channel>)
-the away status of channel members. Defaults to 300. Set to 0 to disable. If
-disabled, you will not receive any C<irc_away_sync_*> / C<irc_user_away> /
-C<irc_user_back> events.
+the away status of channel members. Defaults to 0 (disabled). If enabled, you
+will receive C<irc_away_sync_*> / C<irc_user_away> / C<irc_user_back> events.
 
 =head1 METHODS
 
@@ -1269,7 +1251,8 @@ Expects a nickname. Returns a hashref containing similar information to that
 returned by WHOIS. Returns a false value if the nickname doesn't exist in the
 state. The hashref contains the following keys:
 
-'Nick', 'User', 'Host', 'Userhost', 'Real', 'Server' and, if applicable, 'IRCop'.
+'Nick', 'User', 'Host', 'Userhost', 'Hops', 'Real', 'Server' and, if
+applicable, 'IRCop'.
 
 =item C<ban_mask>
 
