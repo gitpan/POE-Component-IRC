@@ -38,25 +38,30 @@ sub PCI_register {
     
     $self->{commands} = {
         PLUGIN_ADD => sub {
-            my ($self, @cmd, $method, $recipient) = @_;
+            my ($self, $method, $recipient, @cmd) = @_;
             my $msg = $self->load(@cmd) ? 'Done.' : 'Nope';
             $self->{irc}->yield($method => $recipient => $msg);
         },
         PLUGIN_DEL => sub {
-            my ($self, @cmd, $method, $recipient) = @_;
+            my ($self, $method, $recipient, @cmd) = @_;
             my $msg = $self->unload(@cmd) ? 'Done.' : 'Nope';
             $self->{irc}->yield($method => $recipient => $msg);
         },
+	PLUGIN_RELOAD => sub {
+            my ($self, $method, $recipient, @cmd) = @_;
+            my $msg = $self->reload(@cmd) ? 'Done.' : 'Nope';
+            $self->{irc}->yield($method => $recipient => $msg);
+        },
         PLUGIN_LIST => sub {
-            my ($self, @cmd, $method, $recipient) = @_;
+            my ($self, $method, $recipient, @cmd) = @_;
             my @aliases = keys %{ $self->{irc}->plugin_list() };
             my $msg = scalar @aliases
                 ? 'Plugins [ ' . join(', ', @aliases ) . ' ]'
                 : 'No plugins loaded.';
             $self->{irc}->yield($method => $recipient => $msg);
         },
-        PLUGIN_RELOAD => sub {
-            my ($self, @cmd, $method, $recipient) = @_;
+        PLUGIN_LOADED => sub {
+            my ($self, $method, $recipient, @cmd) = @_;
             my @aliases = $self->loaded();
             my $msg = scalar @aliases
                 ? 'Managed Plugins [ ' . join(', ', @aliases ) . ' ]'
@@ -88,7 +93,7 @@ sub S_public {
     my $cmd = uc (shift @cmd);
     
     if (defined $self->{commands}->{$cmd}) {
-        $self->{command}->{$cmd}->($self, @cmd, 'privmsg', $channel);
+        $self->{command}->{$cmd}->($self, 'privmsg', $channel, @cmd);
     }
     
     return PCI_EAT_NONE;
@@ -105,7 +110,7 @@ sub S_msg {
     return PCI_EAT_NONE if !$self->_bot_owner($nick);
     
     if (defined $self->{commands}->{$cmd}) {
-        $self->{command}->{$cmd}->($self, @cmd, 'notice', $nick);
+        $self->{command}->{$cmd}->($self, 'notice', $nick, @cmd);
     }
 
     return PCI_EAT_NONE;
@@ -129,20 +134,27 @@ sub _bot_owner {
 sub load {
     my ($self, $desc, $plugin) = splice @_, 0, 3;
     return if !$desc || !$plugin;
+    
+    my $object;
+    my $module = ref $plugin || $plugin;
+    if (! ref $plugin){        
+        $module .= '.pm' if $module !~ /\.pm$/;
+        $module =~ s/::/\//g;
 
-    my $module = $plugin;
-    $module .= '.pm' if $module !~ /\.pm$/;
-    $module =~ s/::/\//g;
+        eval "require $plugin";
+        if ($@) {
+            delete $INC{$module};
+            $self->_unload_subs($plugin);
+            croak "$@";
+        }
 
-    eval "require $plugin";
-    if ($@) {
-        delete $INC{$module};
-        $self->_unload_subs($plugin);
-        croak "$@";
+        $object = $plugin->new( @_ );
+        return if !$object;
+    } else {
+        $object = $plugin;
+        $plugin = ref $object;
     }
-
-    my $object = $plugin->new( @_ );
-    return if !$object;
+    
     my $args = [ @_ ];
     $self->{plugins}->{ $desc }->{module} = $module;
     $self->{plugins}->{ $desc }->{plugin} = $plugin;

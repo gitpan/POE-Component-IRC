@@ -17,7 +17,7 @@ use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC);
 use vars qw($VERSION);
 
-$VERSION = '2.50';
+$VERSION = '2.51';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
@@ -63,9 +63,7 @@ sub S_join {
     my ($self, $irc) = splice @_, 0, 2;
     
     my $mapping = $irc->isupport('CASEMAPPING');
-    my $nick = ( split /!/, ${ $_[0] } )[0];
-    my $userhost = ( split /!/, ${ $_[0] } )[1];
-    my ($user,$host) = split(/\@/,$userhost);
+    my ($nick, $user, $host) = split /[!@]/, ${ $_[0] };
     my $channel = ${ $_[1] };
     my $uchan = u_irc $channel, $mapping;
     my $unick = u_irc $nick, $mapping;
@@ -84,7 +82,14 @@ sub S_join {
 
     }
     else {
-        $self->yield ( 'who' => $nick );
+        if ( !exists $self->{whojoiners} || $self->{whojoiners} ) {
+            $self->yield ( 'who' => $nick );
+        }
+        else {
+            # Fake 'irc_nick_sync
+            $self->_send_event(irc_nick_sync => $nick, $channel);
+        }
+        
         $self->{STATE}->{Nicks}->{ $unick }->{Nick} = $nick;
         $self->{STATE}->{Nicks}->{ $unick }->{User} = $user;
         $self->{STATE}->{Nicks}->{ $unick }->{Host} = $host;
@@ -398,9 +403,17 @@ sub S_352 {
     $self->{STATE}->{Nicks}->{ $unick }->{Nick} = $nick;
     $self->{STATE}->{Nicks}->{ $unick }->{User} = $user;
     $self->{STATE}->{Nicks}->{ $unick }->{Host} = $host;
-    $self->{STATE}->{Nicks}->{ $unick }->{Hops} = $hops;
-    $self->{STATE}->{Nicks}->{ $unick }->{Real} = $real;
-    $self->{STATE}->{Nicks}->{ $unick }->{Server} = $server;
+    
+    if ( !exists $self->{whojoiners} || $self->{whojoiners} ) {
+        $self->{STATE}->{Nicks}->{ $unick }->{Hops} = $hops;
+        $self->{STATE}->{Nicks}->{ $unick }->{Real} = $real;
+        $self->{STATE}->{Nicks}->{ $unick }->{Server} = $server;
+        $self->{STATE}->{Nicks}->{ $unick }->{IRCop} = 1 if $status =~ /\*/;
+    }
+    
+    if ($self->{awaypoll}) {
+        $self->{STATE}->{Nicks}->{ $unick }->{Away} = $status =~ /G/ ? 1 : 0;
+    }
     
     if ( exists $self->{STATE}->{Chans}->{ $uchan } ) {
         my $whatever = '';
@@ -426,17 +439,6 @@ sub S_352 {
                 $self->yield(irc_user_back => $nick, [ $self->nick_channels( $nick ) ] );
             }
         }
-    }
-    
-    if ( $status =~ /\*/ ) {
-        $self->{STATE}->{Nicks}->{ $unick }->{IRCop} = 1;
-    }
-    
-    if ( $status =~ /G/ ) {
-        $self->{STATE}->{Nicks}->{ $unick }->{Away} = 1;
-    }
-    else {
-        $self->{STATE}->{Nicks}->{ $unick }->{Away} = 0;
     }
     
     return PCI_EAT_NONE;
@@ -1123,11 +1125,18 @@ returned object provides methods to query the collected state.
 
 POE::Component::IRC::State's constructors, and its C<connect> event, all
 take the same arguments as L<POE::Component::IRC|POE::Component::IRC> does, as
-well as an additional one:
+well as two additional ones:
 
 'AwayPoll', the interval (in seconds) in which to poll (i.e. C<WHO #channel>)
 the away status of channel members. Defaults to 0 (disabled). If enabled, you
-will receive C<irc_away_sync_*> / C<irc_user_away> / C<irc_user_back> events.
+will receive C<irc_away_sync_*> / C<irc_user_away> / C<irc_user_back> events,
+and will be able to use the C<is_away> method for users other than yourself.
+
+'WhoJoiners', a boolean indicating whether the component should send a
+C<WHO nick> for every person which joins a channel. Defaults to on
+(the C<WHO> is sent). If you turn this off, C<is_operator> will not work
+and C<nick_info> will only return the keys C<'Nick'>, C<'User'>, C<'Host'>
+and C<'Userhost'>.
 
 =head1 METHODS
 
@@ -1172,7 +1181,9 @@ to not be on that channel an empty list will be returned.
 =item C<is_away>
 
 Expects a nick as parameter. Returns a true value if the specified nick is away.
-Returns a false value if the nick is not away or not in the state.
+Returns a false value if the nick is not away or not in the state. This will
+only work for your IRC user unless you specified a value for 'AwayPoll' in
+C<spawn>.
 
 =item C<is_operator>
 
@@ -1312,12 +1323,14 @@ events, there are the following events you can register for:
 =item C<irc_away_sync_start>
 
 Sent whenever the component starts to synchronise the away statuses of channel
-members. It does this every 60 seconds. ARG0 is the channel name.
+members. ARG0 is the channel name. You will only receive this event if you
+specified a value for 'AwayPoll' in C<spawn>.
 
 =item C<irc_away_sync_end>
 
 Sent whenever the component has completed synchronising the away statuses of
-channel members. It does this every 60 seconds. ARG0 is the channel name.
+channel members. ARG0 is the channel name. You will only receive this event if
+you specified a value for 'AwayPoll' in C<spawn>.
 
 =item C<irc_chan_sync>
 
@@ -1358,13 +1371,15 @@ umode that is being set.
 
 Sent when an IRC user sets his/her status to away. ARG0 is the nickname, ARG1
 is an arrayref of channel names that are common to the nickname and the
-component.
+component. You will only receive this event if you specified a value for
+'AwayPoll' in C<spawn>.
 
 =item C<irc_user_back>
 
 Sent when an IRC user unsets his/her away status. ARG0 is the nickname, ARG1
 is an arrayref of channel names that are common to the nickname and the
-component.
+component. You will only receive this event if you specified a value for
+'AwayPoll' in C<spawn>.
 
 =back
 
@@ -1398,18 +1413,17 @@ The component gathers information by registering for 'irc_quit', 'irc_nick',
 When the component is asked to join a channel, when it joins it will issue
 'WHO #channel', 'MODE #channel', and 'MODE #channel b'. These will solicit
 between them the numerics, 'irc_352', 'irc_324' and 'irc_329', respectively.
-'WHO #channel' will then be issued once every minute from then on. When
-someone joins a channel the bot is on, it issues a 'WHO nick'. You may want
-to ignore these. 
+When someone joins a channel the bot is on, it issues a 'WHO nick'. You may
+want to ignore these. 
 
 Currently, whenever the component sees a topic or channel list change, it will
-use time() for the SetAt value and the full address of the user who set it for
-the SetBy value. When an ircd gives us it's record of such changes, it will use
-it's own time (obviously) and may only give us the nickname of the user, rather
-than their full address. Thus, if our time() and the ircd's time do not match,
-or the ircd uses thenickname only, ugly inconsistencies can develop. This
-leaves the SetAt and SetBy values at best, inaccurate, and you should use them
-with this in mind (for now, at least).
+use C<time()> for the SetAt value and the full address of the user who set it
+for the SetBy value. When an ircd gives us its record of such changes, it will
+use its own time (obviously) and may only give us the nickname of the user,
+rather than their full address. Thus, if our C<time()> and the ircd's time do
+not match, or the ircd uses the nickname only, ugly inconsistencies can develop.
+This leaves the SetAt and SetBy values inaccurate at best, and you should use
+them with this in mind (for now, at least).
 
 =head1 AUTHOR
 
