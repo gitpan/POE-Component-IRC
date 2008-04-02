@@ -29,8 +29,8 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS $GOT_SOCKET6);
 
-$VERSION = '5.72';
-$REVISION = do {my@r=(q$Revision: 554 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+$VERSION = '5.74';
+$REVISION = do {my@r=(q$Revision: 577 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 
 BEGIN {
     eval {
@@ -3632,5 +3632,7 @@ Some good examples reside in the POE cookbook which has a whole section
 devoted to IRC programming L<http://poe.perl.org/?POE_Cookbook>.
 
 The examples/ folder of this distribution.
+
+The C<#poe> channel on irc.freenode.org.
 
 =cut
