@@ -13,7 +13,7 @@ use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formattin
 use POSIX qw(strftime);
 use vars qw($VERSION);
 
-$VERSION = '1.7';
+$VERSION = '1.8';
 
 sub new {
     my ($package, %self) = @_;
@@ -235,7 +235,7 @@ sub S_part {
     my ($self, $irc) = splice @_, 0, 2;
     my ($parter, $user, $host) = parse_user(${ $_[0] });
     my $chan = ${ $_[1] };
-    my $msg = ${ $_[2] };
+    my $msg = defined $_[2] ? ${ $_[2] } : '';
     $self->_log_entry($chan, part => $parter, "$user\@$host", $chan, $msg);
     return PCI_EAT_NONE;
 }
@@ -306,7 +306,7 @@ sub _log_entry {
     }
     my $line = "$time " . $self->{Format}->{$type}->(@args);
     $line = "$date $line" if !$self->{Sort_by_date};
-    print $log_file normalize($line) . "\n";
+    print $log_file $self->_normalize($line) . "\n";
     return;
 }
 

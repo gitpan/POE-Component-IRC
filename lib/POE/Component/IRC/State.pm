@@ -17,7 +17,7 @@ use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC);
 use vars qw($VERSION);
 
-$VERSION = '2.51';
+$VERSION = '2.52';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
@@ -75,28 +75,29 @@ sub S_join {
         $self->yield(who => $channel );
         $self->yield(mode => $channel );
         $self->yield(mode => $channel => 'b');
+        
         if ($self->{awaypoll}) {
             $poe_kernel->state(_away_sync => $self);
             $poe_kernel->delay_add(_away_sync => $self->{awaypoll} => $channel);
         }
-
     }
     else {
-        if ( !exists $self->{whojoiners} || $self->{whojoiners} ) {
-            $self->yield ( 'who' => $nick );
+        if ( (!exists $self->{whojoiners} || $self->{whojoiners})
+            && !exists $self->{STATE}->{Nicks}->{ $unick }->{Real}) {
+                $self->yield(who => $nick);
+                push @{ $self->{NICK_SYNCH}->{ $unick } }, $channel;
         }
         else {
-            # Fake 'irc_nick_sync
+            # Fake 'irc_nick_sync'
             $self->_send_event(irc_nick_sync => $nick, $channel);
         }
-        
-        $self->{STATE}->{Nicks}->{ $unick }->{Nick} = $nick;
-        $self->{STATE}->{Nicks}->{ $unick }->{User} = $user;
-        $self->{STATE}->{Nicks}->{ $unick }->{Host} = $host;
-        $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan } = '';
-        $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick } = '';
-        push @{ $self->{NICK_SYNCH}->{ $unick } }, $channel;
     }
+
+    $self->{STATE}->{Nicks}->{ $unick }->{Nick} = $nick;
+    $self->{STATE}->{Nicks}->{ $unick }->{User} = $user;
+    $self->{STATE}->{Nicks}->{ $unick }->{Host} = $host;
+    $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan } = '';
+    $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick } = '';
     
     return PCI_EAT_NONE;
 }
@@ -253,10 +254,10 @@ sub S_chan_mode {
 
 # RPL_UMODEIS
 sub S_221 {
-    my ($self,$irc) = splice @_, 0, 2;
+    my ($self, $irc) = splice @_, 0, 2;
     my $mode = ${ $_[1] };
     $mode =~ s/^\+//;
-    ($self->{STATE}->{usermode} = $mode ) =~ s/^\+//;
+    $self->{STATE}->{usermode} = $mode;
     return PCI_EAT_NONE;
 }
 
@@ -470,6 +471,18 @@ sub S_315 {
         $self->_send_event(irc_nick_sync => $channel, $chan );
     }
 
+    return PCI_EAT_NONE;
+}
+
+# RPL_CREATIONTIME
+sub S_329 {
+    my ($self, $irc) = splice @_, 0, 2;
+    my $mapping = $irc->isupport('CASEMAPPING');
+    my $channel = ${ $_[2] }->[0];
+    my $time = ${ $_[2] }->[1];
+    my $uchan = u_irc $channel, $mapping;
+    
+    $self->{STATE}->{Chans}->{ $uchan }->{CreationTime} = $time;
     return PCI_EAT_NONE;
 }
 
@@ -835,6 +848,22 @@ sub is_channel_mode_set {
     return;
 }
 
+sub is_channel_synced {
+    my ($self, $channel) = @_;
+    return $self->_channel_sync($channel);
+}
+
+sub channel_creation_time {
+    my ($self, $channel) = @_;
+    my $mapping = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc $channel, $mapping;
+
+    return if !$self->_channel_exists($channel);
+    return if !exists $self->{STATE}->{Chans}->{ $uchan }->{CreationTime};
+    
+    return $self->{STATE}->{Chans}->{ $uchan }->{CreationTime};
+}
+
 sub channel_limit {
     my ($self, $channel) = @_;
     my $mapping = $self->isupport('CASEMAPPING');
@@ -870,11 +899,16 @@ sub channel_modes {
     my $uchan = u_irc $channel, $mapping;
     return if !$self->_channel_exists($channel);
 
+    my %modes;
     if ( defined $self->{STATE}->{Chans}->{ $uchan }->{Mode} ) {
-        return $self->{STATE}->{Chans}->{ $uchan }->{Mode};
+        %modes = map { ($_ => '') } split(//, $self->{STATE}->{Chans}->{ $uchan }->{Mode});
+    }
+    if ( defined $self->{STATE}->{Chans}->{ $uchan }->{ModeArgs} ) {
+        my %args = %{ $self->{STATE}->{Chans}->{ $uchan }->{ModeArgs} };
+        @modes{keys %args} = values %args;
     }
     
-    return;
+    return \%modes;
 }
 
 sub is_channel_member {
@@ -1196,9 +1230,15 @@ or is not in the state.
 Expects a channel and a single mode flag [A-Za-z]. Returns a true value
 if that mode is set on the channel.
 
+=item C<channel_creation_time>
+
+Expects a channel as parameter. Returns channel creation time or a false value.
+
 =item C<channel_modes>
 
-Expects a channel as parameter. Returns channel modes or a false value.
+Expects a channel as parameter. Returns a hash ref keyed on channel mode, with
+the mode argument (if any) as the value. Returns a false value instead if the
+channel is not in the state.
 
 =item C<channel_limit>
 
@@ -1238,6 +1278,11 @@ Expects a channel and a nickname as parameters. Returns a true value if
 the nick is a half-operator on the specified channel. Returns false if the nick
 is not a half-operator on the channel or if the nick/channel does not exist in
 the state.
+
+=item C<is_channel_synced>
+
+Expects a channel as a parameter. Returns true if the channel has been synced.
+Returns false if it has not been synced or if the channel is not in the state.
 
 =item C<has_channel_voice>
 
