@@ -2,7 +2,6 @@ package POE::Component::IRC::Plugin::Logger;
 
 use strict;
 use warnings;
-use Carp qw(croak);
 use Encode qw(decode);
 use Encode::Guess;
 use Fcntl qw(O_WRONLY O_APPEND O_CREAT);
@@ -11,14 +10,13 @@ use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting );
 use POSIX qw(strftime);
-use vars qw($VERSION);
 
-$VERSION = '1.8';
+our $VERSION = '1.8';
 
 sub new {
     my ($package, %self) = @_;
     if (!$self{Path}) {
-        croak "$package requires a Path";
+        die "$package requires a Path";
     }
     return bless \%self, $package;
 }
@@ -27,10 +25,10 @@ sub PCI_register {
     my ($self, $irc) = @_;
     
     if (!$irc->isa('POE::Component::IRC::State')) {
-        croak __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
+        die __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
     }
     
-    if ( !grep { $_->isa('POE::Component::IRC::Plugin::BotTraffic') } @{ $irc->pipeline->{PIPELINE} } ) {
+    if ( !grep { $_->isa('POE::Component::IRC::Plugin::BotTraffic') } values %{ $irc->plugin_list() } ) {
         $irc->plugin_add('BotTraffic', POE::Component::IRC::Plugin::BotTraffic->new());
     }
     
@@ -45,13 +43,13 @@ sub PCI_register {
     }
 
     if (! -d $self->{Path}) {
-        mkdir $self->{Path}, $self->{dir_perm} or croak 'Cannot create directory ' . $self->{Path} . ": $!; aborted";
+        mkdir $self->{Path}, $self->{dir_perm} or die 'Cannot create directory ' . $self->{Path} . ": $!; aborted";
     }
     
     $self->{irc} = $irc;
     $self->{logging} = { };
-    $self->{Private} = 1 unless defined $self->{Private};
-    $self->{Public} = 1 unless defined $self->{Public};
+    $self->{Private} = 1 if !defined $self->{Private};
+    $self->{Public} = 1 if !defined $self->{Public};
     $self->{Format} = {
         '+b'         => sub { my ($nick, $mask) = @_;            "--- $nick sets ban on $mask" },
         '-b'         => sub { my ($nick, $mask) = @_;            "--- $nick removes ban on $mask" },
@@ -106,11 +104,11 @@ sub PCI_register {
             return $line;
         },
         topic_set_by => sub {
-            my ($chan, $nick, $time) = @_;
+            my ($chan, $user, $time) = @_;
             my $date = localtime $time;
-            return "--- Topic for $chan was set by $nick at $date";
+            return "--- Topic for $chan was set by $user at $date";
         },
-    } unless defined $self->{Format};
+    } if !defined $self->{Format};
 
     $irc->plugin_register($self, 'SERVER', qw(001 332 333 chan_mode ctcp_action bot_ctcp_action bot_msg bot_public join kick msg nick part public quit topic));
     return 1;
@@ -137,9 +135,9 @@ sub S_332 {
 
 sub S_333 {
     my ($self, $irc) = splice @_, 0, 2;
-    my ($chan, $nick, $time) = @{ ${ $_[2] } };
+    my ($chan, $user, $time) = @{ ${ $_[2] } };
     # only log this if we were just joining the channel
-    $self->_log_entry($chan, topic_set_by => $chan, $nick, $time) if !$irc->channel_list($chan);
+    $self->_log_entry($chan, topic_set_by => $chan, $user, $time) if !$irc->channel_list($chan);
     return PCI_EAT_NONE;
 }
 
@@ -235,7 +233,7 @@ sub S_part {
     my ($self, $irc) = splice @_, 0, 2;
     my ($parter, $user, $host) = parse_user(${ $_[0] });
     my $chan = ${ $_[1] };
-    my $msg = defined $_[2] ? ${ $_[2] } : '';
+    my $msg = ref $_[2] eq 'SCALAR' ? ${ $_[2] } : '';
     $self->_log_entry($chan, part => $parter, "$user\@$host", $chan, $msg);
     return PCI_EAT_NONE;
 }
@@ -290,7 +288,7 @@ sub _log_entry {
         my $log_dir = catdir($self->{Path}, $context);
         if (! -d $log_dir) {
             mkdir $log_dir, $self->{dir_perm}
-                or croak "Couldn't create directory $log_dir: $!; aborted";
+                or die "Couldn't create directory $log_dir: $!; aborted";
         }
         $log_file = catfile($self->{Path}, $context, "$date.log");
     }
@@ -313,7 +311,7 @@ sub _log_entry {
 sub _open_log {
     my ($self, $file_name) = @_;
     sysopen(my $log, $file_name, O_WRONLY|O_APPEND|O_CREAT, $self->{file_perm})
-        or croak "Couldn't create file $file_name: $!; aborted";
+        or die "Couldn't create file $file_name: $!; aborted";
     binmode($log, ':utf8');
     $log->autoflush(1);
     return $log;
@@ -362,9 +360,7 @@ present.
 
 =head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Arguments:
 
@@ -393,8 +389,6 @@ your own. See the source for details.
 
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
-
-=back
 
 =head1 AUTHOR
 

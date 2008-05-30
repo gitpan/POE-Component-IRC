@@ -2,12 +2,10 @@ package POE::Component::IRC::Plugin::AutoJoin;
 
 use strict;
 use warnings;
-use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user );
-use vars qw($VERSION);
 
-$VERSION = '1.2';
+our $VERSION = '1.2';
 
 sub new {
     my ($package, %self) = @_;
@@ -18,7 +16,7 @@ sub PCI_register {
     my ($self, $irc) = @_;
     
     if (!$irc->isa('POE::Component::IRC::State')) {
-        croak __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
+        die  __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
     }
     
     if (!$self->{Channels}) {
@@ -43,7 +41,7 @@ sub S_001 {
     my ($self, $irc) = splice @_, 0, 2;
     
     # delay this so that the user will be cloaked (if applicable) before joining channels
-    if ( grep { $_->isa('POE::Component::IRC::Plugin::NickServID') } @{ $irc->pipeline->{PIPELINE} } ) {
+    if ( grep { $_->isa('POE::Component::IRC::Plugin::NickServID') } values %{ $irc->plugin_list() } ) {
         while (my ($chan, $key) = each %{ $self->{Channels} }) {
             $irc->delay([join => $chan => $key], 5);
         }
@@ -154,9 +152,7 @@ or a subclass thereof.
 
 =head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Two optional arguments:
 
@@ -170,8 +166,6 @@ uses the channels the component is already on, if any.
 
 Returns a plugin object suitable for feeding to L<POE::Component::IRC|POE::Component::IRC>'s
 plugin_add() method.
-
-=back
 
 =head1 AUTHOR
 

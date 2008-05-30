@@ -35,7 +35,6 @@ lib/POE/Component/IRC/Cookbook/BasicBot.pm
 lib/POE/Component/IRC/Cookbook/Disconnecting.pm
 lib/POE/Component/IRC/Cookbook/Resolver.pm
 lib/POE/Component/IRC/Cookbook/Translator.pm
-lib/POE/Component/IRC/Pipeline.pm
 lib/POE/Component/IRC/Plugin.pm
 lib/POE/Component/IRC/Plugin/AutoJoin.pm
 lib/POE/Component/IRC/Plugin/BotAddressed.pm
@@ -45,6 +44,7 @@ lib/POE/Component/IRC/Plugin/Connector.pm
 lib/POE/Component/IRC/Plugin/Console.pm
 lib/POE/Component/IRC/Plugin/CTCP.pm
 lib/POE/Component/IRC/Plugin/CycleEmpty.pm
+lib/POE/Component/IRC/Plugin/DCC.pm
 lib/POE/Component/IRC/Plugin/FollowTail.pm
 lib/POE/Component/IRC/Plugin/ISupport.pm
 lib/POE/Component/IRC/Plugin/Logger.pm
@@ -64,7 +64,6 @@ lib/POE/Filter/IRC.pm
 lib/POE/Filter/IRC/Compat.pm
 Makefile.PL
 MANIFEST			This list of files
-MANIFEST.SKIP
 META.yml
 README
 t/0_compile.t
@@ -115,4 +114,3 @@ xt/perl_critic.t
 xt/perlcriticrc
 xt/pod.t
 xt/pod_coverage.t
-xt/test_kwalitee.t

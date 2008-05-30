@@ -2,7 +2,6 @@ package POE::Component::IRC::Plugin::CycleEmpty;
 
 use strict;
 use warnings;
-use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user u_irc );
 
@@ -17,7 +16,7 @@ sub PCI_register {
     my ($self, $irc) = @_;
     
     if (!$irc->isa('POE::Component::IRC::State')) {
-        croak __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
+        die __PACKAGE__ . " requires PoCo::IRC::State or a subclass thereof";
     }
     
     $self->{cycling} = { };
@@ -116,14 +115,12 @@ L<POE::Component::IRC::State|POE::Component::IRC::State> or a subclass thereof.
 
 =head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
 
-=item C<cycling>
+=head2 C<cycling>
 
 One argument:
 
@@ -132,8 +129,6 @@ A channel name
 Returns 1 if the plugin is currently cycling that channel, 0 otherwise.
 Useful if need to ignore the fact that the Component just parted the channel
 in question.
-
-=back
 
 =head1 AUTHOR
 

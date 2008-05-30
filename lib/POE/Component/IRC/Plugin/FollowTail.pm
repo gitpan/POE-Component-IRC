@@ -2,19 +2,17 @@ package POE::Component::IRC::Plugin::FollowTail;
 
 use strict;
 use warnings;
-use Carp;
 use POE qw(Wheel::FollowTail);
 use POE::Component::IRC::Plugin qw( :ALL );
-use vars qw($VERSION);
 
-$VERSION = '0.02';
+our $VERSION = '0.02';
 
 sub new {
     my ($package, %args) = @_;
     $args{lc $_} = delete $args{$_} for keys %args;
     
     if (!$args{filename} || ! -e $args{filename}) {
-        croak "$package requires a valid 'filename' attribute\n"
+        die "$package requires a valid 'filename' attribute";
     }
     
     return bless \%args, $package;
@@ -65,20 +63,20 @@ sub _shutdown {
 
 sub _input {
     my ($kernel, $self, $input) = @_[KERNEL, OBJECT, ARG0];
-    $self->{irc}->_send_event( 'irc_tail_input', $self->{filename}, $input );
+    $self->{irc}->send_event( 'irc_tail_input', $self->{filename}, $input );
     return;
 }
 
 sub _error {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    $self->{irc}->_send_event( 'irc_tail_error', $self->{filename}, @_[ARG0..ARG2] );
+    $self->{irc}->send_event( 'irc_tail_error', $self->{filename}, @_[ARG0..ARG2] );
     $kernel->yield('_shutdown','TERM');
     return;
 }
 
 sub _reset {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    $self->{irc}->_send_event( 'irc_tail_reset', $self->{filename} );
+    $self->{irc}->send_event( 'irc_tail_reset', $self->{filename} );
     return;
 }
 
@@ -156,11 +154,9 @@ plugin that uses L<POE::Wheel::FollowTail|POE::Wheel::FollowTail> to follow
 the end of an ever-growing file. It generates 'irc_tail_' prefixed events for
 each new record that is appended to its file.
 
-=head1 CONSTRUCTOR
+=head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Takes two arguments:
 
@@ -168,30 +164,24 @@ Takes two arguments:
 
 'filter', a POE::Filter object to pass to POE::Wheel::FollowTail, optional;
 
-=back
-
-=head1 EVENTS
+=head1 OUTPUT
 
 The plugin generates the following additional
 L<POE::Component::IRC|POE::Component::IRC> events:
 
-=over
-
-=item C<irc_tail_input>
+=head2 C<irc_tail_input>
 
 Emitted for every complete record read. ARG0 will be the filename, ARG1 the
 record which was read.
 
-=item C<irc_tail_error>
+=head2 C<irc_tail_error>
 
 Emitted whenever an error occurs. ARG0 will be the filename, ARG1 and ARG2 hold
 numeric and string values for $!, respectively.
 
-=item C<irc_tail_reset>
+=head2 C<irc_tail_reset>
 
 Emitted every time a file is reset. ARG0 will be the filename.
-
-=back
 
 =head1 AUTHOR
 

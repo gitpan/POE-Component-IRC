@@ -2,16 +2,14 @@ package POE::Component::IRC::Plugin::NickServID;
 
 use strict;
 use warnings;
-use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( u_irc );
-use vars qw($VERSION);
 
-$VERSION = '1.2';
+our $VERSION = '1.2';
 
 sub new {
     my ($package, %self) = @_;
-    croak "$package requires a Password" unless defined $self{Password};
+    die "$package requires a Password" if !defined $self{Password};
     return bless \%self, $package;
 }
 
@@ -28,7 +26,7 @@ sub PCI_unregister {
 
 sub S_001 {
     my ($self, $irc) = splice @_, 0, 2;
-    $irc->yield(nickserv => 'IDENTIFY ' . $self->{Password});
+    $irc->yield(nickserv => "IDENTIFY $self->{Password}");
     return PCI_EAT_NONE;
 }
 
@@ -37,7 +35,7 @@ sub S_nick {
     my $mapping = $irc->isupport('CASEMAPPING');
     my $new_nick = u_irc( ${ $_[1] }, $mapping );
     if ( $new_nick eq u_irc($self->{nick}, $mapping) ) {
-        $irc->yield(nickserv => 'IDENTIFY ' . $self->{Password});
+        $irc->yield(nickserv => "IDENTIFY $self->{Password}");
         return PCI_EAT_NONE;
     }
 }
@@ -66,9 +64,7 @@ if your nickname matches the supplied password.
 
 =head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Arguments:
 
@@ -76,8 +72,6 @@ Arguments:
 
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
-
-=back
 
 =head1 AUTHOR
 

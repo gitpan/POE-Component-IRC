@@ -6,9 +6,8 @@ use warnings;
 use POE;
 use POE::Component::IRC::Plugin qw( PCI_EAT_NONE );
 use POE::Component::IRC::Common qw(:ALL);
-use vars qw($VERSION);
 
-$VERSION = '0.04';
+our $VERSION = '0.04';
 
 sub new {
     return bless { }, shift;
@@ -143,7 +142,7 @@ sub S_318 {
     my $nick = u_irc ${ $_[2] }->[0], $mapping;
     my $whois = delete $self->{WHOIS}->{ $nick };
 
-    $irc->_send_event( 'irc_whois', $whois ) if defined $whois;
+    $irc->send_event( 'irc_whois', $whois ) if defined $whois;
     return PCI_EAT_NONE;
 }
 
@@ -171,7 +170,7 @@ sub S_369 {
     my $nick = u_irc ${ $_[2] }->[0], $mapping;
 
     my $whowas = delete $self->{WHOWAS}->{ $nick };
-    $irc->_send_event( 'irc_whowas', $whowas ) if defined $whowas;
+    $irc->send_event( 'irc_whowas', $whowas ) if defined $whowas;
     return PCI_EAT_NONE;
 }
 
@@ -190,15 +189,11 @@ and 'irc_whowas' code from L<POE::Component::IRC|POE::Component::IRC> as a
 plugin. It is used internally by L<POE::Component::IRC|POE::Component::IRC>
 so there is no need to use this plugin yourself.
 
-=head1 CONSTRUCTOR
+=head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 No arguments required. Returns an POE::Component::IRC::Plugin::Whois object.
-
-=back
 
 =head1 AUTHOR
 

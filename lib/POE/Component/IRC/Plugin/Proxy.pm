@@ -8,6 +8,8 @@ use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( :ALL );
 
+our $VERSION = '5.78';
+
 sub new {
     my ($package, %args) = @_;
     $args{ lc $_ } = delete $args{ $_ } for keys %args;
@@ -282,7 +284,7 @@ sub _client_input {
         if ( ( not $self->{wheels}->{ $wheel_id }->{reg} ) and $self->{wheels}->{ $wheel_id }->{register} >= 2 ) {
             my $password = delete $self->{wheels}->{ $wheel_id }->{pass};
             $self->{wheels}->{ $wheel_id }->{reg} = 1;
-            unless ( $password and $password eq $self->{password} ) {
+            if ( !$password || $password ne $self->{password} ) {
                 $self->_send_to_client( $wheel_id => 'ERROR :Closing Link: * [' . ( $self->{wheels}->{ $wheel_id }->{user} || "unknown" ) . '@' . $self->{wheels}->{ $wheel_id }->{peer} . '] (Unauthorised connection)' );
                 $self->{wheels}->{ $wheel_id }->{quiting}++;
                 last SWITCH;
@@ -292,10 +294,10 @@ sub _client_input {
             if ( $nickname ne $self->{wheels}->{ $wheel_id }->{nick} ) {
                 $self->_send_to_client( $wheel_id, $self->{wheels}->{ $wheel_id }->{nick} . " NICK :$nickname" );
             }
-            foreach my $line ( @{ $self->{stash} } ) {
+            for my $line ( @{ $self->{stash} } ) {
                 $self->_send_to_client( $wheel_id, $line );
             }
-            foreach my $channel ( $self->current_channels() ) {
+            for my $channel ( $self->current_channels() ) {
                 $self->_send_to_client( $wheel_id, ":$fullnick JOIN $channel" );
                 $self->{irc}->yield( 'names' => $channel );
                 $self->{irc}->yield( 'topic' => $channel );
@@ -304,7 +306,7 @@ sub _client_input {
             last SWITCH;
         }
     
-        unless ( $self->{wheels}->{ $wheel_id }->{reg} ) {
+        if ( !$self->{wheels}->{ $wheel_id }->{reg} ) {
             last SWITCH;
         }
         if ( $input->{command} eq 'NICK' or $input->{command} eq 'USER' or $input->{command} eq 'PASS' ) {
@@ -363,13 +365,13 @@ sub list_wheels {
 sub wheel_info {
     my ($self, $wheel_id) = @_;
     return if !defined $self->{wheels}->{ $wheel_id };
-    return $self->{wheels}->{ $wheel_id }->{start} unless wantarray();
+    return $self->{wheels}->{ $wheel_id }->{start} if !wantarray();
     return map { $self->{wheels}->{ $wheel_id }->{$_} } qw(peer port start lag);
 }
 
 sub current_channels {
     my ($self) = @_;
-    return if !defined ( $self->{current_channels} ) && scalar keys %{ $self->{current_channels} } > 0;
+    return if !defined $self->{current_channels} || !keys %{ $self->{current_channels} };
     return ( map { $self->{current_channels}->{ $_ } } keys %{ $self->{current_channels} } );
 }
 
@@ -423,11 +425,9 @@ multiple IRC clients to connect.
 
 Neat, huh? >;o)
 
-=head1 CONSTRUCTOR
+=head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Takes a number of arguments:
 
@@ -440,73 +440,61 @@ Takes a number of arguments:
 Returns an object suitable for passing to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
 
-=back
-
-=head1 METHODS
-
-=over 
-
-=item C<current_channels>
+=head2 C<current_channels>
 
 Takes no arguments, returns a list of the channels that the component is
 currently a member of.
 
-=item C<getsockname>
+=head2 C<getsockname>
 
 Takes no arguments.  Accesses the listeners getsockname() method. See
 L<POE::Wheel::SocketFactory|POE::Wheel::SocketFactory> for details of the
 return value;
 
-=item C<list_wheels>
+=head2 C<list_wheels>
 
 Takes no arguments. Returns a list of wheel ids of the current connected clients.
 
-=item C<wheel_info>
+=head2 C<wheel_info>
 
 Takes one parameter, a wheel ID to query. Returns undef if an invalid wheel id
 is passed. In a scalar context returns the time that the client connected in
 unix time. In a list context returns a list consisting of the peer address,
 port, tthe connect time and the lag in seconds for that connection.
 
-=back
-
-=head1 EVENTS
+=head1 OUTPUT
 
 The plugin emits the following L<POE::Component::IRC|POE::Component::IRC>
 events:
 
-=over
-
-=item C<irc_proxy_up>
+=head2 C<irc_proxy_up>
 
 Emitted when the listener is successfully started. ARG0 is the result of the
 listener getsockname().
 
-=item C<irc_proxy_connect>
+=head2 C<irc_proxy_connect>
 
 Emitted when a client connects to the listener. ARG0 is the wheel ID of the
 client.
 
-=item C<irc_proxy_rw_fail>
+=head2 C<irc_proxy_rw_fail>
 
 Emitted when the Wheel::ReadWrite fails on a connection. ARG0 is the wheel ID
 of the client.
 
-=item C<irc_proxy_authed>
+=head2 C<irc_proxy_authed>
 
 Emitted when a connecting client successfully negotiates an IRC session with
 the plugin. ARG0 is the wheel ID of the client.
 
-=item C<irc_proxy_close>
+=head2 C<irc_proxy_close>
 
 Emitted when a connected client disconnects. ARG0 is the wheel ID of the client.
 
-=item C<irc_proxy_down>
+=head2 C<irc_proxy_down>
 
 Emitted when the listener is successfully shutdown. ARG0 is the result of the
 listener getsockname().
-
-=back
 
 =head1 QUIRKS
 

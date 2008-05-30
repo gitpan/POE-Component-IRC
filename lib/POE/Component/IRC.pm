@@ -1,36 +1,24 @@
-# $Id: IRC.pm,v 1.4 2005/04/24 10:31:28 chris Exp $
-#
-# POE::Component::IRC, by Dennis Taylor <dennis@funkplanet.com>
-# 
-# Additional enhancements by Chris 'BinGOs' Williams.
-#
-# This module may be used, modified, and distributed under the same
-# terms as Perl itself. Please see the license that came with your Perl
-# distribution for details.
-#
-
 package POE::Component::IRC;
 
 use strict;
 use warnings;
 use Carp;
-use File::Basename ();
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
            Filter::Line Filter::Stream Filter::Stackable);
-#use POE::Filter::CTCP;
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
 use POE::Component::IRC::Common qw(:ALL);
 use POE::Component::IRC::Constants qw(:ALL);
-use POE::Component::IRC::Pipeline;
 use POE::Component::IRC::Plugin qw(:ALL);
+use POE::Component::IRC::Plugin::DCC;
 use POE::Component::IRC::Plugin::ISupport;
 use POE::Component::IRC::Plugin::Whois;
 use Socket;
-use vars qw($VERSION $REVISION $GOT_SSL $GOT_CLIENT_DNS $GOT_SOCKET6);
+use base qw(POE::Component::Pluggable);
 
-$VERSION = '5.76';
-$REVISION = do {my@r=(q$Revision: 591 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our $VERSION = '5.78';
+our $REVISION = do {my@r=(q$Revision: 651 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6);
 
 BEGIN {
     eval {
@@ -107,15 +95,11 @@ sub _create {
         pong      => [ PRI_HIGH,     'oneortwo',      ],
     };
 
-    my @event_map = map {($_ => $self->{IRC_CMDS}->{$_}->[CMD_SUB])}
+    my %event_map = map {($_ => $self->{IRC_CMDS}->{$_}->[CMD_SUB])}
         keys %{ $self->{IRC_CMDS} };
 
     $self->{OBJECT_STATES_ARRAYREF} = [qw(
-        _dcc_failed
-        _dcc_read
-        _dcc_timeout
-        _dcc_up
-        _delayed_cmd
+        _delay
         _delay_remove
         _parseline
         __send_event
@@ -128,11 +112,6 @@ sub _create {
         _stop
         debug
         connect
-        dcc
-        dcc_accept
-        dcc_resume
-        dcc_chat
-        dcc_close
         _resolve_addresses
         _do_connect
         _send_login
@@ -153,9 +132,13 @@ sub _create {
     )];
 
     $self->{OBJECT_STATES_HASHREF} = {
-        @event_map,
-        _tryclose => 'dcc_close',
-        quote     => 'sl',
+        %event_map,
+        quote      => 'sl',
+        dcc        => '_dcc_dispatch',
+        dcc_accept => '_dcc_dispatch',
+        dcc_resume => '_dcc_dispatch',
+        dcc_chat   => '_dcc_dispatch',
+        dcc_close  => '_dcc_dispatch',
     };
 
     return;
@@ -168,7 +151,7 @@ sub _configure {
     my ($self, $args) = @_;
     my $spawned = 0;
     
-    if (ref $args eq 'HASH' && scalar keys %{ $args }) {
+    if (ref $args eq 'HASH' && keys %{ $args }) {
         $spawned = delete $args->{spawned};
         @{ $self }{ keys %{ $args } } = values %{ $args };
     }
@@ -176,15 +159,14 @@ sub _configure {
     if ($self->{debug}) {
         $self->{ircd_filter}->debug(1);
         $self->{ircd_compat}->debug(1);
-#        $self->{ctcp_filter}->debug(1);
     }
     
     if ($self->{useipv6} && !$GOT_SOCKET6) {
-        carp "'useipv6' specified, but Socket6 was not found";
+        warn "'useipv6' option specified, but Socket6 was not found\n";
     }
     
     if ($self->{usessl} && !$GOT_SSL) {
-        carp "'usessl' specified, but POE::Component::SSLify was not found";
+        warn "'usessl' opyion specified, but POE::Component::SSLify was not found\n";
     }
 
     if (!$self->{nodns} && $GOT_CLIENT_DNS && !$self->{resolver} ) {
@@ -192,6 +174,9 @@ sub _configure {
             Alias => 'resolver' . $self->session_id(),
         );
     }
+
+    $self->{dcc}->nataddr($self->{nataddr}) if exists $self->{nataddr};
+    $self->{dcc}->dccports($self->{dccports}) if exists $self->{dccports};
     
     $self->{port} = 6667 if !$self->{port};
     $self->{msg_length} = 450 if !defined $self->{msg_length};
@@ -213,279 +198,24 @@ sub _configure {
     }
 
     if (!defined $self->{ircname}) {
-        $self->{'ircname'} = $ENV{IRCNAME} || eval { (getpwuid $>)[6] }
+        $self->{ircname} = $ENV{IRCNAME} || eval { (getpwuid $>)[6] }
             || 'Just Another Perl Hacker';
     }
     
     if (!defined $self->{server} && !$spawned) {
-        croak 'No IRC server specified' if !$ENV{IRCSERVER};
+        die "No IRC server specified\n" if !$ENV{IRCSERVER};
         $self->{server} = $ENV{IRCSERVER};
     }
   
     return;
 }
 
-# What happens when an attempted DCC connection fails.
-sub _dcc_failed {
-    my ($self, $operation, $errnum, $errstr, $id) = @_[OBJECT, ARG0 .. ARG3];
-
-    if (!exists $self->{dcc}->{$id}) {
-        if (exists $self->{wheelmap}->{$id}) {
-            $id = $self->{wheelmap}->{$id};
-        }
-        else {
-            carp "_dcc_failed: Unknown wheel ID: $id";
-            return;
-        }
-    }
-  
-    # Reclaim our port if necessary.
-    if ( $self->{dcc}->{$id}->{listener} && $self->{dccports}
-        && $self->{dcc}->{$id}->{listenport} ) {
-        push ( @{ $self->{dccports} }, $self->{dcc}->{$id}->{listenport} );
-    }
-
-    DCC: {
-        last DCC if $errnum != 0;
-    
-        # Did the peer of a DCC GET connection close the socket after the file
-        # transfer finished? If so, it's not really an error.
-        if ($self->{dcc}->{$id}->{type} eq 'GET') {
-            if ($self->{dcc}->{$id}->{done} < $self->{dcc}->{$id}->{size}) {
-                last DCC;
-            }
-      
-            $self->_send_event(
-                'irc_dcc_done',
-                $id,
-                @{ $self->{dcc}->{$id} }{qw(
-                    nick type port file size
-                    done listenport clientaddr
-                )},
-            );
-
-            if ( $self->{dcc}->{$id}->{wheel} ) {
-                delete $self->{wheelmap}->{ $self->{dcc}->{$id}->{wheel}->ID };
-            }
-            close $self->{dcc}->{$id}->{fh};
-            delete $self->{dcc}->{$id};
-        }
-        elsif ($self->{dcc}->{$id}->{type} eq 'CHAT') {
-            $self->_send_event( 'irc_dcc_done', $id, @{ $self->{dcc}->{$id} }{
-              qw(nick type port done listenport clientaddr) } );
-      
-            if ($self->{dcc}->{$id}->{wheel}) {
-                delete $self->{wheelmap}->{ $self->{dcc}->{$id}->{wheel}->ID };
-            }
-            delete $self->{dcc}->{$id};
-        }
-        
-        return;
-    }
-  
-    # something went wrong
-    if ($errnum == 0 && $self->{dcc}->{$id}->{type} eq 'GET') {
-        $errstr = 'Aborted by sender';
-    }
-    else {
-        if ($errstr) {
-            $errstr = "$operation error $errnum: $errstr";
-        }
-        else {
-            $errstr = "$operation error $errnum";
-        }
-    }
-  
-    $self->_send_event(
-        'irc_dcc_error',
-        $id,
-        $errstr,
-        @{ $self->{dcc}->{$id} }{qw(
-            nick type port file size
-            done listenport clientaddr
-        )},
-    );
-
-    close $self->{dcc}->{$id}->{fh} if exists $self->{dcc}->{$id}->{fh};
-    if (exists $self->{dcc}->{$id}->{wheel}) {
-        delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
-    }
-    delete $self->{dcc}->{$id};
-
-    return;
-}
-
 sub debug {
     my ($self, $switch) = @_[OBJECT, ARG0];
 
-    $switch = $switch eq 'on' ? 1 : 0;
     $self->{debug} = $switch;
     $self->{ircd_filter}->debug( $switch );
     $self->{ircd_compat}->debug( $switch );
-#    $self->{ctcp_filter}->debug( $switch );
-    return;
-}
-
-# Accept incoming data on a DCC socket.
-sub _dcc_read {
-    my ($self, $data, $id) = @_[OBJECT, ARG0, ARG1];
-
-    $id = $self->{wheelmap}->{$id};
-
-    if ($self->{dcc}->{$id}->{type} eq 'GET') {
-        # Acknowledge the received data.
-        print {$self->{dcc}->{$id}->{fh}} $data;
-        $self->{dcc}->{$id}->{done} += length $data;
-        $self->{dcc}->{$id}->{wheel}->put(
-            pack 'N', $self->{dcc}->{$id}->{done}
-        );
-
-        # Send an event to let people know about the newly arrived data.
-        $self->_send_event(
-            'irc_dcc_get',
-            $id,
-            @{ $self->{dcc}->{$id} }{qw(
-                nick port file size
-                done listenport clientaddr
-            )},
-        );
-    }
-    elsif ($self->{dcc}->{$id}->{type} eq 'SEND') {
-        # Record the client's download progress.
-        $self->{dcc}->{$id}->{done} = unpack 'N', substr( $data, -4 );
-        
-        $self->_send_event(
-            'irc_dcc_send',
-            $id,
-            @{ $self->{dcc}->{$id} }{qw(
-                nick port file size done
-                listenport clientaddr
-            )},
-        );
-
-        # Are we done yet?
-        if ($self->{dcc}->{$id}->{done} >= $self->{dcc}->{$id}->{size}) {
-            # Reclaim our port if necessary.
-            if ( $self->{dcc}->{$id}->{listener} && $self->{dccports}
-                && $self->{dcc}->{$id}->{listenport} ) {
-                push @{ $self->{dccports} },
-                    $self->{dcc}->{$id}->{listenport};
-            }
-
-            $self->_send_event(
-                'irc_dcc_done',
-                $id,
-                @{ $self->{dcc}->{$id} }{qw(
-                    nick type port file size
-                    done listenport clientaddr
-                )},
-            );
-            delete $self->{wheelmap}->{ $self->{dcc}->{$id}->{wheel}->ID };
-            delete $self->{dcc}->{$id}->{wheel};
-            delete $self->{dcc}->{$id};
-            return;
-        }
-
-        # Send the next 'blocksize'-sized packet.
-        read $self->{dcc}->{$id}->{fh}, $data,
-            $self->{dcc}->{$id}->{blocksize};
-        $self->{dcc}->{$id}->{wheel}->put( $data );
-    }
-    else {
-        $self->_send_event(
-            'irc_dcc_' . lc $self->{dcc}->{$id}->{type},
-            $id,
-            @{ $self->{dcc}->{$id} }{qw(nick port)},
-            $data,
-        );
-    }
-    
-    return;
-}
-
-# What happens when a DCC connection sits waiting for the other end to
-# pick up the phone for too long.
-sub _dcc_timeout {
-    my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
-
-    if (exists $self->{dcc}->{$id} && !$self->{dcc}->{$id}->{open}) {
-        $kernel->yield(
-            '_dcc_failed',
-            'connection',
-            0,
-            'DCC connection timed out',
-            $id,
-        );
-    }
-    return;
-}
-
-# This event occurs when a DCC connection is established.
-sub _dcc_up {
-    my ($kernel, $self, $sock, $addr, $port, $id) =
-        @_[KERNEL, OBJECT, ARG0 .. ARG3];
-    
-    # Monitor the new socket for incoming data
-    # and delete the listening socket.
-    delete $self->{dcc}->{$id}->{factory};
-    $self->{dcc}->{$id}->{addr} = $addr;
-    $self->{dcc}->{$id}->{clientaddr} = inet_ntoa($addr);
-    $self->{dcc}->{$id}->{port} = $port;
-    $self->{dcc}->{$id}->{open} = 1;
-
-    $self->{dcc}->{$id}->{wheel} = POE::Wheel::ReadWrite->new(
-        Handle => $sock,
-        Driver => ($self->{dcc}->{$id}->{type} eq 'GET'
-            ? POE::Driver::SysRW->new( BlockSize => INCOMING_BLOCKSIZE )
-            : POE::Driver::SysRW->new()
-        ),
-        Filter => ($self->{dcc}->{$id}->{type} eq 'CHAT'
-            ? POE::Filter::Line->new( Literal => "\012" )
-            : POE::Filter::Stream->new() ),
-        InputEvent => '_dcc_read',
-        ErrorEvent => '_dcc_failed',
-    );
-    
-    $self->{wheelmap}->{ $self->{dcc}->{$id}->{wheel}->ID } = $id;
-    
-    my $handle;
-    if ($self->{dcc}->{$id}->{type} eq 'GET') {
-        # check if we're resuming
-        my $mode = -s $self->{dcc}->{$id}->{file} ? '>>' : '>';
-        
-        if ( !open $handle, $mode, $self->{dcc}->{$id}->{file} ) {
-            $kernel->yield(_dcc_failed => 'open file', $! + 0, $!, $id);
-            return;
-        }
-        
-        binmode $handle;
-        $self->{dcc}->{$id}->{fh} = $handle;
-    }
-    elsif ($self->{dcc}->{$id}->{type} eq 'SEND') {
-        if ( !open $handle, '<', $self->{dcc}->{$id}->{file} ) {
-            $kernel->yield(_dcc_failed => 'open file', $! + 0, $!, $id);
-            return;
-        }
-
-        binmode $handle;
-        # Send the first packet to get the ball rolling.
-        read $handle, my $buffer, $self->{dcc}->{$id}->{blocksize};
-        $self->{dcc}->{$id}->{wheel}->put($buffer);
-        $self->{dcc}->{$id}->{fh} = $handle;
-    }
-
-    # Tell any listening sessions that the connection is up.
-    $self->_send_event(
-        'irc_dcc_start',
-        $id,
-        @{ $self->{dcc}->{$id} }{qw(nick type port)},
-        ($self->{dcc}->{$id}->{'type'} =~ /^(SEND|GET)$/
-            ? (@{ $self->{dcc}->{$id} }{qw(file size)})
-            : ()
-        ),
-        @{ $self->{dcc}->{$id} }{qw(listenport clientaddr)},
-    );
-    
     return;
 }
 
@@ -522,9 +252,9 @@ sub send_event {
 
 # Hack to make plugin_add/del send events from OUR session
 sub __send_event {
-    my($self, $event, @args) = @_[ OBJECT, ARG0, ARG1 .. $#_ ];
+    my ($self, $event, @args) = @_[OBJECT, ARG0..$#_];
     # Actually send the event...
-    $self->_send_event( $event, @args );
+    $self->_send_event($event, @args);
     return 1;
 }
 
@@ -534,7 +264,7 @@ sub __send_event {
 # Changed to a method by BinGOs, 21st January 2005.
 # Amended by BinGOs (2nd February 2005) use call to send events to
 # *our* session first.
-sub _send_event  {
+sub _send_event {
     my ($self, $event, @args) = @_;
     my $kernel = $poe_kernel;
     my $session = $kernel->get_active_session()->ID();
@@ -545,7 +275,8 @@ sub _send_event  {
     # don't eat the events before *our* session can process them. *sigh*
     
     for my $value (values %{ $self->{events}->{irc_all} },
-        values %{ $self->{events}->{$event} }) {
+        values %{ $self->{events}->{$event} })
+    {
         $sessions{$value} = $value;
     }
 
@@ -555,14 +286,14 @@ sub _send_event  {
 
     my @extra_args;
     # Let the plugin system process this
-    return 1 if $self->_plugin_process(
+    return 1 if $self->_pluggable_process(
         'SERVER',
         $event,
         \( @args ),
-        \@extra_args
+        \@extra_args,
     ) == PCI_EAT_ALL;
 
-    push @args, @extra_args if scalar @extra_args;
+    push @args, @extra_args if @extra_args;
 
     # BINGOS:
     # We have a hack here, because the component used to send 'irc_connected'
@@ -687,7 +418,7 @@ sub _sock_up {
         };
 
         if ($@) {
-            carp "Couldn't use an SSL socket: $@";
+            warn "Couldn't use an SSL socket: $@\n";
             $self->{usessl} = 0;
         }
     }
@@ -712,8 +443,7 @@ sub _sock_up {
         $self->{connected} = 1;
     }
     else {
-        $self->_send_event(irc_socketerr => "Couldn't create ReadWrite wheel
-            for IRC socket" );
+        $self->_send_event(irc_socketerr => "Couldn't create ReadWrite wheel for IRC socket");
         return;
     }
 
@@ -754,7 +484,7 @@ sub _socks_proxy_response {
     }
     
     my @resp = unpack 'CCnN', $input;
-    if (scalar @resp != 4 || $resp[0] ne '0' || $resp[1] !~ /^(90|91|92|93)$/) {
+    if (@resp != 4 || $resp[0] ne '0' || $resp[1] !~ /^(90|91|92|93)$/) {
         $self->_send_event(
             'irc_socks_failed',
             'Mangled response from SOCKS proxy',
@@ -846,7 +576,6 @@ sub _start {
 
     $self->{ircd_filter} = POE::Filter::IRCD->new(debug => $self->{debug});
     $self->{ircd_compat} = POE::Filter::IRC::Compat->new(debug => $self->{debug});
-#    $self->{ctcp_filter} = POE::Filter::CTCP->new(debug => $self->{debug});
     
     my $srv_filters = [
         POE::Filter::Line->new(
@@ -875,6 +604,8 @@ sub _start {
 
     $self->{isupport} = POE::Component::IRC::Plugin::ISupport->new();
     $self->plugin_add('ISupport' . $self->{SESSION_ID}, $self->{isupport});
+    $self->{dcc} = POE::Component::IRC::Plugin::DCC->new();
+    $self->plugin_add('DCC' . $self->{SESSION_ID}, $self->{dcc});
 
     if ($kernel != $sender) {
         my $sender_id = $sender->ID;
@@ -883,6 +614,7 @@ sub _start {
         $self->{sessions}->{$sender_id}->{refcnt}++;
         $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
         $kernel->post($sender => irc_registered => $self);
+	$kernel->detach_myself();
     }
 
     return 1;
@@ -900,17 +632,16 @@ sub _stop {
     return;
 }
 
-
 # The handler for commands which have N arguments, separated by commas.
 sub commasep {
     my ($kernel, $self, $state, @args) = @_[KERNEL, OBJECT, STATE, ARG0 .. $#_];
     my $args;
 
-    if ($state eq 'whois' and scalar @args > 1 ) {
+    if ($state eq 'whois' and @args > 1 ) {
         $args = shift @args;
         $args .= ' ' . join ',', @args;
     }
-    elsif ( $state eq 'part' and scalar @args > 1 ) {
+    elsif ( $state eq 'part' and @args > 1 ) {
         my $chantypes = join('', @{ $self->isupport('CHANTYPES') }) || '#&';
         my $message;
         if ($args[-1] =~ /\s+/ || $args[-1] !~ /^[$chantypes]/) {
@@ -931,7 +662,6 @@ sub commasep {
     return;
 }
 
-
 # Get variables in order for openning a connection
 sub connect {
     my ($kernel, $self, $session, $sender, $args)
@@ -946,7 +676,7 @@ sub connect {
     }
 
     if ( $self->{resolver} && $self->{res_addresses}
-        && scalar @{ $self->{res_addresses} } ) {
+        && @{ $self->{res_addresses} } ) {
         push @{ $self->{res_addresses} }, $self->{server};
         $self->{server} = shift @{ $self->{res_addresses} };
     }
@@ -997,7 +727,7 @@ sub _do_connect {
     for my $address (qw(socks_proxy proxy server localaddr)) {
         next if !$self->{$address} || !irc_ip_is_ipv6( $self->{$address} );
         if (!$GOT_SOCKET6) {
-            carp "IPv6 address specified for '$address' but Socket6 not found";
+            warn "IPv6 address specified for '$address' but Socket6 not found\n";
             return;
         }
         $domain = AF_INET6;
@@ -1038,12 +768,12 @@ sub _got_dns_response {
         push @{ $self->{res_addresses} }, $net_dns_answer->rdatastr;
     }
 
-    if ( !scalar @{ $self->{res_addresses} } && $type eq 'AAAA') {
+    if ( !@{ $self->{res_addresses} } && $type eq 'AAAA') {
         $kernel->yield(_resolve_addresses => $self->{server}, 'A');
         return;
     }
 
-    if ( !scalar @{ $self->{res_addresses} } ) {
+    if ( !@{ $self->{res_addresses} } ) {
         $self->_send_event(irc_socketerr => 'Unable to resolve ' . $self->{server});
         return;
       }
@@ -1064,7 +794,7 @@ sub ctcp {
     my $message = join ' ', @_[ARG1 .. $#_];
 
     if (!defined $to || !defined $message) {
-        carp "The POE::Component::IRC event '$state' requires two arguments";
+        warn "The '$state' event requires two arguments\n";
         return;
     }
 
@@ -1078,261 +808,8 @@ sub ctcp {
     return;
 }
 
-# Attempt to initiate a DCC SEND or CHAT connection with another person.
-sub dcc {
-    my ($kernel, $self, $nick, $type, $file, $blocksize, $timeout)
-        = @_[KERNEL, OBJECT, ARG0 .. ARG4];
-    my ($bindport, $factory, $port, $myaddr, $size);
-
-    if (!defined $type) {
-        carp "The POE::Component::IRC event 'dcc' requires at least two arguments";
-        return;
-    }
-
-    $type = uc $type;
-
-    # Let the plugin system process this
-    return 1 if $self->_plugin_process(
-        'USER',
-        'DCC',
-        \$nick,
-        \$type,
-        \$file,
-        \$blocksize,
-    ) == PCI_EAT_ALL;
-
-    if ($type eq 'CHAT') {
-        $file = 'chat';   # As per the semi-specification
-
-    }
-    elsif ($type eq 'SEND') {
-        if (!defined $file) {
-            carp "The POE::Component::IRC event 'dcc' requires
-                three arguments for a SEND";
-            return;
-        }
-        $size = (stat $file)[7];
-        if (!defined $size) {
-            $self->_send_event(
-                'irc_dcc_error',
-                0,
-                "Couldn't get ${file}'s size: $!",
-                $nick,
-                $type,
-                0,
-                $file,
-            );
-            return;
-        }
-    }
-
-    if ($self->{localaddr} && $self->{localaddr} =~ tr/a-zA-Z.//) {
-        $self->{localaddr} = inet_aton( $self->{localaddr} );
-    }
-
-    if ( $self->{dccports} ) {
-        $bindport = shift @{ $self->{dccports} };
-        if (!defined $bindport) {
-          carp "dcc: Can't allocate listen port for DCC $type";
-          return;
-        }
-    }
-
-    $factory = POE::Wheel::SocketFactory->new(
-        BindAddress  => $self->{localaddr} || INADDR_ANY,
-        BindPort     => $bindport,
-        SuccessEvent => '_dcc_up',
-        FailureEvent => '_dcc_failed',
-        Reuse        => 'yes',
-    );
-    
-    ($port, $myaddr) = unpack_sockaddr_in( $factory->getsockname() );
-    $myaddr = inet_aton( $self->{nataddr} ) if $self->{nataddr};
-  
-    if (!defined $myaddr) {
-        carp "dcc: Can't determine our IP address! ($!)";
-        return;
-    }
-    $myaddr = unpack 'N', $myaddr;
-
-    # Tell the other end that we're waiting for them to connect.
-    my $basename = File::Basename::fileparse($file);
-    $basename = qq{"$basename"};
-
-    $kernel->yield(
-        'ctcp',
-        $nick,
-        "DCC $type $basename $myaddr $port" . ($size ? " $size" : '')
-    );
-
-    # Store the state for this connection.
-    $self->{dcc}->{ $factory->ID } = {
-        open       => undef,
-        nick       => $nick,
-        type       => $type,
-        file       => $file,
-        size       => $size,
-        port       => $port,
-        addr       => $myaddr,
-        done       => 0,
-        blocksize  => ($blocksize || BLOCKSIZE),
-        listener   => 1,
-        factory    => $factory,
-        listenport => $bindport,
-        clientaddr => $myaddr,
-    };
-    
-    $kernel->alarm(
-        '_dcc_timeout',
-        time() + ($timeout || DCC_TIMEOUT),
-        $factory->ID,
-    );
-    return;
-}
-
-# Accepts a proposed DCC connection to another client. See '_dcc_up' for
-# the rest of the logic for this.
-sub dcc_accept {
-    my ($kernel, $self, $cookie, $myfile) = @_[KERNEL, OBJECT, ARG0, ARG1];
-
-    # Let the plugin system process this
-    return 1 if $self->_plugin_process(
-        'USER',
-        'DCC_ACCEPT',
-        \$cookie,
-        \$myfile
-    ) == PCI_EAT_ALL;
-
-    if ($cookie->{type} =~ /SEND|ACCEPT/) {
-        $cookie->{type} = 'GET';
-        $cookie->{file} = $myfile if defined $myfile;   # filename override
-    }
-
-    my $factory = POE::Wheel::SocketFactory->new(
-        RemoteAddress => $cookie->{addr},
-        RemotePort    => $cookie->{port},
-        SuccessEvent  => '_dcc_up',
-        FailureEvent  => '_dcc_failed',
-    );
-  
-    $self->{dcc}->{$factory->ID} = $cookie;
-    $self->{dcc}->{$factory->ID}->{factory} = $factory;
-    return;
-}
-
-# bboett - first step - the user asks for a resume:
-# tries to resume a previous dcc transfer. See '_dcc_up' for
-# the rest of the logic for this.
-sub dcc_resume {
-    my ($kernel, $self, $cookie) = @_[KERNEL, OBJECT, ARG0 .. ARG2];
-
-    # Let the plugin system process this
-    return 1 if $self->_plugin_process(
-        'USER',
-        'DCC_RESUME',
-        \$cookie,
-    ) == PCI_EAT_ALL;
-    
-    if ($cookie->{type} eq 'SEND') {
-        $cookie->{type} = 'RESUME';
-        if ($cookie->{tmpfile}) {
-            my $size = -s $cookie->{tmpfile};
-            my $fraction = $size % INCOMING_BLOCKSIZE;
-            print("DCC RESUME org size $size frac= $fraction\n");
-            $size -= $fraction;
-            $cookie->{resumesize} = $size;
-
-            # we need to truncate the whole thing, adjust the size we are
-            # requesting to the size we will truncate the file to
-            if ( open(my $handle, '>>', $cookie->{tmpfile}) ) {
-                if (truncate($handle, $size)) {
-                    print("Success truncating file to size=$size\n");
-                }
-                my $nick = parse_user($cookie->{nick});
-                close($handle);
-
-                my $message = "\001DCC RESUME " . $cookie->{file} . ' '
-                    . $cookie->{port} . " $size\001";
-                my $state = 'PRIVMSG';
-                my $pri = $self->{IRC_CMDS}->{$state}->[CMD_PRI];
-
-                $state .= " $nick :$message";
-                $kernel->yield(sl_prioritized => $pri, $state );
-            }
-        }
-    }
-    
-    return;
-}
-
-# Send data over a DCC CHAT connection.
-sub dcc_chat {
-    my ($kernel, $self, $id, @data) = @_[KERNEL, OBJECT, ARG0, ARG1 .. $#_];
-
-    if (!exists $self->{dcc}->{$id}) {
-        carp "dcc_chat: Unknown wheel ID: $id";
-        return;
-    }
-    
-    if (!exists $self->{dcc}->{$id}->{wheel}) {
-        carp "dcc_chat: No DCC wheel for $id!";
-        return;
-    }
-  
-    if ($self->{dcc}->{$id}->{type} ne 'CHAT') {
-        carp "dcc_chat: $id isn't a DCC CHAT connection!";
-        return;
-    }
-
-    # Let the plugin system process this
-    return 1 if $self->_plugin_process(
-        'USER',
-        'DCC_CHAT',
-        \$id,
-        \( @data ),
-    ) == PCI_EAT_ALL;
-
-    $self->{dcc}->{$id}->{wheel}->put( join "\n", @data );
-    return;
-}
-
-# Terminate a DCC connection manually.
-sub dcc_close {
-    my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
-
-    if ($self->{dcc}->{$id}->{wheel}->get_driver_out_octets()) {
-        $kernel->delay_set( _tryclose => 2 => @_[ARG0..$#_] );
-        return;
-    }
-
-    # Let the plugin system process this
-    return 1 if $self->_plugin_process(
-        'USER',
-        'DCC_CLOSE',
-        \$id,
-    ) == PCI_EAT_ALL;
-
-    $self->_send_event(
-        'irc_dcc_done',
-        $id,
-        @{ $self->{dcc}->{$id} }{qw(
-            nick type port file size
-            done listenport clientaddr
-        )},
-    );
-
-    # Reclaim our port if necessary.
-    if ($self->{dcc}->{$id}->{listener} && $self->{dccports}
-        && $self->{dcc}->{$id}->{listenport}) {
-        push ( @{ $self->{dccports} }, $self->{dcc}->{$id}->{listenport} );
-    }
-
-    if (exists $self->{dcc}->{$id}->{wheel}) {
-        delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
-        delete $self->{dcc}->{$id}->{wheel};
-    }
-
-    delete $self->{dcc}->{$id};
+sub _dcc_dispatch {
+    $_[OBJECT]->_pluggable_process(USER => $_[STATE] => \(@_[ARG0..$#_]));
     return;
 }
 
@@ -1341,8 +818,8 @@ sub ison {
     my ($kernel, @nicks) = @_[KERNEL, ARG0 .. $#_];
     my $tmp = 'ISON';
 
-    if (!scalar @nicks) {
-        carp "No nicknames passed to POE::Component::IRC::ison";
+    if (!@nicks) {
+        warn "The 'ison' event requires one or more nicknames\n";
         return;
     }
 
@@ -1368,7 +845,7 @@ sub kick {
     my $message = join '', @_[ARG2 .. $#_];
 
     if (!defined $chan || !defined $nick) {
-        carp "The POE::Component::IRC event 'kick' requires at least two arguments";
+        warn "The 'kick' event requires at least two arguments\n";
         return;
     }
 
@@ -1383,7 +860,7 @@ sub remove {
     my $message = join '', @_[ARG2 .. $#_];
 
     if (!defined $chan || !defined $nick) {
-        carp "The POE::Component::IRC event 'remove' requires at least two arguments";
+        warn "The 'remove' event requires at least two arguments\n";
         return;
     }
 
@@ -1400,8 +877,7 @@ sub new {
         croak 'Not enough arguments to POE::Component::IRC::new()';
     }
     
-    carp join ' ', "Use of $package->new() is deprecated, please'
-        . ' use spawn(). Called from ", caller();
+    carp "Use of ${package}->new() is deprecated, please use spawn()";
     
     my $self = $package->spawn ( alias => $alias, options => \%options );
     return $self;
@@ -1416,6 +892,12 @@ sub spawn {
 
     my $self = bless { }, $package;
     $self->_create();
+
+    $self->_pluggable_init(
+        prefix     => 'irc_',
+        reg_prefix => 'PCI_',
+        types      => { SERVER => 'S', USER => 'U' },
+    );
 
     my $options = delete $params{options};
     my $alias = delete $params{alias};
@@ -1448,7 +930,7 @@ sub noargs {
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
     if (defined $arg) {
-        carp "The POE::Component::IRC event '$state' takes no arguments";
+        warn "The '$state' event takes no arguments\n";
         return;
     }
     $kernel->yield(sl_prioritized => $pri, $state);
@@ -1495,7 +977,7 @@ sub oneortwo {
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
     
     if (!defined $one) {
-        carp "The POE::Component::IRC event '$state' requires at least one argument";
+        warn "The '$state' event requires at least one argument\n";
         return;
     }
 
@@ -1512,7 +994,7 @@ sub onlyonearg {
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
     if (!defined $arg) {
-        carp "The POE::Component::IRC event '$state' requires one argument";
+        warn "The '$state' event requires one argument\n";
         return;
     }
 
@@ -1530,7 +1012,7 @@ sub onlytwoargs {
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
     if (!defined $one || !defined $two) {
-        carp "The POE::Component::IRC event '$state' requires two arguments";
+        warn "The '$state' event requires two arguments\n";
         return;
     }
 
@@ -1553,7 +1035,7 @@ sub privandnotice {
     $state =~ s/noticehi/notice/;
 
     if (!defined $to || !defined $message) {
-        carp "The POE::Component::IRC event '$state' requires two arguments";
+        warn "The '$state' event requires two arguments\n";
         return;
     }
 
@@ -1581,12 +1063,12 @@ sub _poco_irc_sig_register {
         $sender_id = $ref->ID();
     }
     else {
-        carp "Can\'t resolve $sender";
+        warn "Can\'t resolve $sender\n";
         return;
     }
   
-    if (!scalar @events) {
-        carp "Signal POCOIRC: Not enough arguments";
+    if (!@events) {
+        warn "Signal POCOIRC: Not enough arguments\n";
         return;
     }
 
@@ -1610,8 +1092,8 @@ sub register {
     my ($kernel, $self, $session, $sender, @events)
         = @_[KERNEL, OBJECT, SESSION, SENDER, ARG0 .. $#_];
 
-    if (!scalar @events) {
-        carp 'register: Not enough arguments';
+    if (!@events) {
+        warn "The 'register' event requires more arguments\n";
         return;
     }
 
@@ -1626,7 +1108,8 @@ sub register {
         if (!$self->{sessions}->{$sender_id}->{refcnt} && $session != $sender) {
             $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
         }
-        $self->{sessions}->{$sender_id}->{refcnt}++
+        
+        $self->{sessions}->{$sender_id}->{refcnt}++;
     }
 
     # BINGOS:
@@ -1642,23 +1125,25 @@ sub register {
 sub shutdown {
     my ($kernel, $self, $sender, $session) = @_[KERNEL, OBJECT, SENDER, SESSION];
     my $args = '';
-    $args = join '', @_[ARG0..$#_] if scalar @_[ARG0..$#_];
+    $args = join '', @_[ARG0..$#_] if @_[ARG0..$#_];
     $args = ":$args" if $args =~ /\s/;
-    
-    my $cmd = join ' ', 'QUIT', $args;
-    $kernel->sig( 'POCOIRC_REGISTER' );
-    $kernel->sig( 'POCOIRC_SHUTDOWN' );
+    my $cmd = "QUIT $args";
+
+    $kernel->sig('POCOIRC_REGISTER');
+    $kernel->sig('POCOIRC_SHUTDOWN');
     $self->{_shutdown} = 1;
-    $self->_send_event( 'irc_shutdown', $sender->ID() );
+    $self->_send_event(irc_shutdown => $sender->ID());
     $self->_unregister_sessions();
     $kernel->alarm_remove_all();
-    $kernel->alias_remove( $_ ) for $kernel->alias_list( $session );
-    delete $self->{$_} for qw(sock socketfactory dcc wheelmap);
+    $kernel->alias_remove($_) for $kernel->alias_list($session);
+    delete $self->{$_} for qw(socketfactory dcc wheelmap);
+    
     # Delete all plugins that are loaded.
-    $self->plugin_del( $_ ) for keys %{ $self->plugin_list() };
+    $self->_pluggable_destroy();
+    
     $self->{resolver}->shutdown() if $self->{resolver};
     $kernel->call($session => sl_high => $cmd) if $self->{socket};
-
+    
     return;
 }
 
@@ -1701,14 +1186,14 @@ sub sl_prioritized {
     # Get the first word for the plugin system
     if (my ($event) = $msg =~ /^(\w+)\s*/ ) {
         # Let the plugin system process this
-        return 1 if $self->_plugin_process(
+        return 1 if $self->_pluggable_process(
             'USER',
             $event,
             \$msg,
         ) == PCI_EAT_ALL;
     }
     else {
-        carp "Unable to extract the event name from '$msg'";
+        warn "Unable to extract the event name from '$msg'\n";
     }
 
     my $now = time();
@@ -1756,7 +1241,7 @@ sub sl_delayed {
         $self->{socket}->put($arg);
     }
 
-    if (scalar @{ $self->{send_queue} }) {
+    if (@{ $self->{send_queue} }) {
         $kernel->delay( sl_delayed => $self->{send_time} - $now - 10 );
     }
     
@@ -1775,19 +1260,18 @@ sub spacesep {
     return;
 }
 
-
 # Set or query the current topic on a channel.
 sub topic {
-    my ($kernel,$chan,@args) = @_[KERNEL,ARG0,ARG1..$#_];
-    my $topic; 
-    $topic = join '', @args if scalar @args;
+    my ($kernel, $chan, @args) = @_[KERNEL, ARG0..$#_];
+    my $topic;
+    $topic = join '', @args if @args;
 
     if (defined $topic) {
         $chan .= " :";
         $chan .= $topic if length $topic;
     }
     
-    $kernel->yield(sl_prioritized => PRI_NORMAL, "TOPIC $chan" );
+    $kernel->yield(sl_prioritized => PRI_NORMAL, "TOPIC $chan");
     return;
 }
 
@@ -1796,8 +1280,8 @@ sub unregister {
     my ($kernel, $self, $session, $sender, @events)
         = @_[KERNEL, OBJECT, SESSION, SENDER, ARG0 .. $#_];
 
-    if (!scalar @events) {
-        carp 'unregister: Not enough arguments';
+    if (!@events) {
+        warn "The 'unregister' event requires more arguments\n";
         return;
     }
 
@@ -1813,7 +1297,7 @@ sub _unregister {
         $event = "irc_$event" if $event !~ /^_/;
         my $blah = delete $self->{events}->{$event}->{$sender_id};
         if (!defined $blah) {
-            carp "$sender_id hasn't registered for '$event' events";
+            carp "Sender $sender_id hasn't registered for '$event' events";
             next;
         }
     
@@ -1846,8 +1330,8 @@ sub _unregister_sessions {
 sub userhost {
     my ($kernel, @nicks) = @_[KERNEL, ARG0 .. $#_];
 
-    if (!scalar @nicks) {
-        carp 'No nicknames passed to POE::Component::IRC::userhost';
+    if (!@nicks) {
+        warn "The 'userhost' event requires at least one nickname\n";
         return;
     }
 
@@ -1872,6 +1356,11 @@ sub version {
 sub server_name {
     my ($self) = @_;
     return $self->{INFO}->{ServerName};
+}
+
+sub localaddr {
+    my ($self) = @_;
+    return $self->{localaddr};
 }
 
 sub nick_name {
@@ -1925,15 +1414,10 @@ sub delay {
         return;
     }
 
-    return $poe_kernel->call($self->session_id() => _delayed_cmd => $arrayref => @args);
+    return $poe_kernel->call($self->session_id() => _delay => $arrayref => @args);
 }
 
-sub delay_remove {
-    my ($self, @args) = @_;
-    return $poe_kernel->call($self->session_id() => _delay_remove => @args);
-}
-
-sub _delayed_cmd {
+sub _delay {
     my ($kernel, $self, $arrayref, $time) = @_[KERNEL, OBJECT, ARG0, ARG1];
     
     return if !scalar @{ $arrayref };
@@ -1944,6 +1428,12 @@ sub _delayed_cmd {
     return $alarm_id;
 }
 
+sub delay_remove {
+    my ($self, @args) = @_;
+    return $poe_kernel->call($self->session_id() => _delay_remove => @args);
+}
+
+
 sub _delay_remove {
     my ($kernel, $self, $alarm_id) = @_[KERNEL, OBJECT, ARG0];
     
@@ -1953,17 +1443,6 @@ sub _delay_remove {
         splice @old_alarm_list, 1, 1;
         $self->send_event(irc_delay_removed => $alarm_id, @old_alarm_list );
         return \@old_alarm_list;
-    }
-    
-    return;
-}
-
-sub _validate_command {
-    my ($self, $cmd) = @_;
-    $cmd = lc $cmd || return;
-
-    for my $command ( keys %{ $self->{IRC_CMDS} } ) {
-        return 1 if $cmd eq $command
     }
     
     return;
@@ -2016,8 +1495,8 @@ sub _compress_downlink {
 sub S_ping {
     my ($self, $irc) = splice @_, 0, 2;
     my $arg = ${ $_[0] };
-    $irc->yield(sl_login => "PONG :$arg" );
-    return;
+    $irc->yield(sl_login => "PONG :$arg");
+    return PCI_EAT_NONE;
 }
 
 # NICK messages for the purposes of determining our current nickname
@@ -2026,13 +1505,13 @@ sub S_nick {
     my $nick = ( split /!/, ${ $_[0] } )[0];
     my $new = ${ $_[1] };
     $self->{RealNick} = $new if ( $nick eq $self->{RealNick} );
-    return;
+    return PCI_EAT_NONE;
 }
 
 sub S_isupport {
     my ($self, $irc) = splice @_, 0, 2;
     $self->{ircd_compat}->chantypes( $self->{isupport}->isupport('CHANTYPES') || [ '#', '&' ] );
-    return;
+    return PCI_EAT_NONE;
 }
 
 # accesses the ISupport plugin
@@ -2049,186 +1528,10 @@ sub resolver {
     return $_[0]->{resolver};
 }
 
-# accesses the plugin pipeline
-sub pipeline {
-    my ($self) = @_;
-    
-    if (!eval { $self->{PLUGINS}->isa('POE::Component::IRC::Pipeline') }) {
-        $self->{PLUGINS} = POE::Component::IRC::Pipeline->new($self);
-    }
-    return $self->{PLUGINS};
-}
-
-# Adds a new plugin object
-sub plugin_add {
-    my ($self, $name, $plugin) = @_;
-    my $pipeline = $self->pipeline;
-
-    if (!defined $name || !defined $plugin) {
-        carp 'Please supply a name and the plugin object to be added!';
-        return;
-    }
-
-    return $pipeline->push($name => $plugin);
-}
-
-# Removes a plugin object
-sub plugin_del {
-    my ($self, $name) = @_;
-
-    if (!defined $name) {
-        carp 'Please supply a name/object for the plugin to be removed!';
-        return;
-    }
-
-    my $return = scalar $self->pipeline->remove($name);
-    carp "$@" if $@;
-    
-    return $return;
-}
-
-# Gets the plugin object
-sub plugin_get {
-    my ($self, $name) = @_;  
-
-    if (!defined $name) {
-        carp 'Please supply a name/object for the plugin to be removed!';
-        return;
-  }
-
-  return scalar $self->pipeline->get($name);
-}
-
-# Lists loaded plugins
-sub plugin_list {
-  my ($self) = @_;
-  my $pipeline = $self->pipeline;
-  my %return;
-
-  for my $plugin (@{ $pipeline->{PIPELINE} }) {
-    $return{ $pipeline->{PLUGS}{$plugin} } = $plugin;
-  }
-
-  return \%return;
-}
-
-# Lists loaded plugins in order!
-sub plugin_order {
-    my ($self) = @_;
-    return $self->pipeline->{PIPELINE};
-}
-
-# Lets a plugin register for certain events
-sub plugin_register {
-    my ($self, $plugin, $type, @events) = @_;
-    my $pipeline = $self->pipeline;
-
-    if (!defined $plugin) {
-        carp 'Please supply the plugin object to register!';
-        return;
-    }
-
-    if (!defined $type || $type !~ /SERVER|USER/) {
-        carp 'Type should be SERVER or USER!';
-        return;
-    }
-
-    if (!scalar @events) {
-        carp 'Please supply at least one event to register!';
-        return;
-    }
-
-    for my $event (@events) {
-        if (ref $event eq 'ARRAY') {
-            @{ $pipeline->{HANDLES}{$plugin}{$type} }{ map { lc } @$event } = (1) x @$event;
-        }
-        else {
-            $pipeline->{HANDLES}{$plugin}{$type}{lc $event} = 1;
-        }
-    }
-
-    return 1;
-}
-
-# Lets a plugin unregister events
-sub plugin_unregister {
-    my ($self, $plugin, $type, @events) = @_;
-    my $pipeline = $self->pipeline;
-
-    if (!defined $type || $type !~ /SERVER|USER/) {
-        carp 'Type should be SERVER or USER!';
-        return;
-    }
-
-    if (!defined $plugin) {
-        carp 'Please supply the plugin object to register!';
-        return;
-    }
-
-    if (!scalar @events) {
-        carp 'Please supply at least one event to unregister!';
-        return;
-    }
-
-    for my $event (@events) {
-        if (ref $event eq 'ARRAY') {
-            for my $e (map { lc } @$event) {
-                if (!delete $pipeline->{HANDLES}{$plugin}{$type}{$e}) {
-                    carp "The event '$e' does not exist!";
-                    next;
-                }
-            }
-        }
-        else {
-            $event = lc $event;
-            if (!delete $pipeline->{HANDLES}{$plugin}{$type}{$event}) {
-                carp "The event '$event' does not exist!";
-                next;
-            }
-        }
-    }
-
-    return 1;
-}
-
-# Process an input event for plugins
-sub _plugin_process {
-    my ($self, $type, $event, @args) = @_;
-    my $pipeline = $self->pipeline;
-
-    $event = lc $event;
-    $event =~ s/^irc_//;
-
-    my $sub = ($type eq 'SERVER' ? 'S' : 'U') . "_$event";
-    my $return = PCI_EAT_NONE;
-
-    if ( $self->can($sub) ) {
-        eval { $self->$sub( $self, @args ) };
-        carp "$@" if $@;
-    }
-
-    for my $plugin (@{ $pipeline->{PIPELINE} }) {
-        next if $self eq $plugin;
-        next if !$pipeline->{HANDLES}{$plugin}{$type}{$event}
-            && !$pipeline->{HANDLES}{$plugin}{$type}{all};
-        
-        my $ret = PCI_EAT_NONE;
-
-        if ( $plugin->can($sub) ) {
-            eval { $ret = $plugin->$sub($self, @args) };
-            carp "$sub call failed with '$@'" if $@ && $self->{plugin_debug};
-        }
-        elsif ( $plugin->can('_default') ) {
-            eval { $ret = $plugin->_default($self, $sub, @args) };
-            carp "_default call failed with '$@'" if $@ && $self->{plugin_debug};
-        }
-
-        return $return if $ret == PCI_EAT_PLUGIN;
-        $return = PCI_EAT_ALL if $ret == PCI_EAT_CLIENT;
-        return PCI_EAT_ALL if $ret == PCI_EAT_ALL;
-    }
-
-    return $return;
+sub _pluggable_event {
+    my ($self, @args) = @_;
+    $self->yield(__send_event => @args);
+    return;
 }
 
 1;
@@ -2347,12 +1650,12 @@ and dispatches 'irc_' prefixed events to interested sessions and
 an object that can be used to access additional information using methods.
 
 Sessions register their interest in receiving 'irc_' events by sending
-C<register> to the component. One would usually do this in your C<_start>
-handler. Your session will continue to receive events until you C<unregister>.
-The component will continue to stay around until you tell it not to with
-C<shutdown>.
+L<< C<register>|/"register" >> to the component. One would usually do this in
+your C<_start> handler. Your session will continue to receive events until
+you L<< C<unregister>|/"unregister" >>. The component will continue to stay
+around until you tell it not to with L<< C<shutdown>|/"shutdown" >>.
 
-The SYNOPSIS demonstrates a fairly basic bot.
+The L<SYNOPSIS|/"SYNOPSIS"> demonstrates a fairly basic bot.
 
 See L<POE::Component::IRC::Cookbook|POE::Component::IRC::Cookbook> for more
 examples.
@@ -2391,6 +1694,10 @@ That is not a subclass, just a placeholder for documentation!
 A number of useful plugins have made their way into the core distribution:
 
 =over 
+
+=item L<POE::Component::IRC::Plugin::DCC|POE::Component::IRC::Plugin::DCC>
+
+Provides DCC support. Loaded by default.
 
 =item L<POE::Component::IRC::Plugin::AutoJoin|POE::Component::IRC::Plugin::AutoJoin>
 
@@ -2456,13 +1763,11 @@ to gain ops.
 
 =head1 CONSTRUCTORS
 
-Both CONSTRUCTORS return an object. The object is also available within 'irc_'
-event handlers by using 
-C<< $_[SENDER]->get_heap() >>. See also C<register> and C<irc_registered>.
+Both constructors return an object. The object is also available within 'irc_'
+event handlers by using C<< $_[SENDER]->get_heap() >>. See also L<< C<register>|/"register" >>
+and L<< C<irc_registered>|"/irc_registered" >>.
 
-=over
-
-=item C<spawn>
+=head2 C<spawn>
 
 Takes a number of arguments, all of which are optional: 
 
@@ -2484,7 +1789,8 @@ Takes a number of arguments, all of which are optional:
 
 'UseSSL', set to some true value if you want to connect using SSL.
 
-'Raw', set to some true value to enable the component to send C<irc_raw> events.
+'Raw', set to some true value to enable the component to send
+L<< C<irc_raw>|/"irc_raw" >> events.
 
 'LocalAddr', which local IP address on a multihomed box to connect as;
 
@@ -2532,7 +1838,8 @@ the IRC server might disconnect you with a "Request too long" message.
 C<spawn> will supply reasonable defaults for any of these attributes which are
 missing, so don't feel obliged to write them all out.
 
-All the above options may be supplied to C<connect> input event as well.
+All the above options may be supplied to L<< C<connect>|/"connect" >> input
+event as well.
 
 If the component finds that L<POE::Component::Client::DNS|POE::Component::Client::DNS>
 is installed it will use that to resolve the server name passed. Disable this
@@ -2547,25 +1854,25 @@ when enabling this option.
 Two new attributes are "Proxy" and "ProxyPort" for sending your
 IRC traffic through a proxy server. "Proxy"'s value should be the IP
 address or server name of the proxy. "ProxyPort"'s value should be the
-port on the proxy to connect to.  C<connect> will default to using the
-I<actual> IRC server's port if you provide a proxy but omit the proxy's
-port. These are for HTTP Proxies. See 'socks_proxy' for SOCKS4 and SOCKS4a
-support.
+port on the proxy to connect to. L<< C<connect>|/"connect" >> will default
+to using the I<actual> IRC server's port if you provide a proxy but omit
+the proxy's port. These are for HTTP Proxies. See 'socks_proxy' for SOCKS4
+and SOCKS4a support.
 
 For those people who run bots behind firewalls and/or Network Address
 Translation there are two additional attributes for DCC. "DCCPorts", is an
-arrayref of ports to use when initiating DCC, using C<dcc()>. "NATAddr", is the
-NAT'ed IP address that your bot is hidden behind, this is sent whenever you
-do DCC.
+arrayref of ports to use when initiating DCC, using C<dcc>. "NATAddr", is
+the NAT'ed IP address that your bot is hidden behind, this is sent whenever
+you do DCC.
 
 SSL support requires L<POE::Component::SSLify|POE::Component::SSLify>, as well
 as an IRC server that supports SSL connections. If you're missing
 POE::Component::SSLify, specifing 'UseSSL' will do nothing. The default is to
 not try to use SSL.
 
-Setting 'Raw' to true, will enable the component to send C<irc_raw> events to
-interested plugins and sessions. See below for more details on what a C<irc_raw>
-events is :)
+Setting 'Raw' to true, will enable the component to send
+L<< C<irc_raw>|/"irc_raw" >> events to interested plugins and sessions.
+See below for more details on what a C<irc_raw> events is :)
 
 'NoDNS' has different results depending on whether it is set with C<spawn()> or
 C<connect>. Setting it with C<spawn()>, disables the creation of the
@@ -2590,7 +1897,7 @@ installed. If you have L<Socket6|Socket6> and L<POE::Component::Client::DNS|POE:
 installed and specify a hostname that resolves to an IPv6 address then IPv6
 will be used. If you specify an ipv6 'localaddr' then IPv6 will be used.
 
-=item C<new>
+=head2 C<new>
 
 This method is deprecated. See the C<spawn()> method instead.
 Takes one argument: a name (kernel alias) which this new connection
@@ -2598,73 +1905,75 @@ will be known by. Returns a POE::Component::IRC object :)
 Use of this method will generate a warning. There are currently no plans to
 make it die() >;]
 
-=back
-
 =head1 METHODS
 
-These are methods supported by the POE::Component::IRC object. 
+These are methods supported by the POE::Component::IRC object. It also
+inherits a few from L<POE::Component::Pluggable|POE::Component::Pluggable>.
+See its documentation for details.
 
-=over
-
-=item C<server_name>
+=head2 C<server_name>
 
 Takes no arguments. Returns the name of the IRC server that the component
 is currently connected to.
 
-=item C<nick_name>
+=head2 C<nick_name>
 
 Takes no arguments. Returns a scalar containing the current nickname that the
 bot is using.
 
-=item C<session_id>
+=head2 C<localaddr>
+
+Takes no arguments. Returns the IP address being used.
+
+=head2 C<session_id>
 
 Takes no arguments. Returns the ID of the component's session. Ideal for posting
 events to the component.
 
  $kernel->post( $irc->session_id() => 'mode' => $channel => '+o' => $dude );
 
-=item C<session_alias>
+=head2 C<session_alias>
 
 Takes no arguments. Returns the session alias that has been set through
 C<spawn()>'s alias argument. 
 
-=item C<version>
+=head2 C<version>
 
 Takes no arguments. Returns the version number of the module.
 
-=item C<send_queue>
+=head2 C<send_queue>
 
 The component provides anti-flood throttling. This method takes no arguments
 and returns a scalar representing the number of messages that are queued up
 waiting for dispatch to the irc server.
 
-=item C<connected>
+=head2 C<connected>
 
 Takes no arguments. Returns true or false depending on whether the component is
 currently connected to an IRC network or not.
 
-=item C<disconnect>
+=head2 C<disconnect>
 
 Takes no arguments. Terminates the socket connection disgracefully >;o]
 
-=item C<raw_events>
+=head2 C<raw_events>
 
-With no arguments, returns true or false depending on whether C<irc_raw> events
-are being  generated or not. Provide a true or false argument to enable or
-disable this feature accordingly.
+With no arguments, returns true or false depending on whether
+L<< C<irc_raw>|/"irc_raw" >> events are being  generated or not. Provide a
+true or false argument to enable or disable this feature accordingly.
 
-=item C<isupport>
+=head2 C<isupport>
 
 Takes one argument, a server capability to query. Returns undef on failure or a
 value representing the applicable capability. A full list of capabilities is
 available at L<http://www.irc.org/tech_docs/005.html>.
 
-=item C<isupport_dump_keys>
+=head2 C<isupport_dump_keys>
 
 Takes no arguments, returns a list of the available server capabilities keys,
-which can be used with C<isupport()>.
+which can be used with L<< C<isupport()>|/"isupport" >>.
 
-=item C<yield>
+=head2 C<yield>
 
 This method provides an alternative object based means of posting events to the
 component. First argument is the event to post, following arguments are sent as
@@ -2672,7 +1981,7 @@ arguments to the resultant post.
 
  $irc->yield(mode => $channel => '+o' => $dude);
 
-=item C<call>
+=head2 C<call>
 
 This method provides an alternative object based means of calling events to the
 component. First argument is the event to call, following arguments are sent as
@@ -2681,7 +1990,7 @@ call.
 
  $irc->call(mode => $channel => '+o' => $dude);
 
-=item C<delay>
+=head2 C<delay>
 
 This method provides a way of posting delayed events to the component. The
 first argument is an arrayref consisting of the delayed command to post and
@@ -2690,41 +1999,35 @@ wishes to delay the command being posted.
 
  my $alarm_id = $irc->delay( [ mode => $channel => '+o' => $dude ], 60 );
 
-Returns an alarm ID that can be used with C<delay_remove()> to cancel the delayed
-event. This will be undefined if something went wrong.
+Returns an alarm ID that can be used with L<< C<delay_remove()>|/"delay_remove" >>
+to cancel the delayed event. This will be undefined if something went wrong.
 
-=item C<delay_remove>
+=head2 C<delay_remove>
 
 This method removes a previously scheduled delayed event from the component.
-Takes one argument, the C<alarm_id> that was returned by a C<delay()> method call.
+Takes one argument, the C<alarm_id> that was returned by a
+L<< C<delay()>|/"delay" >> method call.
 
  my $arrayref = $irc->delay_remove( $alarm_id );
 
 Returns an arrayref that was originally requested to be delayed.
 
-=item C<resolver>
+=head2 C<resolver>
 
 Returns a reference to the L<POE::Component::Client::DNS|POE::Component::Client::DNS>
 object that is internally created by the component.
 
-=item C<pipeline>
-
-Returns a reference to the L<POE::Component::IRC::Pipeline|POE::Component::IRC::Pipeline>
-object used by the plugin system.
-
-=item C<send_event>
+=head2 C<send_event>
 
 Sends an event through the components event handling system. These will get
 processed by plugins then by registered sessions. First argument is the event
 name, followed by any parameters for that event.
 
-=back
-
 =head1 INPUT
 
 How to talk to your new IRC component... here's the events we'll accept.
 These are events that are posted to the component, either via
-C<< $poe_kernel->post() >> or via the object method C<yield()>.
+C<< $poe_kernel->post() >> or via the object method L<< C<yield()>|/"yield" >>.
 
 So the following would be functionally equivalent:
 
@@ -2742,9 +2045,7 @@ So the following would be functionally equivalent:
 
 =head2 Important Commands
 
-=over
-
-=item C<register>
+=head3 C<register>
 
 Takes N arguments: a list of event names that your session wants to
 listen for, minus the 'irc_' prefix. So, for instance, if you just
@@ -2753,21 +2054,21 @@ need to listen for JOINs, PARTs, QUITs, and KICKs to people on the
 channel you're in. You'd tell POE::Component::IRC that you want those
 events by saying this:
 
- $kernel->post( 'my client', 'register', qw(join part quit kick) );
+ $kernel->post('my client', 'register', qw(join part quit kick));
 
 Then, whenever people enter or leave a channel your bot is on (forcibly
-or not), your session will receive events with names like C<irc_join>,
-C<irc_kick>, etc., which you can use to update a list of people on the
-channel.
+or not), your session will receive events with names like
+L<< C<irc_join>|/"irc_join" >>, L<< C<irc_kick>|/"irc_kick" >>, etc.,
+which you can use to update a list of people on the channel.
 
 Registering for C<'all'> will cause it to send all IRC-related events to
 you; this is the easiest way to handle it. See the test script for an
 example.
 
-Registering will generate an C<irc_registered> event that your session can
-trap. ARG0 is the components object. Useful if you want to bolt PoCo-IRC's
-new features such as Plugins into a bot coded to the older deprecated API.
-If you are using the new API, ignore this :)
+Registering will generate an L<< C<irc_registered>|/"irc_registered" >>
+event that your session can trap. ARG0 is the components object. Useful
+if you want to bolt PoCo-IRC's new features such as Plugins into a bot
+coded to the older deprecated API. If you are using the new API, ignore this :)
 
 Registering with multiple component sessions can be tricky, especially if
 one wants to marry up sessions/objects, etc. Check 'SIGNALS' section of this
@@ -2778,14 +2079,14 @@ session, the component will automatically register that session as wanting 'all'
 irc events. That session will receive an C<irc_registered> event indicating that
 the component is up and ready to go.
 
-=item C<connect>
+=head3 C<connect>
 
 Takes one argument: a hash reference of attributes for the new
 connection, see C<spawn()> for details. This event tells the IRC client to
 connect to a new/different server. If it has a connection already open, it'll
 close it gracefully before reconnecting.
 
-=item C<ctcp> and C<ctcpreply>
+=head3 C<ctcp> and C<ctcpreply>
 
 Sends a CTCP query or response to the nick(s) or channel(s) which you
 specify. Takes 2 arguments: the nick or channel to send a message to
@@ -2796,27 +2097,27 @@ for you). The "/me" command in popular IRC clients is actually a CTCP action.
  # Doing a /me 
  $irc->yield(ctcp => $channel => 'ACTION dances.');
 
-=item C<join>
+=head3 C<join>
 
 Tells your IRC client to join a single channel of your choice. Takes
 at least one arg: the channel name (required) and the channel key
 (optional, for password-protected channels).
 
-=item C<kick>
+=head3 C<kick>
 
 Tell the IRC server to forcibly evict a user from a particular
 channel. Takes at least 2 arguments: a channel name, the nick of the
 user to boot, and an optional witty message to show them as they sail
 out the door.
 
-=item C<remove> (FreeNode only)
+=head3 C<remove> (FreeNode only)
 
 Tell the IRC server to forcibly evict a user from a particular
 channel. Takes at least 2 arguments: a channel name, the nick of the
 user to boot, and an optional witty message to show them as they sail
 out the door. Similar to KICK but does an enforced PART instead.
 
-=item C<mode>
+=head3 C<mode>
 
 Request a mode change on a particular channel or user. Takes at least
 one argument: the mode changes to effect, as a single string (e.g.,
@@ -2826,30 +2127,30 @@ big string and it'll still work, whatever. I regret that I haven't the
 patience now to write a detailed explanation, but serious IRC users know
 the details anyhow.
 
-=item C<nick>
+=head3 C<nick>
 
 Allows you to change your nickname. Takes exactly one argument: the
 new username that you'd like to be known as.
 
-=item C<nickserv> (FreeNode only)
+=head3 C<nickserv> (FreeNode only)
 
 Talks to FreeNode's NickServ. Takes any number of arguments.
 
-=item C<notice>
+=head3 C<notice>
 
 Sends a NOTICE message to the nick(s) or channel(s) which you
 specify. Takes 2 arguments: the nick or channel to send a notice to
 (use an array reference here to specify multiple recipients), and the
 text of the notice to send.
 
-=item C<part>
+=head3 C<part>
 
 Tell your IRC client to leave the channels which you pass to it. Takes
 any number of arguments: channel names to depart from. If the last argument
 doesn't begin with a channel name identifier or contains a space character,
 it will be treated as a PART message and dealt with accordingly.
 
-=item C<privmsg>
+=head3 C<privmsg>
 
 Sends a public or private message to the nick(s) or channel(s) which
 you specify. Takes 2 arguments: the nick or channel to send a message
@@ -2859,30 +2160,30 @@ the text of the message to send.
 Have a look at the constants in L<POE::Component::IRC::Common|POE::Component::IRC::Common>
 if you would like to use formatting and color codes in your messages.
 
-=item C<quit>
+=head3 C<quit>
 
 Tells the IRC server to disconnect you. Takes one optional argument:
 some clever, witty string that other users in your channels will see
-as you leave. You can expect to get an C<irc_disconnect> event shortly
-after sending this.
+as you leave. You can expect to get an
+L<< C<irc_disconnect>|/"irc_disconnect" >> event shortly after sending this.
 
-=item C<shutdown>
+=head3 C<shutdown>
 
 By default, POE::Component::IRC sessions never go away. Even after
 they're disconnected, they're still sitting around in the background,
-waiting for you to call C<connect> on them again to reconnect.
-(Whether this behavior is the Right Thing is doubtful, but I don't want
-to break backwards compatibility at this point.) You can send the IRC
-session a C<shutdown> event manually to make it delete itself.
+waiting for you to call L<< C<connect>|/"connect" >> on them again to
+reconnect. (Whether this behavior is the Right Thing is doubtful, but I
+don't want to break backwards compatibility at this point.) You can send
+the IRC session a C<shutdown> event manually to make it delete itself.
 
 If you are connected, C<shutdown> will send a quit message to ircd and
 disconnect. If you provide an argument that will be used as the QUIT
 message.
 
-Terminating multiple components can be tricky. Check the 'SIGNALS' section of
-this documentation for an alternative method of shutting down multiple poco-ircs.
+Terminating multiple components can be tricky. Check the L<SIGNALS|/"SIGNALS">
+section for an alternative method of shutting down multiple poco-ircs.
 
-=item C<topic>
+=head3 C<topic>
 
 Retrieves or sets the topic for particular channel. If called with just
 the channel name as an argument, it will ask the server to return the
@@ -2890,37 +2191,34 @@ current topic. If called with the channel name and a string, it will
 set the channel topic to that string. Supply an empty string to unset a
 channel topic.
 
-=item C<unregister>
+=head3 C<unregister>
 
 Takes N arguments: a list of event names which you I<don't> want to
-receive. If you've previously done a C<register> for a particular event
-which you no longer care about, this event will tell the IRC
-connection to stop sending them to you. (If you haven't, it just
+receive. If you've previously done a L<< C<register>|/"register" >>
+for a particular event which you no longer care about, this event will
+tell the IRC connection to stop sending them to you. (If you haven't, it just
 ignores you. No big deal.)
 
 If you have registered with 'all', attempting to unregister individual 
 events such as 'mode', etc. will not work. This is a 'feature'.
 
-=item C<debug>
+=head3 C<debug>
 
 Takes one argument: 0 to turn debugging off or 1 to turn debugging on.
-This flips the debugging flag in L<POE::Filter::IRC::Compat|POE::Filter::IRC::Compat>,
-L<POE::Filter::CTCP|POE::Filter::CTCP>,and POE::Component::IRC. This has the
-same effect as setting Debug in C<spawn()> or C<connect>.
-
-=back
+This flips the debugging flag in L<POE::Filter::IRCD|POE::Filter::IRCD>,
+L<POE::Filter::IRC::Compat|POE::Filter::IRC::Compat>, and
+POE::Component::IRC. This has the same effect as setting Debug in
+C<spawn()> or C<connect>.
 
 =head2 Not-So-Important Commands
 
-=over
-
-=item C<admin>
+=head3 C<admin>
 
 Asks your server who your friendly neighborhood server administrators
 are. If you prefer, you can pass it a server name to query, instead of
 asking the server you're currently on.
 
-=item C<away>
+=head3 C<away>
 
 When sent with an argument (a message describig where you went), the
 server will note that you're now away from your machine or otherwise
@@ -2928,77 +2226,37 @@ preoccupied, and pass your message along to anyone who tries to
 communicate with you. When sent without arguments, it tells the server
 that you're back and paying attention.
 
-=item C<dcc>
+=head3 C<dcc*>
 
-Send a DCC SEND or CHAT request to another person. Takes at least two
-arguments: the nickname of the person to send the request to and the
-type of DCC request (SEND or CHAT). For SEND requests, be sure to add
-a third argument for the filename you want to send. Optionally, you
-can add a fourth argument for the DCC transfer blocksize, but the
-default of 1024 should usually be fine.
+See the L<DCC plugin|POE::Component::IRC::Plugin/"COMMANDS"> (loaded by default)
+documentation for DCC-related commands.
 
-Incidentally, you can send other weird nonstandard kinds of DCCs too;
-just put something besides 'SEND' or 'CHAT' (say, 'FOO') in the type
-field, and you'll get back C<irc_dcc_foo> events when activity happens
-on its DCC connection.
-
-If you are behind a firewall or Network Address Translation, you may want to
-consult C<connect> for some parameters that are useful with this command.
-
-=item C<dcc_accept>
-
-Accepts an incoming DCC connection from another host. First argument:
-the magic cookie from an C<irc_dcc_request> event. In the case of a DCC
-GET, the second argument can optionally specify a new name for the
-destination file of the DCC transfer, instead of using the sender's name
-for it. (See the C<irc_dcc_request> section below for more details.)
-
-=item C<dcc_resume>
-
-Resumes a DCC SEND file transfer. First argument: the magic cookie from an
-C<irc_dcc_request> event. The second argument is the name of the file to which
-you want to write. The third argument is the size from which will be resumed.
-
-=item C<dcc_chat>
-
-Sends lines of data to the person on the other side of a DCC CHAT
-connection. Takes any number of arguments: the magic cookie from an
-C<irc_dcc_start> event, followed by the data you wish to send. (It'll be
-chunked into lines by a L<POE::Filter::Line|POE::Filter::Line> for you,
-don't worry.)
-
-=item C<dcc_close>
-
-Terminates a DCC SEND or GET connection prematurely, and causes DCC CHAT
-connections to close gracefully. Takes one argument: the magic cookie
-from an C<irc_dcc_start> or C<irc_dcc_request> event.
-
-=item C<info>
+=head3 C<info>
 
 Basically the same as the "version" command, except that the server is
 permitted to return any information about itself that it thinks is
 relevant. There's some nice, specific standards-writing for ya, eh?
 
-=item C<invite>
+=head3 C<invite>
 
 Invites another user onto an invite-only channel. Takes 2 arguments:
 the nick of the user you wish to admit, and the name of the channel to
 invite them to.
 
-=item C<ison>
+=head3 C<ison>
 
 Asks the IRC server which users out of a list of nicknames are
 currently online. Takes any number of arguments: a list of nicknames
 to query the IRC server about.
 
-=item C<links>
+=head3 C<links>
 
 Asks the server for a list of servers connected to the IRC
 network. Takes two optional arguments, which I'm too lazy to document
 here, so all you would-be linklooker writers should probably go dig up
 the RFC.
 
-=item C<list>
+=head3 C<list>
 
 Asks the server for a list of visible channels and their topics. Takes
 any number of optional arguments: names of channels to get topic
@@ -3006,7 +2264,7 @@ information for. If called without any channel names, it'll list every
 visible channel on the IRC network. This is usually a really big list,
 so don't do this often.
 
-=item C<motd>
+=head3 C<motd>
 
 Request the server's "Message of the Day", a document which typically
 contains stuff like the server's acceptable use policy and admin
@@ -3016,7 +2274,7 @@ here's how to do it. If you'd like to get the MOTD for a server other
 than the one you're logged into, pass it the server's hostname as an
 argument; otherwise, no arguments.
 
-=item C<names>
+=head3 C<names>
 
 Asks the server for a list of nicknames on particular channels. Takes
 any number of arguments: names of channels to get lists of users
@@ -3024,51 +2282,45 @@ for. If called without any channel names, it'll tell you the nicks of
 everyone on the IRC network. This is a really big list, so don't do
 this much.
 
-=item C<quote>
+=head3 C<quote>
 
 Sends a raw line of text to the server. Takes one argument: a string
 of a raw IRC command to send to the server. It is more optimal to use
 the events this module supplies instead of writing raw IRC commands
 yourself.
 
-=item C<stats>
+=head3 C<stats>
 
 Returns some information about a server. Kinda complicated and not
 terribly commonly used, so look it up in the RFC if you're
 curious. Takes as many arguments as you please.
 
-=item C<time>
+=head3 C<time>
 
 Asks the server what time it thinks it is, which it will return in a
 human-readable form. Takes one optional argument: a server name to
 query. If not supplied, defaults to current server.
 
-=item C<trace>
+=head3 C<trace>
 
 If you pass a server name or nick along with this request, it asks the
 server for the list of servers in between you and the thing you
 mentioned. If sent with no arguments, it will show you all the servers
 which are connected to your current server.
 
-=item C<userhost>
-
-Asks the IRC server for information about particular nicknames. (The
-RFC doesn't define exactly what this is supposed to return.) Takes any
-number of arguments: the nicknames to look up.
-
-=item C<users>
+=head3 C<users>
 
 Asks the server how many users are logged into it. Defaults to the
 server you're currently logged into; however, you can pass a server
 name as the first argument to query some other machine instead.
 
-=item C<version>
+=head3 C<version>
 
 Asks the server about the version of ircd that it's running. Takes one
 optional argument: a server name to query. If not supplied, defaults
 to current server.
 
-=item C<who>
+=head3 C<who>
 
 Lists the logged-on users matching a particular channel name, hostname,
 nickname, or what-have-you. Takes one optional argument: a string for
@@ -3077,84 +2329,86 @@ argument, it will return everyone who's currently logged in (bad
 move). Tack an "o" on the end if you want to list only IRCops, as per
 the RFC.
 
-=item C<whois>
+=head3 C<whois>
 
 Queries the IRC server for detailed information about a particular
 user. Takes any number of arguments: nicknames or hostmasks to ask for
-information about. As of version 3.2, you will receive an C<irc_whois>
-event in addition to the usual numeric responses. See below for details.
+information about. As of version 3.2, you will receive an
+L<< C<irc_whois>|/"irc_whois" >> event in addition to the usual numeric
+responses. See below for details.
 
-=item C<whowas>
+=head3 C<whowas>
 
 Asks the server for information about nickname which is no longer
 connected. Takes at least one argument: a nickname to look up (no
 wildcards allowed), the optional maximum number of history entries to
 return, and the optional server hostname to query. As of version 3.2,
-you will receive an C<irc_whowas> event in addition to the usual numeric
-responses. See below for details.
+you will receive an L<< C<irc_whowas>|/"irc_whowas" >> event in addition
+to the usual numeric responses. See below for details.
 
-=item C<ping> and C<pong>
+=head3 C<ping> and C<pong>
 
 Included for completeness sake. The component will deal with ponging to
 pings automatically. Don't worry about it.
 
-=back
-
 =head2 Purely Esoteric Commands
 
-=over
+=head3 C<die>
 
-=item C<locops>
+Tells the IRC server you're connect to, to terminate. Only useful for
+IRCops, thank goodness. Takes no arguments. 
+
+=head3 C<locops>
 
 Opers-only command. This one sends a message to all currently
 logged-on local-opers (+l). This option is specific to EFNet.
 
-=item C<oper>
+=head3 C<oper>
 
 In the exceedingly unlikely event that you happen to be an IRC
 operator, you can use this command to authenticate with your IRC
 server. Takes 2 arguments: your username and your password.
 
-=item C<operwall>
+=head3 C<operwall>
 
 Opers-only command. This one sends a message to all currently
 logged-on global opers. This option is specific to EFNet.
 
-=item C<rehash>
+=head3 C<rehash>
 
 Tells the IRC server you're connected to, to rehash its configuration
 files. Only useful for IRCops. Takes no arguments.
 
-=item C<die>
-
-Tells the IRC server you're connect to, to terminate. Only useful for
-IRCops, thank goodness. Takes no arguments. 
-
-=item C<restart>
+=head3 C<restart>
 
 Tells the IRC server you're connected to, to shut down and restart itself.
 Only useful for IRCops, thank goodness. Takes no arguments.
 
-=item C<sconnect>
+=head3 C<sconnect>
 
 Tells one IRC server (which you have operator status on) to connect to
 another. This is actually the CONNECT command, but I already had an
-event called C<connect>, so too bad. Takes the args you'd expect: a
-server to connect to, an optional port to connect on, and an optional
-remote server to connect with, instead of the one you're currently on.
+event called L<< C<connect>|/"connect" >>, so too bad. Takes the args
+you'd expect: a server to connect to, an optional port to connect on,
+and an optional remote server to connect with, instead of the one you're
+currently on.
 
-=item C<summon>
+=head3 C<summon>
 
 Don't even ask.
 
-=item C<wallops>
+=head3 C<userhost>
+
+Asks the IRC server for information about particular nicknames. (The
+RFC doesn't define exactly what this is supposed to return.) Takes any
+number of arguments: the nicknames to look up.
+
+=head3 C<wallops>
 
 Another opers-only command. This one sends a message to all currently
 logged-on opers (and +w users); sort of a mass PA system for the IRC
 server administrators. Takes one argument: some clever, witty message
 to send.
-
-=back
 
 =head1 OUTPUT
 
@@ -3176,9 +2430,7 @@ object. Useful if you want on-the-fly access to the object and its methods.
 
 =head2 Important Events
 
-=over
-
-=item C<irc_connected>
+=head3 C<irc_connected>
 
 The IRC component will send an C<irc_connected> event as soon as it
 establishes a connection to an IRC server, before attempting to log
@@ -3189,7 +2441,7 @@ can start sending commands to the server yet. Wait until you receive
 an C<irc_001> event (the server welcome message) before actually sending
 anything back to the server.
 
-=item C<irc_ctcp>
+=head3 C<irc_ctcp>
 
 C<irc_ctcp> events are generated upon receipt of CTCP messages, in addition to
 the C<irc_ctcp_*> events mentioned below. They are identical in every way to
@@ -3201,7 +2453,7 @@ and the rest as given below.
 It is not recommended that you register for both C<irc_ctcp> and C<irc_ctcp_*>
 events, since they will both be fired and presumably cause duplication.
 
-=item C<irc_ctcp_*>
+=head3 C<irc_ctcp_*>
 
 C<irc_ctcp_whatever> events are generated upon receipt of CTCP messages.
 For instance, receiving a CTCP PING request generates an C<irc_ctcp_ping>
@@ -3210,47 +2462,47 @@ generates an C<irc_ctcp_action> event, blah blah, so on and so forth. ARG0
 is the nick!hostmask of the sender. ARG1 is the channel/recipient
 name(s). ARG2 is the text of the CTCP message.
 
-Note that DCCs are handled separately -- see the C<irc_dcc_request>
-event, below.
+Note that DCCs are handled separately -- see the
+L<DCC plugin|POE::Component::IRC::Plugin::DCC>.
 
-=item C<irc_ctcpreply_*>
+=head3 C<irc_ctcpreply_*>
 
 C<irc_ctcpreply_whatever> messages are just like C<irc_ctcp_whatever>
 messages, described above, except that they're generated when a response
 to one of your CTCP queries comes back. They have the same arguments and
 such as C<irc_ctcp_*> events.
 
-=item C<irc_disconnected>
+=head3 C<irc_disconnected>
 
-The counterpart to C<irc_connected>, sent whenever a socket connection
-to an IRC server closes down (whether intentionally or
+The counterpart to L<< C<irc_connected>|/"irc_connected" >>, sent whenever
+a socket connection to an IRC server closes down (whether intentionally or
 unintentionally). ARG0 is the server name.
 
-=item C<irc_error>
+=head3 C<irc_error>
 
 You get this whenever the server sends you an ERROR message. Expect
 this to usually be accompanied by the sudden dropping of your
 connection. ARG0 is the server's explanation of the error.
 
-=item C<irc_join>
+=head3 C<irc_join>
 
 Sent whenever someone joins a channel that you're on. ARG0 is the
 person's nick!hostmask. ARG1 is the channel name.
 
-=item C<irc_invite>
+=head3 C<irc_invite>
 
 Sent whenever someone offers you an invitation to another channel. ARG0
 is the person's nick!hostmask. ARG1 is the name of the channel they want
 you to join.
 
-=item C<irc_kick>
+=head3 C<irc_kick>
 
 Sent whenever someone gets booted off a channel that you're on. ARG0
 is the kicker's nick!hostmask. ARG1 is the channel name. ARG2 is the
 nick of the unfortunate kickee. ARG3 is the explanation string for the
 kick.
 
-=item C<irc_mode>
+=head3 C<irc_mode>
 
 Sent whenever someone changes a channel mode in your presence, or when
 you change your own user mode. ARG0 is the nick!hostmask of that
@@ -3259,59 +2511,50 @@ mode change). ARG2 is the mode string (i.e., "+o-b"). The rest of the
 args (ARG3 .. $#_) are the operands to the mode string (nicks,
 hostmasks, channel keys, whatever).
 
-=item C<irc_msg>
+=head3 C<irc_msg>
 
 Sent whenever you receive a PRIVMSG command that was addressed to you
 privately. ARG0 is the nick!hostmask of the sender. ARG1 is an array
 reference containing the nick(s) of the recipients. ARG2 is the text
 of the message.
 
-=item C<irc_nick>
+=head3 C<irc_nick>
 
 Sent whenever you, or someone around you, changes nicks. ARG0 is the
 nick!hostmask of the changer. ARG1 is the new nick that they changed
 to.
 
-=item C<irc_notice>
+=head3 C<irc_notice>
 
 Sent whenever you receive a NOTICE command. ARG0 is the nick!hostmask
 of the sender. ARG1 is an array reference containing the nick(s) or
 channel name(s) of the recipients. ARG2 is the text of the NOTICE
 message.
 
-=item C<irc_part>
+=head3 C<irc_part>
 
 Sent whenever someone leaves a channel that you're on. ARG0 is the
 person's nick!hostmask. ARG1 is the channel name. ARG2 is the part message.
 
-=item C<irc_ping>
-
-An event sent whenever the server sends a PING query to the
-client. (Don't confuse this with a CTCP PING, which is another beast
-entirely. If unclear, read the RFC.) Note that POE::Component::IRC will
-automatically take care of sending the PONG response back to the
-server for you, although you can still register to catch the event for
-informational purposes.
-
-=item C<irc_public>
+=head3 C<irc_public>
 
 Sent whenever you receive a PRIVMSG command that was sent to a
 channel. ARG0 is the nick!hostmask of the sender. ARG1 is an array
 reference containing the channel name(s) of the recipients. ARG2 is
 the text of the message.
 
-=item C<irc_quit>
+=head3 C<irc_quit>
 
 Sent whenever someone on a channel with you quits IRC (or gets
 KILLed). ARG0 is the nick!hostmask of the person in question. ARG1 is
 the clever, witty message they left behind on the way out.
 
-=item C<irc_socketerr>
+=head3 C<irc_socketerr>
 
 Sent when a connection couldn't be established to the IRC server. ARG0
 is probably some vague and/or misleading reason for what failed.
 
-=item C<irc_topic>
+=head3 C<irc_topic>
 
 Sent when a channel topic is set or unset. ARG0 is the nick!hostmask of the
 sender. ARG1 is the channel affected. ARG2 will be either: a string if the
@@ -3319,8 +2562,7 @@ topic is being set; or a zero-length string (i.e. '') if the topic is being
 unset. Note: replies to queries about what a channel topic *is*
 (i.e. TOPIC #channel) , are returned as numerics, not with this event.
 
-
-=item C<irc_whois>
+=head3 C<irc_whois>
 
 Sent in response to a 'whois' query. ARG0 is a hashref, with the following
 keys: 
@@ -3353,58 +2595,81 @@ additional key:
 
 'identified'.
 
-=item C<irc_whowas>
+=head3 C<irc_whowas>
 
 Similar to the above, except some keys will be missing.
 
-=item C<irc_raw>
+=head3 C<irc_raw>
 
-Enabled by passing C<Raw => 1> to C<spawn()> or C<connect>, ARG0 is the raw IRC
+Enabled by passing C<< Raw => 1 >> to C<spawn()> or C<connect>, ARG0 is the raw IRC
 string received by the component from the IRC server, before it has been
 mangled by filters and such like.
 
-=item C<irc_registered>
+=head3 C<irc_registered>
 
 Sent once to the requesting session on registration ( see C<register> ). ARG0
 is a reference tothe component's object.
 
-=item C<irc_shutdown>
+=head3 C<irc_shutdown>
 
 Sent to all registered sessions when the component has been asked to
-C<shutdown>. ARG0 will be the session ID of the requesting session.
+L<< C<shutdown>|/"shutdown" >>. ARG0 will be the session ID of the requesting
+session.
 
-=item C<irc_isupport>
+=head3 C<irc_isupport>
 
 Emitted by the first event after an C<irc_005>, to indicate that isupport
 information has been gathered. ARG0 is the
 L<POE::Component::IRC::Plugin::ISupport|POE::Component::IRC::Plugin::ISupport>
 object.
 
-=item C<irc_delay_set>
+=head3 C<irc_delay_set>
 
-Emitted on a succesful addition of a delayed event using C<delay()> method. ARG0
-will be the alarm_id which can be used later with C<delay_remove()>. Subsequent
-parameters are the arguments that were passed to C<delay()>.
+Emitted on a succesful addition of a delayed event using the
+L<< C<delay()>|/"delay" >> method. ARG0 will be the alarm_id which can be used
+later with L<< C<delay_remove()>|/"delay_remove" >>. Subsequent parameters are
+the arguments that were passed to C<delay()>.
 
-=item C<irc_delay_removed>
+=head3 C<irc_delay_removed>
 
 Emitted when a delayed command is successfully removed. ARG0 will be the
 alarm_id that was removed. Subsequent parameters are the arguments that were
 passed to C<delay()>.
 
-=item C<irc_socks_failed>
+=head3 C<irc_socks_failed>
 
 Emitted whenever we fail to connect successfully to a SOCKS server or the
 SOCKS server is not actually a SOCKS server. ARG0 will be some vague reason
 as to what went wrong. Hopefully.
 
-=item C<irc_socks_rejected>
+=head3 C<irc_socks_rejected>
 
 Emitted whenever a SOCKS connection is rejected by a SOCKS server. ARG0 is
 the SOCKS code, ARG1 the SOCKS server address, ARG2 the SOCKS port and ARG3
 the SOCKS user id ( if defined ).
 
-=item All numeric events (see RFC 1459)
+=head2 Somewhat Less Important Events
+
+=head3 C<irc_dcc_*>
+
+See the L<DCC plugin|POE::Component::IRC::Plugin/"OUTPUT"> (loaded by default)
+documentation for DCC-related events.
+
+=head3 C<irc_ping>
+
+An event sent whenever the server sends a PING query to the
+client. (Don't confuse this with a CTCP PING, which is another beast
+entirely. If unclear, read the RFC.) Note that POE::Component::IRC will
+automatically take care of sending the PONG response back to the
+server for you, although you can still register to catch the event for
+informational purposes.
+
+=head3 C<irc_snotice>
+
+A weird, non-RFC-compliant message from an IRC server. Don't worry
+about it. ARG0 is the text of the server's message.
+
+=head2 All numeric events
 
 Most messages from IRC servers are identified only by three-digit
 numeric codes with undescriptive constant names like RPL_UMODEIS and
@@ -3418,113 +2683,28 @@ is the name of the server which sent the message. ARG1 is the text of
 the message. ARG2 is an ARRAYREF of the parsed message, so there is no
 need to parse ARG1 yourself.
 
-=back
-
-=head2 Somewhat Less Important Events
-
-=over
-
-=item C<irc_dcc_chat>
-
-Notifies you that one line of text has been received from the
-client on the other end of a DCC CHAT connection. ARG0 is the
-connection's magic cookie, ARG1 is the nick of the person on the other
-end, ARG2 is the port number, and ARG3 is the text they sent.
-
-=item C<irc_dcc_done>
-
-You receive this event when a DCC connection terminates normally.
-Abnormal terminations are reported by C<irc_dcc_error>, below. ARG0 is
-the connection's magic cookie, ARG1 is the nick of the person on the
-other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3 is the
-port number. For DCC SEND and GET connections, ARG4 will be the
-filename, ARG5 will be the file size, and ARG6 will be the number of
-bytes transferred. (ARG5 and ARG6 should always be the same.)
-
-=item C<irc_dcc_failed>
-
-You get this event when a DCC connection fails for some reason. ARG0 
-will be the operation that failed, ARG1 is the error number, ARG2 is
-the description of the error and ARG3 the connection's magic cookie.
-
-=item C<irc_dcc_error>
-
-You get this event whenever a DCC connection or connection attempt
-terminates unexpectedly or suffers some fatal error. ARG0 will be the
-connection's magic cookie, ARG1 will be a string describing the error.
-ARG2 will be the nick of the person on the other end of the connection.
-ARG3 is the DCC type (SEND, GET, CHAT, etc.). ARG4 is the port number of
-the DCC connection, if any. For SEND and GET connections, ARG5 is the
-filename, ARG6 is the expected file size, and ARG7 is the transfered size.
-
-=item C<irc_dcc_get>
-
-Notifies you that another block of data has been successfully
-transferred from the client on the other end of your DCC GET connection.
-ARG0 is the connection's magic cookie, ARG1 is the nick of the person on
-the other end, ARG2 is the port number, ARG3 is the filename, ARG4 is
-the total file size, and ARG5 is the number of bytes successfully
-transferred so far.
-
-=item C<irc_dcc_request>
-
-You receive this event when another IRC client sends you a DCC SEND or
-CHAT request out of the blue. You can examine the request and decide
-whether or not to accept it here. ARG0 is the nick of the client on the
-other end. ARG1 is the type of DCC request (CHAT, SEND, etc.). ARG2 is
-the port number. ARG3 is a "magic cookie" argument, suitable for sending
-with C<dcc_accept> events to signify that you want to accept the
-connection (see the 'dcc_accept' docs). For DCC SEND and GET
-connections, ARG4 will be the filename, and ARG5 will be the file size.
-
-=item C<irc_dcc_send>
-
-Notifies you that another block of data has been successfully
-transferred from you to the client on the other end of a DCC SEND
-connection. ARG0 is the connection's magic cookie, ARG1 is the nick of
-the person on the other end, ARG2 is the port number, ARG3 is the
-filename, ARG4 is the total file size, and ARG5 is the number of bytes
-successfully transferred so far.
-
-=item C<irc_dcc_start>
-
-This event notifies you that a DCC connection has been successfully
-established. ARG0 is a unique "magic cookie" argument which you can pass
-to C<dcc_chat> or C<dcc_close>. ARG1 is the nick of the person on the
-other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3 is the
-port number. For DCC SEND and GET connections, ARG4 will be the filename
-and ARG5 will be the file size.
-
-=item C<irc_snotice>
-
-A weird, non-RFC-compliant message from an IRC server. Don't worry
-about it. ARG0 is the text of the server's message.
-
-=back
-
 =head1 SIGNALS
 
 The component will handle a number of custom signals that you may send using 
-L<POE::Kernel|POE::Kernel> C<signal()> method.
+L<POE::Kernel|POE::Kernel>'s C<signal()> method.
 
-=over
-
-=item C<POCOIRC_REGISTER>
+=head2 C<POCOIRC_REGISTER>
 
 Registering with multiple PoCo-IRC components has been a pita. Well, no more,
 using the power of L<POE::Kernel|POE::Kernel> signals.
 
 If the component receives a C<POCOIRC_REGISTER> signal it'll register the
-requesting session and trigger an C<irc_registered> event. From that event one
-can get all the information necessary such as the poco-irc object and the
-SENDER session to do whatever one needs to build a poco-irc dispatch table.
+requesting session and trigger an L<< C<irc_registered>|/"irc_registered" >>
+event. From that event one can get all the information necessary such as the
+poco-irc object and the SENDER session to do whatever one needs to build a
+poco-irc dispatch table.
 
 The way the signal handler in PoCo-IRC is written also supports sending the 
 C<POCOIRC_REGISTER> to multiple sessions simultaneously, by sending the signal
 to the POE Kernel itself.
 
 Pass the signal your session, session ID or alias, and the IRC events (as
-specified to C<register>).
+specified to L<< C<register>|/"register" >>).
 
 To register with multiple PoCo-IRCs one can do the following in your session's
 _start handler:
@@ -3533,7 +2713,7 @@ _start handler:
      my ($kernel, $session) = @_[KERNEL, SESSION];
 
      # Registering with multiple pocoircs for 'all' IRC events
-     $kernel->signal( $kernel, 'POCOIRC_REGISTER', $session->ID(), 'all' );
+     $kernel->signal($kernel, 'POCOIRC_REGISTER', $session->ID(), 'all');
 
      return:
  }
@@ -3553,12 +2733,12 @@ Each poco-irc will send your session an C<irc_registered> event:
      $heap->{irc_objects}->{ $sender_id } = $irc_object;
 
      # Make the poco connect 
-     $irc_object->yield( connect => { } );
+     $irc_object->yield(connect => { });
 
      return;
  }
 
-=item C<POCOIRC_SHUTDOWN>
+=head2 C<POCOIRC_SHUTDOWN>
 
 Telling multiple poco-ircs to shutdown was a pita as well. The same principle as
 with registering applies to shutdown too.
@@ -3566,12 +2746,10 @@ with registering applies to shutdown too.
 Send a C<POCOIRC_SHUTDOWN> to the POE Kernel to terminate all the active
 poco-ircs simultaneously.
 
- $poe_kernel->signal( $poe_kernel, 'POCOIRC_SHUTDOWN' );
+ $poe_kernel->signal($poe_kernel, 'POCOIRC_SHUTDOWN');
 
 Any additional parameters passed to the signal will become your quit messages
 on each IRC network.
-
-=back
 
 =head1 BUGS
 

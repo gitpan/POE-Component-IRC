@@ -4,9 +4,8 @@ use strict;
 use warnings;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POSIX;
-use vars qw($VERSION);
 
-$VERSION = '1.3';
+our $VERSION = '1.3';
 
 sub new {
     my ($package, %args) = @_;
@@ -33,7 +32,10 @@ sub S_ctcp_version {
     my ($self, $irc) = splice @_, 0, 2;
     my $nick = ( split /!/, ${ $_[0] } )[0];
 
-    $irc->yield( ctcpreply => $nick => 'VERSION ' . ( $self->{version} ? $self->{version} : "POE::Component::IRC-" . $POE::Component::IRC::VERSION ) );
+    $irc->yield( ctcpreply => $nick => 'VERSION ' . ( defined $self->{version}
+            ? $self->{version}
+            : "POE::Component::IRC-$POE::Component::IRC::VERSION"
+    ));
     return PCI_EAT_CLIENT if $self->eat();
     return PCI_EAT_NONE;
 }
@@ -140,11 +142,9 @@ POE::Component::IRC::Plugin::CTCP is a L<POE::Component::IRC|POE::Component::IRC
 plugin. It watches for 'irc_ctcp_version', 'irc_ctcp_userinfo', 'irc_ctcp_ping',
 'irc_ctcp_time' and 'irc_ctcp_source' events and autoresponds on your behalf.
 
-=head1 CONSTRUCTOR
+=head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Takes a number of optional arguments:
 
@@ -163,19 +163,11 @@ behaviour;
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
 
-=back
-
-=head1 METHODS
-
-=over
-
-=item C<eat>
+=head2 C<eat>
 
 With no arguments, returns true or false on whether the plugin is "eating" ctcp
 events that it has dealt with. An argument will set "eating" to on or off
 appropriately, depending on whether the value is true or false.
-
-=back
 
 =head1 AUTHOR
 

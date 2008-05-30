@@ -3,9 +3,8 @@ package POE::Component::IRC::Plugin::NickReclaim;
 use strict;
 use warnings;
 use POE::Component::IRC::Plugin qw(:ALL);
-use vars qw($VERSION);
 
-$VERSION = '1.3';
+our $VERSION = '1.3';
 
 sub new {
     my ($package, %args) = @_;
@@ -172,11 +171,9 @@ It registers and handles 'irc_433' events. On receiving a 433 event it will
 reset the nickname to the 'nick' specified with spawn() or connect(), appended
 with an underscore, and then poll to try and change it to the original nickname. 
 
-=head1 CONSTRUCTOR
+=head1 METHODS
 
-=over
-
-=item C<new>
+=head2 C<new>
 
 Takes one optional argument:
 
@@ -184,8 +181,6 @@ Takes one optional argument:
 
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
-
-=back
 
 =head1 AUTHOR
 
