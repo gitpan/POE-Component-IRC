@@ -3,23 +3,19 @@ package POE::Component::IRC::Constants;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 require Exporter;
 use base qw(Exporter);
 our @EXPORT_OK = qw(
-    PCI_REFCOUNT_TAG BLOCKSIZE INCOMING_BLOCKSIZE DCC_TIMEOUT PRI_LOGIN
-    PRI_HIGH PRI_NORMAL MSG_PRI MSG_TEXT CMD_PRI CMD_SUB
+    PCI_REFCOUNT_TAG PRI_LOGIN PRI_HIGH PRI_NORMAL MSG_PRI MSG_TEXT
+    CMD_PRI CMD_SUB
 );
 our %EXPORT_TAGS = ( ALL => [@EXPORT_OK] );
 
 use constant {
     # The name of the reference count P::C::I keeps in client sessions.
     PCI_REFCOUNT_TAG => 'P::C::I registered',
-
-    BLOCKSIZE          => 1024,  # Send DCC data in 1k chunks
-    INCOMING_BLOCKSIZE => 10240, # 10k per DCC socket read
-    DCC_TIMEOUT        => 300,   # Five minutes for listening DCCs
 
     # Message priorities.
     PRI_LOGIN  => 10, # PASS/NICK/USER messages must go first.

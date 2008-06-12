@@ -126,3 +126,4 @@ Chris "BinGOs" Williams
 L<POE::Component::IRC|POE::Component::IRC>
 
 =cut
+

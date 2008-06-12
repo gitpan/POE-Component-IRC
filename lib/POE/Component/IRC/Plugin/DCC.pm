@@ -5,12 +5,16 @@ use warnings;
 use File::Basename qw(fileparse);
 use POE qw(Driver::SysRW Filter::Line Filter::Stream
            Wheel::ReadWrite Wheel::SocketFactory);
-use POE::Component::IRC::Common qw(parse_user);
-use POE::Component::IRC::Constants qw(:ALL);
 use POE::Component::IRC::Plugin qw(:ALL);
 use Socket;
 
-our $VERSION = '1.0';
+our $VERSION = '1.1';
+
+use constant {
+    BLOCKSIZE          => 1024,  # Send DCC data in 1k chunks
+    INCOMING_BLOCKSIZE => 10240, # 10k per DCC socket read
+    DCC_TIMEOUT        => 300,   # Five minutes for listening DCCs
+};
 
 sub new {
     my ($package, %self) = @_;
@@ -39,6 +43,7 @@ sub PCI_register {
         ],
     );
 
+    $irc->plugin_register($self, 'SERVER', qw(disconnected dcc_request));
     $irc->plugin_register($self, 'USER', qw(dcc dcc_accept dcc_chat dcc_close dcc_resume));
     
     return 1;
@@ -73,41 +78,70 @@ sub nataddr {
     return;
 }
 
+sub S_disconnected {
+    my ($self) = $_;
+    # clean up old cookies for any ignored RESUME requests 
+    delete $self->{resuming};
+    return PCI_EAT_NONE;
+}
+
+sub S_dcc_request {
+    my ($self, $irc) = splice @_, 0, 2;
+    my ($nick, $type, $port, $cookie, $file, $size) = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
+
+    if ($type eq 'ACCEPT' && $self->{resuming}->{"$port+$nick"}) {
+
+        # the old cookie has the peer's address
+        my $old_cookie = delete $self->{resuming}->{"$port+$nick"};
+        $irc->yield(dcc_accept => $old_cookie);
+    }
+    elsif ($type eq 'RESUME') {
+        for my $cookie (values %{ $self->{dcc} }) {
+            next if $cookie->{nick} ne $nick;
+            next if $cookie->{port} ne $port;
+            $irc->yield(ctcp => $nick => "DCC ACCEPT $file $port $size");
+            last;
+        }
+    }
+
+    return PCI_EAT_NONE;
+}
+
 # the U_* handlers are stubs which call our POE event handlers
 # so that we can do stuff related to our POE session, e.g.
 # create wheels and set alarms/delays
 
 sub U_dcc {
     my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { defined && ${ $_ } } @_;
+    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
     $poe_kernel->call($self->{session_id}, _event_dcc => @args);
     return PCI_EAT_NONE;
 }
 
 sub U_dcc_accept {
     my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { defined && ${ $_ } } @_;
+    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
     $poe_kernel->call($self->{session_id}, _event_dcc_accept => @args);
     return PCI_EAT_NONE;
 }
 
 sub U_dcc_chat {
     my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { defined && ${ $_ } } @_;
+    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
     $poe_kernel->call($self->{session_id}, _event_dcc_chat => @args);
     return PCI_EAT_NONE;
 }
 
 sub U_dcc_close {
     my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { defined && ${ $_ } } @_;
+    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
     $poe_kernel->call($self->{session_id}, _event_dcc_close => @args);
     return PCI_EAT_NONE;
 }
 
 sub U_dcc_resume {
     my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { defined && ${ $_ } } @_;
+    my @args = map { ref && ${ $_ } } @_;
     $poe_kernel->call($self->{session_id}, _event_dcc_resume => @args);
     return PCI_EAT_NONE;
 }
@@ -180,14 +214,10 @@ sub _event_dcc {
     $myaddr = unpack 'N', $myaddr;
 
     my $basename = fileparse($file);
-    $basename = qq{"$basename"};
+    $basename = qq{"$basename"} if $basename =~ /[\s"]/;
 
     # Tell the other end that we're waiting for them to connect.
-    $irc->yield(
-        'ctcp',
-        $nick,
-        "DCC $type $basename $myaddr $port" . ($size ? " $size" : '')
-    );
+    $irc->yield(ctcp => $nick => "DCC $type $basename $myaddr $port" . ($size ? " $size" : ''));
 
     # Store the state for this connection.
     $self->{dcc}->{ $factory->ID } = {
@@ -225,7 +255,7 @@ sub _event_dcc_accept {
         return;
     }
 
-    if ($cookie->{type} =~ /SEND|ACCEPT/) {
+    if ($cookie->{type} eq 'SEND') {
         $cookie->{type} = 'GET';
         $cookie->{file} = $myfile if defined $myfile;   # filename override
     }
@@ -318,30 +348,27 @@ sub _event_dcc_close {
 # tries to resume a previous dcc transfer. See '_dcc_up' for
 # the rest of the logic for this.
 sub _event_dcc_resume {
-    my ($self, $cookie) = @_[OBJECT, ARG0];
+    my ($self, $cookie, $myfile) = @_[OBJECT, ARG0, ARG1];
     my $irc = $self->{irc};
-    # TODO: this isn't finished
 
-    if ($cookie->{type} eq 'SEND') {
-        $cookie->{type} = 'RESUME';
-        if ($cookie->{tmpfile}) {
-            my $size = -s $cookie->{tmpfile};
-            my $fraction = $size % INCOMING_BLOCKSIZE;
-            $size -= $fraction;
-            $cookie->{resumesize} = $size;
+    my $sender_file = $cookie->{file};
+    $cookie->{file} = $myfile if defined $myfile;
+    my $size = -s $cookie->{file};
+    my $fraction = $size % INCOMING_BLOCKSIZE;
+    $size -= $fraction;
 
-            # we need to truncate the whole thing, adjust the size we are
-            # requesting to the size we will truncate the file to
-            if (open(my $handle, '>>', $cookie->{tmpfile})) {
-                if (!truncate($handle, $size)) {
-                    warn "dcc_resume: Can't truncate '$cookie->{file}' to size $size\n";
-                }
-
-                my $nick = parse_user($cookie->{nick});
-                my $message = "\001DCC RESUME @{$cookie}{qw(file port)} $size\001";
-                $irc->yield(ctcp => $nick => $message);
-            }
+    # we need to truncate the whole thing, adjust the size we are
+    # requesting to the size we will truncate the file to
+    if (open(my $handle, '>>', $cookie->{file})) {
+        if (!truncate($handle, $size)) {
+            warn "dcc_resume: Can't truncate '$cookie->{file}' to size $size\n";
+            return;
         }
+        
+        $irc->yield(ctcp => $cookie->{nick} => "DCC RESUME $sender_file $cookie->{port} $size");
+        
+        # save the cookie for later
+        $self->{resuming}->{"$cookie->{port}+$cookie->{nick}"} = $cookie;
     }
     
     return;
@@ -622,11 +649,12 @@ POE::Component::IRC::Plugin::DCC - a PoCo-IRC plugin providing DCC support
 
  # receive a file
  sub irc_dcc_request {
-     my ($nick, $type, $port, $cookie, $file, $size) = @_[ARG0..$#_];
+     my ($user, $type, $port, $cookie, $file, $size) = @_[ARG0..$#_];
      return if $type ne 'SEND';
 
      my $irc = $_[SENDER]->get_heap();
-     print "Someone's sending me '$file' (size: $size) on port $port\n");
+     my $nick = (split /!/, $user)[0];
+     print "$nick wants to send me '$file' (size: $size) on port $port\n");
      $irc->yield(dcc_accept => $cookie);
  }
 
@@ -643,7 +671,7 @@ need to add it manually.
 Takes no arguments.
 
 Returns a plugin object suitable for feeding to
-L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
+L<POE::Component::IRC|POE::Component::IRC>'s C<plugin_add()> method.
 
 =head2 C<dccports>
 
@@ -662,7 +690,7 @@ L<POE::Component::IRC|POE::Component::IRC> commands.
 =head2 C<dcc>
 
 Send a DCC SEND or CHAT request to another person. Takes at least two
-arguments: the nickname of the person to send the request to and the
+arguments: the nick!user@host of the person to send the request to and the
 type of DCC request (SEND or CHAT). For SEND requests, be sure to add
 a third argument for the filename you want to send. Optionally, you
 can add a fourth argument for the DCC transfer blocksize, but the
@@ -674,108 +702,214 @@ field, and you'll get back C<irc_dcc_*> events when activity happens
 on its DCC connection.
 
 If you are behind a firewall or Network Address Translation, you may want to
-consult L<POE::Component::IRC|POE::Component::IRC>'s C<connect> for some
-parameters that are useful with this command.
+consult L<POE::Component::IRC|POE::Component::IRC>'s
+L<C<connect>|POE::Component::IRC/"connect"> for some parameters that are
+useful with this command.
 
 =head2 C<dcc_accept>
 
 Accepts an incoming DCC connection from another host. First argument:
-the magic cookie from an C<irc_dcc_request> event. In the case of a DCC
-GET, the second argument can optionally specify a new name for the
-destination file of the DCC transfer, instead of using the sender's name
-for it. (See the C<irc_dcc_request> section below for more details.)
+the magic cookie from an L<C<irc_dcc_request>|/"irc_dcc_request"> event.
+In the case of a DCC GET, the second argument can optionally specify a
+new name for the destination file of the DCC transfer, instead of using
+the sender's name for it. (See the L<C<irc_dcc_request>|/"irc_dcc_request">
+section below for more details.)
 
 =head2 C<dcc_resume>
 
 Resumes a DCC SEND file transfer. First argument: the magic cookie from an
-C<irc_dcc_request> event. The second argument is the name of the file to which
-you want to write. The third argument is the size from which will be resumed.
+L<C<irc_dcc_request>|/"irc_dcc_request"> event. An optional second argument
+provides the name of the file to which you want to write.
 
 =head2 C<dcc_chat>
 
-Sends lines of data to the person on the other side of a DCC CHAT
-connection. Takes any number of arguments: the magic cookie from an
-C<irc_dcc_start> event, followed by the data you wish to send. (It'll be
-separated by newlines for you.)
+Sends lines of data to the person on the other side of a DCC CHAT connection.
+Takes any number of arguments: the magic cookie from an
+L<C<irc_dcc_start>|/"irc_dcc_start"> event, followed by the data you wish to
+send. (It'll be separated by newlines for you.)
 
 =head2 C<dcc_close>
 
 Terminates a DCC SEND or GET connection prematurely, and causes DCC CHAT
 connections to close gracefully. Takes one argument: the magic cookie
-from an C<irc_dcc_start> or C<irc_dcc_request> event.
+from an L<C<irc_dcc_start>|/"irc_dcc_start"> or
+L<C<irc_dcc_request>|/"irc_dcc_request"> event.
 
 =head1 OUTPUT
 
+
 =head2 C<irc_dcc_request>
 
-You receive this event when another IRC client sends you a DCC SEND or
-CHAT request out of the blue. You can examine the request and decide
-whether or not to accept it here. ARG0 is the nick of the client on the
-other end. ARG1 is the type of DCC request (CHAT, SEND, etc.). ARG2 is
-the port number. ARG3 is a "magic cookie" argument, suitable for sending
-with C<dcc_accept> events to signify that you want to accept the
-connection (see the 'dcc_accept' docs). For DCC SEND and GET
-connections, ARG4 will be the filename, and ARG5 will be the file size.
+B<Note:> This event is actually emitted by
+L<POE::Filter::IRC::Compat|POE::Filter::IRC::Compat>, but documented here
+to keep all the DCC documentation in one place. In case you were wondering.
+
+You receive this event when another IRC client sends you a DCC
+(e.g. SEND or CHAT) request out of the blue. You can examine the request
+and decide whether or not to accept it (with L<C<dcc_accept>|/"dcc_accept">)
+here. In the case of DCC SENDs, you can also request to resume the file with
+L<C<dcc_resume>|/"dcc_resume">.
+
+=over
+
+=item ARG0: the peer's nickname
+
+=item ARG1: the port which the peer is listening on
+
+=item ARG2: the DCC type
+
+=item ARG3: this connection's "magic cookie"
+
+=item ARG4: the file name
+
+=item ARG5: the file size (SEND only)
+
+=back
 
 =head2 C<irc_dcc_chat>
 
 Notifies you that one line of text has been received from the
-client on the other end of a DCC CHAT connection. ARG0 is the
-connection's magic cookie, ARG1 is the nick of the person on the other
-end, ARG2 is the port number, and ARG3 is the text they sent.
+client on the other end of a DCC CHAT connection.
+
+=over
+
+=item ARG0: this connection's "magic cookie"
+
+=item ARG1: the peer's nickname
+
+=item ARG2: the port number
+
+=item ARG3: the text they sent
+
+=back
 
 =head2 C<irc_dcc_done>
 
 You receive this event when a DCC connection terminates normally.
-Abnormal terminations are reported by C<irc_dcc_error>, below. ARG0 is
-the connection's magic cookie, ARG1 is the nick of the person on the
-other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3 is the
-port number. For DCC SEND and GET connections, ARG4 will be the
-filename, ARG5 will be the file size, and ARG6 will be the number of
-bytes transferred. (ARG5 and ARG6 should always be the same.)
+Abnormal terminations are reported by L<C<irc_dcc_error>|/"irc_dcc_error">.
+
+=over
+
+=item ARG0: this connection's "magic cookie"
+
+=item ARG1: the peer's nickname
+
+=item ARG2: the DCC type
+
+=item ARG3: the port number
+
+=item ARG4: the filename
+
+=item ARG5: file size (SEND/GET only)
+
+=item ARG6: transferred file size (SEND/GET only, should be same as ARG5)
+
+=back
 
 =head2 C<irc_dcc_failed>
 
-You get this event when a DCC connection fails for some reason. ARG0 
-will be the operation that failed, ARG1 is the error number, ARG2 is
-the description of the error and ARG3 the connection's magic cookie.
+You get this event when a DCC connection fails for some reason.
+
+=over
+
+=item ARG0: the operation that failed
+
+=item ARG1: the error number
+
+=item ARG2: the error string
+
+=item ARG3: this connection's "magic cookie"
+
+=back
 
 =head2 C<irc_dcc_error>
 
 You get this event whenever a DCC connection or connection attempt
-terminates unexpectedly or suffers some fatal error. ARG0 will be the
-connection's magic cookie, ARG1 will be a string describing the error.
-ARG2 will be the nick of the person on the other end of the connection.
-ARG3 is the DCC type (SEND, GET, CHAT, etc.). ARG4 is the port number of
-the DCC connection, if any. For SEND and GET connections, ARG5 is the
-filename, ARG6 is the expected file size, and ARG7 is the transferred size.
+terminates unexpectedly or suffers some fatal error.
+
+=over
+
+=item ARG0: this connection's "magic cookie"
+
+=item ARG1: the error string
+
+=item ARG2: the peer's nickname
+
+=item ARG3: the DCC type
+
+=item ARG4: the port number
+
+=item ARG5: the file name
+
+=item ARG6: expected file size
+
+=item ARG7: tranferred file size
+
+=back
 
 =head2 C<irc_dcc_get>
 
 Notifies you that another block of data has been successfully
 transferred from the client on the other end of your DCC GET connection.
-ARG0 is the connection's magic cookie, ARG1 is the nick of the person on
-the other end, ARG2 is the port number, ARG3 is the filename, ARG4 is
-the total file size, and ARG5 is the number of bytes successfully
-transferred so far.
+
+=over
+
+=item ARG0: this connection's "magic cookie"
+
+=item ARG1: the peer's nickname
+
+=item ARG2: the port number
+
+=item ARG3: the file name
+
+=item ARG4: the file size
+
+=item ARG5: transferred file size
+
+=back
 
 =head2 C<irc_dcc_send>
 
 Notifies you that another block of data has been successfully
 transferred from you to the client on the other end of a DCC SEND
-connection. ARG0 is the connection's magic cookie, ARG1 is the nick of
-the person on the other end, ARG2 is the port number, ARG3 is the
-filename, ARG4 is the total file size, and ARG5 is the number of bytes
-successfully transferred so far.
+connection.
+
+=over
+
+=item ARG0: this connection's "magic cookie"
+
+=item ARG1: the peer's nickname
+
+=item ARG2: the port number
+
+=item ARG3: the file name
+
+=item ARG4: the file size
+
+=item ARG5: transferred file size
+
+=back
 
 =head2 C<irc_dcc_start>
 
 This event notifies you that a DCC connection has been successfully
-established. ARG0 is a unique "magic cookie" argument which you can pass
-to C<dcc_chat> or C<dcc_close>. ARG1 is the nick of the person on the
-other end, ARG2 is the DCC type (CHAT, SEND, GET, etc.), and ARG3 is the
-port number. For DCC SEND and GET connections, ARG4 will be the filename
-and ARG5 will be the file size.
+established.
+
+=over
+
+=item ARG0: this connection's "magic cookie"
+
+=item ARG1: the peer's nickname
+
+=item ARG2: the DCC type
+
+=item ARG3: the port number
+
+=item ARG4: the file name (SEND/GET only)
+
+=item ARG5: the file size (SEND/GET only)
+
+=back
 
 =head1 AUTHOR
 
