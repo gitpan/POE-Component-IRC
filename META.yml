@@ -21,7 +21,7 @@ requires:
   Encode: 0
   Encode::Guess: 0
   POE: 0.3202
-  POE::Component::Pluggable: 1.08
+  POE::Component::Pluggable: 1.10
   POE::Driver::SysRW: 0
   POE::Filter::IRCD: 1.7
   POE::Filter::Line: 0
@@ -30,4 +30,4 @@ requires:
   POE::Wheel::ReadWrite: 0
   POE::Wheel::SocketFactory: 0
   perl: 5.6.0
-version: 5.82
+version: 5.84
