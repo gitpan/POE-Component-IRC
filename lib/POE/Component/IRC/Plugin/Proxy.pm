@@ -8,7 +8,7 @@ use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( :ALL );
 
-our $VERSION = '5.78';
+our $VERSION = '5.86';
 
 sub new {
     my ($package, %args) = @_;
@@ -28,7 +28,6 @@ sub PCI_register {
         object_states => [
             $self => [ qw(_client_error _client_flush _client_input _listener_accept _listener_failed _start _shutdown _spawn_listener) ],
         ],
-        options => { trace => 1 },
     )->ID();
 
     return 1;

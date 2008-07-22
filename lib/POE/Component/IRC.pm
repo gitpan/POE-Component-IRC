@@ -16,8 +16,8 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '5.84';
-our $REVISION = do {my@r=(q$Revision: 696 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our $VERSION = '5.86';
+our $REVISION = do {my@r=(q$Revision: 703 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -2492,8 +2492,9 @@ For instance, receiving a CTCP PING request generates an C<irc_ctcp_ping>
 event, CTCP ACTION (produced by typing "/me" in most IRC clients)
 generates an C<irc_ctcp_action> event, blah blah, so on and so forth. ARG0
 is the nick!hostmask of the sender. ARG1 is the channel/recipient
-name(s). ARG2 is the text of the CTCP message. On FreeNode there is also
-ARG3, which will be 1 if the sender has identified with NickServ, 0 otherwise.
+name(s). ARG2 is the text of the CTCP message. On servers supporting the
+CAPAB IDENTIFY-MSG feature (e.g. FreeNode), CTCP ACTIONs will have ARG3,
+which will be 1 if the sender has identified with NickServ, 0 otherwise.
 
 Note that DCCs are handled separately -- see the
 L<DCC plugin|POE::Component::IRC::Plugin::DCC>.
