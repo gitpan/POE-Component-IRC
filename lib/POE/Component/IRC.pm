@@ -16,8 +16,8 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '5.86';
-our $REVISION = do {my@r=(q$Revision: 703 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our $VERSION = '5.88';
+our $REVISION = do {my@r=(q$Revision: 721 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -895,16 +895,17 @@ sub spawn {
 
     my $self = bless { }, $package;
     $self->_create();
+    
+    my $options      = delete $params{options};
+    my $alias        = delete $params{alias};
+    my $plugin_debug = delete $params{plugin_debug};
 
     $self->_pluggable_init(
         prefix     => 'irc_',
         reg_prefix => 'PCI_',
         types      => { SERVER => 'S', USER => 'U' },
-        ($self->{plugin_debug} ? (debug => 1) : () ),
+        ($plugin_debug ? (debug => 1) : () ),
     );
-
-    my $options = delete $params{options};
-    my $alias = delete $params{alias};
 
     POE::Session->create(
         object_states => [

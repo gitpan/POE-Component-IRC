@@ -7,10 +7,10 @@ use POE::Filter::IRCD;
 use File::Basename qw(fileparse);
 use base qw(POE::Filter);
 
-our $VERSION = '1.6';
+our $VERSION = '1.7';
 
 my %irc_cmds = (
-    qr/^\d{3,3}$/ => sub {
+    qr/^\d{3}$/ => sub {
         my ($self, $event, $line) = @_;
         $event->{args}->[0] = _decolon( $line->{prefix} );
         shift @{ $line->{params} };
@@ -76,9 +76,9 @@ my %irc_cmds = (
 # the magic cookie jar
 my %dcc_types = (
     qr/CHAT|SEND/ => sub {
-        my ($nick, $type, $arg_string) = @_;
+        my ($nick, $type, $args) = @_;
         my ($file, $addr, $port, $size);
-        return if !(($file, $addr, $port, $size) = $arg_string =~ /^(".+"|\S+) +(\d+) +(\d+)(?: +(\d+))?/);
+        return if !(($file, $addr, $port, $size) = $args =~ /^(".+"|\S+) +(\d+) +(\d+)(?: +(\d+))?/);
         
         $file =~ s/^"|"$//g;
         $file = fileparse($file);
@@ -285,7 +285,7 @@ sub _decolon {
 
 sub _get_ctcp {
     my ($self, $line) = @_;
-    my ($who, $type, $where, $msg) = ($line =~ /^:(\S+) +(\S+) +(\S+) +:?(.*)$/) or return;
+    my ($who, $type, $where, $msg) = ($line =~ /^:(\S+) +(\S+) +(\S+) +:?(.*)$/) or return [];
     # Is this a CTCP request or reply?
     $type = $type eq 'PRIVMSG' ? 'ctcp' : 'ctcpreply';
     
@@ -407,6 +407,12 @@ __END__
 POE::Filter::IRC::Compat - A filter which converts L<POE::Filter::IRCD|POE::Filter::IRCD>
 output into L<POE::Component::IRC|POE::Component::IRC> events.
 
+=head1 SYNOPSIS
+
+ my $filter = POE::Filter::IRC::Compat->new();
+ my @events = @{ $filter->get( [ @lines ] ) };
+ my @msgs = @{ $filter->put( [ @messages ] ) };
+
 =head1 DESCRIPTION
 
 POE::Filter::IRC::Compat is a L<POE::Filter|POE::Filter> that converts
@@ -415,13 +421,28 @@ compatible event references. Basically a hack, so I could replace
 L<POE::Filter::IRC|POE::Filter::IRC> with something that was more
 generic.
 
-=head1 CONSTRUCTOR
+Among other things, it converts normal text into thoroughly CTCP-quoted
+messages, and transmogrifies CTCP-quoted messages into their normal,
+sane components. Rather what you'd expect a filter to do.
+
+A note: the CTCP protocol sucks bollocks. If I ever meet the fellow who
+came up with it, I'll shave their head and tattoo obscenities on it.
+Just read the "specification" (F<docs/ctcpspec.html> in this distribution)
+and you'll hopefully see what I mean. Quote this, quote that, quote this
+again, all in different and weird ways... and who the hell needs to send
+mixed CTCP and text messages? WTF? It looks like it's practically complexity
+for complexity's sake -- and don't even get me started on the design of the
+DCC protocol! Anyhow, enough ranting. Onto the rest of the docs...
+
+=head1 METHODS
 
 =head2 C<new>
 
-Returns a POE::Filter::IRC::Compat object.
+Returns a POE::Filter::IRC::Compat object. Takes no arguments.
 
-=head1 METHODS
+=head2 C<clone>
+
+Makes a copy of the filter, and clears the copy's buffer.
 
 =head2 C<get>
 
@@ -433,6 +454,18 @@ L<POE::Component::IRC|POE::Component::IRC> compatible event hashrefs. Yay.
 These perform a similar function as C<get()> but enable the filter to work with
 L<POE::Filter::Stackable|POE::Filter::Stackable>.
 
+=head2 C<put>
+
+Takes an array reference of CTCP messages to be properly quoted. This
+doesn't support CTCPs embedded in normal messages, which is a
+brain-dead hack in the protocol, so do it yourself if you really need
+it. Returns an array reference of the quoted lines for sending.
+
+=head2 C<debug>
+
+Takes an optinal true/false value which enables/disables debugging
+accordingly. Returns the debug status.
+
 =head2 C<chantypes>
 
 Takes an arrayref of possible channel prefix indicators.
@@ -440,22 +473,6 @@ Takes an arrayref of possible channel prefix indicators.
 =head2 C<identifymsg>
 
 Takes a boolean to turn on/off the support for CAPAB IDENTIFY-MSG.
-
-=head2 C<debug>
-
-Takes a true/false value which enables/disables debugging accordingly.
-Returns the debug status.
-
-=head2 C<clone>
-
-Makes a copy of the filter, and clears the copy's buffer.
-
-=head2 C<put>
-
-Takes an array reference of CTCP messages to be properly quoted. This
-doesn't support CTCPs embedded in normal messages, which is a
-brain-dead hack in the protocol, so do it yourself if you really need
-it. Returns an array reference of the quoted lines for sending.
 
 =head1 AUTHOR
 
