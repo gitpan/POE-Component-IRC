@@ -16,8 +16,8 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '5.88';
-our $REVISION = do {my@r=(q$Revision: 721 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our $VERSION = '5.90';
+our $REVISION = do {my@r=(q$Revision: 731 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -578,7 +578,7 @@ sub _start {
     }
     else {
         $kernel->alias_set($self);
-        $self->{alias} = $self;
+        $self->{alias} = "$self";
     }
 
     $self->{ircd_filter} = POE::Filter::IRCD->new(debug => $self->{debug});
@@ -1068,7 +1068,7 @@ sub _poco_irc_sig_register {
         $sender_id = $ref->ID();
     }
     else {
-        warn "Can\'t resolve $sender\n";
+        warn "Can't resolve $sender\n";
         return;
     }
   
