@@ -2,6 +2,7 @@ package POE::Component::IRC::Plugin::Proxy;
 
 use strict;
 use warnings;
+use Carp;
 use Socket;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD 
            Filter::Line Filter::Stackable);
@@ -11,7 +12,9 @@ use POE::Component::IRC::Common qw( :ALL );
 our $VERSION = '5.86';
 
 sub new {
-    my ($package, %args) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %args = @_;
     $args{ lc $_ } = delete $args{ $_ } for keys %args;
     return bless \%args, $package;
 }
@@ -257,7 +260,7 @@ sub _client_flush {
 }
 
 # this code needs refactoring
-## no critic
+## no critic (Subroutines::ProhibitExcessComplexity)
 sub _client_input {
     my ($kernel, $self, $input, $wheel_id) = @_[KERNEL, OBJECT, ARG0, ARG1];
 
@@ -380,7 +383,7 @@ __END__
 =head1 NAME
 
 POE::Component::IRC::Plugin::Proxy - A PoCo-IRC plugin that provides a
-lightweight IRC proxy/bouncer for L<POE::Component::IRC|POE::Component::IRC>.
+lightweight IRC proxy/bouncer
 
 =head1 SYNOPSIS
 

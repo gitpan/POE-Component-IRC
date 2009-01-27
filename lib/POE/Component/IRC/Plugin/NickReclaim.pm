@@ -2,12 +2,15 @@ package POE::Component::IRC::Plugin::NickReclaim;
 
 use strict;
 use warnings;
+use Carp;
 use POE::Component::IRC::Plugin qw(:ALL);
 
 our $VERSION = '1.3';
 
 sub new {
-    my ($package, %args) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %args = @_;
     $args{ lc $_ } = delete $args{$_} for keys %args;
 
     if (!defined $args{poll} || $args{poll} !~ /^\d+$/) {
@@ -122,14 +125,14 @@ __END__
 =head1 NAME
 
 POE::Component::IRC::Plugin::NickReclaim - A PoCo-IRC plugin for reclaiming
-nickname.
+your nickname
 
 =head1 SYNOPSIS
 
  use strict;
  use warnings;
  use POE qw(Component::IRC Component::IRC::Plugin::NickReclaim);
-
+i
  my $nickname = 'Flibble' . $$;
  my $ircname = 'Flibble the Sailor Bot';
  my $ircserver = 'irc.blahblahblah.irc';

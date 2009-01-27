@@ -1,19 +1,19 @@
 use strict;
 use warnings;
+use lib 't/inc';
 use POE qw(Wheel::SocketFactory);
 use POE::Component::IRC::State;
-use POE::Component::IRC::Test::Harness;
+use POE::Component::Server::IRC;
 use Socket;
-use Test::More tests => 21;
+use Test::More tests => 19;
 
-my $irc = POE::Component::IRC::State->spawn();
-my $ircd = POE::Component::IRC::Test::Harness->spawn(
-    Alias     => 'ircd',
+my $bot = POE::Component::IRC::State->spawn();
+my $ircd = POE::Component::Server::IRC->spawn(
     Auth      => 0,
     AntiFlood => 0,
 );
 
-isa_ok($irc, 'POE::Component::IRC::State');
+isa_ok($bot, 'POE::Component::IRC::State');
 
 POE::Session->create(
     package_states => [
@@ -63,18 +63,18 @@ sub _start {
 sub _shutdown {
     my ($kernel) = $_[KERNEL];
     $kernel->alarm_remove_all();
-    $kernel->post(ircd => 'shutdown');
-    $irc->yield('shutdown');
+    $ircd->yield('shutdown');
+    $bot->yield('shutdown');
 }
 
 sub _config_ircd {
     my ($kernel, $port) = @_[KERNEL, ARG0];
     
-    $kernel->post(ircd => 'add_i_line');
-    $kernel->post(ircd => 'add_listener' => { Port => $port } );
+    $ircd->yield('add_i_line');
+    $ircd->yield(add_listener => Port => $port);
     
-    $irc->yield(register => 'all');
-    $irc->yield(connect => {
+    $bot->yield(register => 'all');
+    $bot->yield(connect => {
         nick    => 'TestBot',
         server  => '127.0.0.1',
         port    => $port,
@@ -114,24 +114,26 @@ sub irc_join {
 }
 
 sub irc_chan_sync {
-    my ($sender, $channel) = @_[SENDER, ARG0];
+    my ($sender, $heap, $channel) = @_[SENDER, HEAP, ARG0];
     my $irc = $sender->get_heap();
     my $mynick = $irc->nick_name();
     my ($occupant) = $irc->channel_list($channel);
     
     is($occupant, 'TestBot', 'Channel Occupancy Test');
-    ok(!$irc->is_channel_mode_set( $channel, 't'), 'Channel Mode Set');
+    ok(!$irc->is_channel_mode_set( $channel, 'i'), 'Channel mode i not set yet');
     ok($irc->is_channel_member($channel, $mynick), 'Is Channel Member');
     ok($irc->is_channel_operator($channel, $mynick ), 'Is Channel Operator');
     ok($irc->ban_mask( $channel, $mynick), 'Ban Mask Test');
     
-    $irc->yield(mode => $channel, '+nt');
+    $irc->yield(mode => $channel, '+i');
+    $heap->{mode_changed} = 1;
 }
 
 sub irc_chan_mode {
-    my ($sender, $who, $channel, $mode) = @_[SENDER, ARG0..ARG2];
+    my ($sender, $heap, $who, $channel, $mode) = @_[SENDER, HEAP, ARG0..ARG2];
     my $irc = $sender->get_heap();
-    
+    return if !$heap->{mode_changed};
+
     $mode =~ s/\+//g;
     ok($irc->is_channel_mode_set($channel, $mode), "Channel Mode Set: $mode");
 }
@@ -151,9 +153,9 @@ sub irc_mode {
 }
 
 sub irc_221 {
-    my $object = $_[SENDER]->get_heap();
+    my $irc = $_[SENDER]->get_heap();
     pass('State did a MODE query');
-    $irc->yield(mode => $object->nick_name(), '+iw');
+    $irc->yield(mode => $irc->nick_name(), '+iw');
 }
 
 sub irc_error {

@@ -2,13 +2,16 @@ package POE::Component::IRC::Plugin::AutoJoin;
 
 use strict;
 use warnings;
+use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user );
 
 our $VERSION = '1.2';
 
 sub new {
-    my ($package, %self) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %self = @_;
     return bless \%self, $package;
 }
 
@@ -29,6 +32,8 @@ sub PCI_register {
         $channels->{$_} = '' for @{ $self->{Channels} };
         $self->{Channels} = $channels;
     }
+
+    $self->{Rejoin_delay} = 5 if !defined $self->{Rejoin_delay};
     $irc->plugin_register($self, 'SERVER', qw(001 chan_mode join kick part));
     return 1;
 }
@@ -71,7 +76,9 @@ sub S_kick {
     my $chan = ${ $_[1] };
     my $victim = ${ $_[2] };
     if ($victim eq $irc->nick_name()) {
-        $irc->delay([join => $chan => $self->{Channels}->{$chan}], 5) if $self->{RejoinOnKick};
+        if ($self->{RejoinOnKick}) {
+            $irc->delay([join => $chan => $self->{Channels}->{$chan}], $self->{Rejoin_delay});
+        }
         delete $self->{Channels}->{$chan};
     }
     return PCI_EAT_NONE;
@@ -91,7 +98,7 @@ __END__
 =head1 NAME
 
 POE::Component::IRC::Plugin::AutoJoin - A PoCo-IRC plugin which
-keeps you on your favorite channels throughout reconnects and even kicks.
+keeps you on your favorite channels
 
 =head1 SYNOPSIS
 
@@ -139,8 +146,8 @@ on the next time it gets connected to the IRC server. It can also rejoin a
 channel if the IRC component gets kicked from it. It keeps track of channel
 keys so it will be able to rejoin keyed channels in case of reconnects/kicks.
 
-This plugin requires the IRC component L<POE::Component::IRC::State|POE::Component::IRC::State>
-or a subclass thereof.
+This plugin requires the IRC component to be
+L<POE::Component::IRC::State|POE::Component::IRC::State> or a subclass thereof.
 
 =head1 METHODS
 
@@ -154,6 +161,9 @@ uses the channels the component is already on, if any.
 
 'RejoinOnKick', set this to 1 if you want the plugin to try to rejoin a channel
 (once) if you get kicked from it. Default is 0.
+
+'Rejoin_delay', the time, in seconds, to wait before rejoining a channel after
+being kicked (if 'RejoinOnKick' is on). Default is 5.
  
 
 Returns a plugin object suitable for feeding to L<POE::Component::IRC|POE::Component::IRC>'s

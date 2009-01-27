@@ -2,13 +2,16 @@ package POE::Component::IRC::Plugin::BotCommand;
 
 use strict;
 use warnings;
+use Carp;
 use POE::Component::IRC::Common qw( parse_user );
 use POE::Component::IRC::Plugin qw( :ALL );
 
 our $VERSION = '1.1';
 
 sub new {
-    my ($package, %args) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %args = @_;
     
     for my $cmd (keys %{ $args{Commands} }) {
         $args{Commands}->{lc $cmd} = delete $args{Commands}->{$cmd};
@@ -111,8 +114,8 @@ __END__
 
 =head1 NAME
 
-POE::Component::IRC::Plugin::BotCommand - A PoCo-IRC plugin which makes it easy
-to handle commands issued to your bot.
+POE::Component::IRC::Plugin::BotCommand - A PoCo-IRC plugin which handles
+commands issued to your bot
 
 =head1 SYNOPSIS
 

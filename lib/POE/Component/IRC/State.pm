@@ -275,7 +275,7 @@ sub S_306 {
 }
 
 # this code needs refactoring
-## no critic
+## no critic (Subroutines::ProhibitExcessComplexity ControlStructures::ProhibitCascadingIfElse)
 sub S_mode {
     my ($self, $irc) = splice @_, 0, 2;
     my $mapping = $irc->isupport('CASEMAPPING');
@@ -287,7 +287,7 @@ sub S_mode {
 
     # CHANMODES is [$list_mode, $always_arg, $arg_when_set, $no_arg]
     # A $list_mode always has an argument
-    my $prefix = $irc->isupport('PREFIX') || { 'o', '@', 'v', '+' };
+    my $prefix = $irc->isupport('PREFIX') || { o => '@', v => '+' };
     my $statmodes = join '', keys %{ $prefix };
     my $chanmodes = $irc->isupport('CHANMODES') || [ qw(beI k l imnpstaqr) ];
     my $alwaysarg = join '', $statmodes,  @{ $chanmodes }[0 .. 1];
@@ -418,7 +418,7 @@ sub S_352 {
     if ( exists $self->{STATE}->{Chans}->{ $uchan } ) {
         my $whatever = '';
         my $existing = $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan } || '';    
-        my $prefix = $irc->isupport('PREFIX') || { 'o', '@', 'v', '+' };
+        my $prefix = $irc->isupport('PREFIX') || { o =>, '@', v => '+' };
 
         for my $mode ( keys %{ $prefix } ) {
             if ($status =~ /\Q$prefix->{$mode}/ && $existing !~ /\Q$prefix->{$mode}/ ) {
@@ -1051,8 +1051,8 @@ __END__
 
 =head1 NAME
 
-POE::Component::IRC::State - a fully event-driven IRC client module with
-channel/nick tracking.
+POE::Component::IRC::State - A fully event-driven IRC client module with
+nickname and channel tracking
 
 =head1 SYNOPSIS
 

@@ -2,10 +2,11 @@ package POE::Component::IRC::Plugin::PlugMan;
 
 use strict;
 use warnings;
+use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( :ALL );
 
-our $VERSION = '5.76';
+our $VERSION = '5.90';
 
 BEGIN { 
     # Turn on the debugger's symbol source tracing
@@ -18,7 +19,9 @@ BEGIN {
 }
 
 sub new {
-    my ($package, %args) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %args = @_;
     $args{ lc $_ } = delete $args{ $_ } for keys %args;
     return bless \%args, $package;
 }
@@ -30,7 +33,7 @@ sub new {
 sub PCI_register {
     my ($self, $irc) = @_;
 
-    if ( !$irc->isa('POE::Component::IRC::State') ) {
+    if (defined $self->{botowner} && !$irc->isa('POE::Component::IRC::State') ) {
         die __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
     }
 
@@ -225,7 +228,7 @@ __END__
 =head1 NAME
 
 POE::Component::IRC::Plugin::PlugMan - A PoCo-IRC plugin that provides plugin
-management services. 
+management services.
 
 =head1 SYNOPSIS
 

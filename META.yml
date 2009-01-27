@@ -1,11 +1,11 @@
 ---
-abstract: 'a fully event-driven IRC client module.'
+abstract: 'A fully event-driven IRC client module'
 author:
   - 'Chris Williams <chris@bingosnet.co.uk>'
 build_requires:
   Test::More: 0.47
 distribution_type: module
-generated_by: 'Module::Install version 0.77'
+generated_by: 'Module::Install version 0.78'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -13,9 +13,9 @@ meta-spec:
 name: POE-Component-IRC
 no_index:
   directory:
+    - examples
     - inc
     - t
-    - examples
 requires:
   Encode: 0
   Encode::Guess: 0
@@ -31,4 +31,4 @@ requires:
   perl: 5.6.0
 resources:
   license: http://dev.perl.org/licenses/
-version: 5.90
+version: 5.92

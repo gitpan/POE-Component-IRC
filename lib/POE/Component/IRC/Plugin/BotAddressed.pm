@@ -2,10 +2,16 @@ package POE::Component::IRC::Plugin::BotAddressed;
 
 use strict;
 use warnings;
+use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 
+our $VERSION = 5.90;
+
 sub new {
-    my ($package, %args) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %args = @_;
+
     $args{lc $_} = delete $args{$_} for keys %args;
     return bless \%args, $package;
 }
@@ -68,8 +74,7 @@ __END__
 =head1 NAME
 
 POE::Component::IRC::Plugin::BotAddressed - A PoCo-IRC plugin that generates
-an 'irc_bot_addressed', 'irc_bot_mentioned' or 'irc_bot_mentioned_action' event
-if its name comes up in channel discussion.
+events when you are addressed
 
 =head1 SYNOPSIS
 
@@ -120,7 +125,7 @@ plugin_add() method.
 
 =head2 C<irc_bot_addressed>
 
-Has the same parameters passed as L<C<irc_ctcp_action>|POE::Component::IRC/"irc_ctcp_action">.
+Has the same parameters passed as L<C<irc_ctcp_public>|POE::Component::IRC/"irc_public">.
 ARG2 contains the message with the addressed nickname removed, ie. Assuming
 that your bot is called LameBOT, and someone says 'LameBOT: dance for me',
 you will actually get 'dance for me'.
@@ -131,7 +136,7 @@ Has the same parameters passed as L<C<irc_public>|POE::Component::IRC/"irc_publi
 
 =head2 C<irc_bot_mentioned_action>
 
-Has the same parameters passed as L<C<irc_ctcp_action>|POE::Component::IRC/"irc_ctcp_action">.
+Has the same parameters passed as L<C<irc_ctcp_action>|POE::Component::IRC/"irc_ctcp_*">.
 
 =head1 AUTHOR
 

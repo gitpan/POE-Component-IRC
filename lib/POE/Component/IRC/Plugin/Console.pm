@@ -2,13 +2,17 @@ package POE::Component::IRC::Plugin::Console;
 
 use strict;
 use warnings;
+use Carp;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw( :ALL );
 
+our $VERSION = '5.90';
+
 sub new {
     my $package = shift;
-    my $self = bless { @_ }, $package;
-    return $self;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %self = @_;
+    return bless \%self, $package;
 }
 
 sub PCI_register {
@@ -188,7 +192,7 @@ __END__
 
 POE::Component::IRC::Plugin::Console - A PoCo-IRC plugin that provides a
 lightweight debugging and control console for
-L<POE::Component::IRC|POE::Component::IRC> bots.
+your bot
 
 =head1 SYNOPSIS
 

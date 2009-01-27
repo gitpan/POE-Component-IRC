@@ -2,6 +2,7 @@ package POE::Component::IRC::Plugin::DCC;
 
 use strict;
 use warnings;
+use Carp;
 use File::Basename qw(fileparse);
 use POE qw(Driver::SysRW Filter::Line Filter::Stream
            Wheel::ReadWrite Wheel::SocketFactory);
@@ -11,13 +12,15 @@ use Socket;
 our $VERSION = '1.1';
 
 use constant {
-    BLOCKSIZE          => 1024,  # Send DCC data in 1k chunks
-    INCOMING_BLOCKSIZE => 10240, # 10k per DCC socket read
-    DCC_TIMEOUT        => 300,   # Five minutes for listening DCCs
+    BLOCKSIZE          => 1024,   # Send DCC data in 1k chunks
+    INCOMING_BLOCKSIZE => 10_240, # 10k per DCC socket read
+    DCC_TIMEOUT        => 300,    # Five minutes for listening DCCs
 };
 
 sub new {
-    my ($package, %self) = @_;
+    my ($package) = shift;
+    croak "$package requires an even number of arguments" if @_ & 1;
+    my %self = @_;
     return bless \%self, $package;
 }
 
@@ -347,6 +350,7 @@ sub _event_dcc_close {
 # bboett - first step - the user asks for a resume:
 # tries to resume a previous dcc transfer. See '_dcc_up' for
 # the rest of the logic for this.
+## no critic (InputOutput::RequireBriefOpen)
 sub _event_dcc_resume {
     my ($self, $cookie, $myfile) = @_[OBJECT, ARG0, ARG1];
     my $irc = $self->{irc};
@@ -563,6 +567,7 @@ sub _dcc_timeout {
 }
 
 # This event occurs when a DCC connection is established.
+## no critic (InputOutput::RequireBriefOpen)
 sub _dcc_up {
     my ($kernel, $self, $sock, $addr, $port, $id) =
         @_[KERNEL, OBJECT, ARG0 .. ARG3];
@@ -638,7 +643,8 @@ __END__
 
 =head1 NAME
 
-POE::Component::IRC::Plugin::DCC - a PoCo-IRC plugin providing DCC support
+POE::Component::IRC::Plugin::DCC - A PoCo-IRC plugin providing support for
+DCC transfers
 
 =head1 SYNOPSIS
 
