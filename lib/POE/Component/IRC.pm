@@ -16,8 +16,8 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '5.92';
-our $REVISION = do {my@r=(q$Revision: 766 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our $VERSION = '5.94';
+our $REVISION = do {my@r=(q$Revision: 769 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
