@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user u_irc );
 
-our $VERSION = '1.1';
+our $VERSION = '5.98';
 
 sub new {
     my ($package) = shift;
@@ -101,7 +101,7 @@ channels if they become empty and opless.
 
  use POE::Component::IRC::Plugin::CycleEmpty;
 
- $irc->plugin_add( 'CycleEmpty', POE::Component::IRC::Plugin::CycleEmpty->new();
+ $irc->plugin_add('CycleEmpty', POE::Component::IRC::Plugin::CycleEmpty->new());
 
 =head1 DESCRIPTION
 
@@ -122,7 +122,7 @@ L<POE::Component::IRC::State|POE::Component::IRC::State> or a subclass thereof.
 =head2 C<new>
 
 Returns a plugin object suitable for feeding to
-L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
+L<POE::Component::IRC|POE::Component::IRC>'s C<plugin_add> method.
 
 =head2 C<is_cycling>
 

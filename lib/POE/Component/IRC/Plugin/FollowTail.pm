@@ -6,7 +6,7 @@ use Carp;
 use POE qw(Wheel::FollowTail);
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '0.02';
+our $VERSION = '5.98';
 
 sub new {
     my ($package) = shift;
@@ -154,7 +154,7 @@ of an ever-growing file
 
 POE::Component::IRC::Plugin::FollowTail is a L<POE::Component::IRC|POE::Component::IRC>
 plugin that uses L<POE::Wheel::FollowTail|POE::Wheel::FollowTail> to follow
-the end of an ever-growing file. It generates 'irc_tail_' prefixed events for
+the end of an ever-growing file. It generates C<irc_tail_> prefixed events for
 each new record that is appended to its file.
 
 =head1 METHODS
@@ -163,9 +163,12 @@ each new record that is appended to its file.
 
 Takes two arguments:
 
-'filename', the name of the file to tail, mandatory;
+B<'filename'>, the name of the file to tail, mandatory;
 
-'filter', a POE::Filter object to pass to POE::Wheel::FollowTail, optional;
+B<'filter'>, a POE::Filter object to pass to POE::Wheel::FollowTail, optional;
+
+Returns a plugin object suitable for feeding to
+L<POE::Component::IRC|POE::Component::IRC>'s C<plugin_add> method.
 
 =head1 OUTPUT
 
@@ -174,17 +177,17 @@ L<POE::Component::IRC|POE::Component::IRC> events:
 
 =head2 C<irc_tail_input>
 
-Emitted for every complete record read. ARG0 will be the filename, ARG1 the
-record which was read.
+Emitted for every complete record read. C<ARG0> will be the filename,
+C<ARG1> the record which was read.
 
 =head2 C<irc_tail_error>
 
-Emitted whenever an error occurs. ARG0 will be the filename, ARG1 and ARG2 hold
-numeric and string values for $!, respectively.
+Emitted whenever an error occurs. C<ARG0> will be the filename, C<ARG1>
+and C<ARG2> hold numeric and string values for $!, respectively.
 
 =head2 C<irc_tail_reset>
 
-Emitted every time a file is reset. ARG0 will be the filename.
+Emitted every time a file is reset. C<ARG0> will be the filename.
 
 =head1 AUTHOR
 

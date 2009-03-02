@@ -6,7 +6,7 @@ use Carp;
 use POE;
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '1.2';
+our $VERSION = '5.98';
 
 sub new {
     my ($package) = shift;
@@ -226,13 +226,13 @@ L<http://poe.perl.org/?POE_Cookbook/IRC_Bot_Reconnecting>.
 
 Takes two optional arguments:
 
-'delay', the frequency, in seconds, at which the plugin will ping the IRC
+B<'delay'>, the frequency, in seconds, at which the plugin will ping the IRC
 server. Defaults to 300.
 
-'reconnect', the time in seconds, to wait before trying to reconnect to
+B<'reconnect'>, the time in seconds, to wait before trying to reconnect to
 the server. Defaults to 60.
 
-'servers', an array reference of IRC servers to consider. Each element should
+B<'servers'>, an array reference of IRC servers to consider. Each element should
 be an array reference containing a server host and (optionally) a port number.
 The plugin will cycle through this list of servers whenever it reconnects.
 

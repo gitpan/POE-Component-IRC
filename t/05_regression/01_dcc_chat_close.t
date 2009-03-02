@@ -1,14 +1,19 @@
+# This make sures that we can close a DCC connection right after sending
+# some data over it. The original bug was that the DCC plugin didn't post
+# a delayed close event correctly so it ended up checking if there was data
+# left to be sent on an undefined value rather than the wheel in question.
+
 use strict;
 use warnings;
 use lib 't/inc';
-use POE qw(Wheel::SocketFactory);
 use POE::Component::IRC;
 use POE::Component::Server::IRC;
+use POE qw(Wheel::SocketFactory);
 use Socket;
-use Test::More tests => 9;
+use Test::More tests => 12;
 
-my $bot1 = POE::Component::IRC->spawn( plugin_debug => 1 );
-my $bot2 = POE::Component::IRC->spawn( plugin_debug => 1 );
+my $bot1 = POE::Component::IRC->spawn( plugin_debug => 1);
+my $bot2 = POE::Component::IRC->spawn( plugin_debug => 1);
 my $ircd = POE::Component::Server::IRC->spawn(
     Auth      => 0,
     AntiFlood => 0,
@@ -25,6 +30,8 @@ POE::Session->create(
             irc_disconnected
             irc_dcc_request
             irc_dcc_done
+            irc_dcc_chat
+            irc_dcc_start
         )],
     ],
 );
@@ -49,14 +56,14 @@ sub _start {
         $kernel->delay(_shutdown => 60);
         return;
     }
-    
+
     $kernel->yield('_shutdown');
 }
 
 sub _config_ircd {
     my ($kernel, $port) = @_[KERNEL, ARG0];
     
-    $ircd->yield('add_i_line' );
+    $ircd->yield('add_i_line');
     $ircd->yield(add_listener => Port => $port);
     
     $bot1->yield(register => 'all');
@@ -66,7 +73,7 @@ sub _config_ircd {
         port    => $port,
         ircname => 'Test test bot',
     });
-
+  
     $bot2->yield(register => 'all');
     $bot2->yield(connect => {
         nick    => 'TestBot2',
@@ -89,22 +96,37 @@ sub irc_join {
     
     if ($nick eq $irc->nick_name()) {
         is($where, '#testchannel', 'Joined Channel Test');
-    }
-    else {
-        $irc->yield(dcc => $nick => CHAT => '' => '' => 15);
+
+        if ($nick eq 'TestBot2') {
+            $irc->yield(dcc => TestBot1 => CHAT => '' => '' => 15);
+        }
     }
 }
 
 sub irc_dcc_request {
     my ($sender, $cookie) = @_[SENDER, ARG3];
-
     pass('Got dcc request');
-    is($cookie->{addr}, '2130706433', 'Correct Address Test');
-    $sender->get_heap()->yield('quit');
+    $sender->get_heap()->yield(dcc_accept => $cookie);
+}
+
+sub irc_dcc_start {
+    my ($sender, $id) = @_[SENDER, ARG0];
+    my $irc = $sender->get_heap();
+    pass('DCC started');
+
+    if ($irc->nick_name() eq 'TestBot2') {
+        $irc->yield(dcc_chat => $id => 'MOO');
+        $irc->yield(dcc_close => $id);
+    }
+}
+
+sub irc_dcc_chat {
+    my ($sender, $what) = @_[SENDER, ARG3];
+    is($what, 'MOO', 'DCC CHAT test');
 }
 
 sub irc_dcc_done {
-    pass('Got dcc timeout');
+    pass('Got dcc close');
     $_[SENDER]->get_heap()->yield('quit');
 }
 
@@ -117,8 +139,9 @@ sub irc_disconnected {
 
 sub _shutdown {
     my ($kernel) = $_[KERNEL];
+
     $kernel->alarm_remove_all();
-    $ircd->yield('shutdown');
+    $ircd->yield('shutdown'); 
     $bot1->yield('shutdown');
     $bot2->yield('shutdown');
 }

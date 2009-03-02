@@ -2,17 +2,22 @@ use strict;
 use warnings;
 use lib 't/inc';
 use POE qw(Wheel::SocketFactory);
-use POE::Component::IRC;
-use POE::Component::Server::IRC;
 use Socket;
+use POE::Component::IRC::State;
+use POE::Component::IRC::Plugin::AutoJoin;
+use POE::Component::Server::IRC;
 use Test::More tests => 9;
 
-my $bot1 = POE::Component::IRC->spawn( plugin_debug => 1 );
-my $bot2 = POE::Component::IRC->spawn( plugin_debug => 1 );
+my $bot1 = POE::Component::IRC::State->spawn( plugin_debug => 1 );
+my $bot2 = POE::Component::IRC::State->spawn( plugin_debug => 1 );
 my $ircd = POE::Component::Server::IRC->spawn(
     Auth      => 0,
     AntiFlood => 0,
 );
+
+$bot2->plugin_add(AutoJoin => POE::Component::IRC::Plugin::AutoJoin->new(
+    Retry_when_banned => 5,
+));
 
 POE::Session->create(
     package_states => [
@@ -23,8 +28,8 @@ POE::Session->create(
             irc_001 
             irc_join
             irc_disconnected
-            irc_dcc_request
-            irc_dcc_done
+            irc_chan_mode
+            irc_474
         )],
     ],
 );
@@ -43,20 +48,20 @@ sub _start {
 
     if ($wheel) {
         my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
-        $kernel->yield(_config_ircd => $port );
+        $kernel->yield(_config_ircd => $port);
         $heap->{count} = 0;
         $wheel = undef;
-        $kernel->delay(_shutdown => 60);
+        $kernel->delay(_shutdown => 60 );
         return;
     }
-    
+
     $kernel->yield('_shutdown');
 }
 
 sub _config_ircd {
     my ($kernel, $port) = @_[KERNEL, ARG0];
-    
-    $ircd->yield('add_i_line' );
+
+    $ircd->yield('add_i_line');
     $ircd->yield(add_listener => Port => $port);
     
     $bot1->yield(register => 'all');
@@ -66,7 +71,7 @@ sub _config_ircd {
         port    => $port,
         ircname => 'Test test bot',
     });
-
+  
     $bot2->yield(register => 'all');
     $bot2->yield(connect => {
         nick    => 'TestBot2',
@@ -79,7 +84,10 @@ sub _config_ircd {
 sub irc_001 {
     my $irc = $_[SENDER]->get_heap();
     pass('Logged in');
-    $irc->yield(join => '#testchannel');
+    
+    if ($irc == $bot1) {
+        $irc->yield(join => '#testchannel');
+    }
 }
 
 sub irc_join {
@@ -90,22 +98,32 @@ sub irc_join {
     if ($nick eq $irc->nick_name()) {
         is($where, '#testchannel', 'Joined Channel Test');
     }
+
+    if ($nick eq 'TestBot1') {
+        $irc->yield(mode => $where, '+b TestBot2!*@*');
+    }
     else {
-        $irc->yield(dcc => $nick => CHAT => '' => '' => 15);
+        $bot1->yield('quit');
+        $bot2->yield('quit');
     }
 }
 
-sub irc_dcc_request {
-    my ($sender, $cookie) = @_[SENDER, ARG3];
+sub irc_chan_mode {
+    my ($chan, $mode) = @_[ARG1, ARG2];
 
-    pass('Got dcc request');
-    is($cookie->{addr}, '2130706433', 'Correct Address Test');
-    $sender->get_heap()->yield('quit');
+    if ($mode eq '+b') {
+        pass('Ban set');
+        $bot2->yield(join => $chan);
+    }
+    elsif ($mode eq '-b') {
+        pass('Ban removed');
+    }
 }
 
-sub irc_dcc_done {
-    pass('Got dcc timeout');
-    $_[SENDER]->get_heap()->yield('quit');
+sub irc_474 {
+    my ($chan) = $_[ARG2]->[0];
+    pass("Can't join due to ban");
+    $bot1->yield(mode => $chan, '-b TestBot2!*@*');
 }
 
 sub irc_disconnected {
@@ -117,6 +135,7 @@ sub irc_disconnected {
 
 sub _shutdown {
     my ($kernel) = $_[KERNEL];
+    
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');
     $bot1->yield('shutdown');

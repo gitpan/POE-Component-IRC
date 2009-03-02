@@ -7,18 +7,18 @@ use POE::Filter::IRCD;
 use File::Basename qw(fileparse);
 use base qw(POE::Filter);
 
-our $VERSION = '1.8';
+our $VERSION = '5.98';
 
 my %irc_cmds = (
     qr/^\d{3}$/ => sub {
         my ($self, $event, $line) = @_;
         $event->{args}->[0] = _decolon( $line->{prefix} );
         shift @{ $line->{params} };
-        if ( $line->{params}->[0] && $line->{params}->[0] =~ /\s+/ ) {
+        if ( $line->{params}->[0] && $line->{params}->[0] =~ /\x20/ ) {
             $event->{args}->[1] = $line->{params}->[0];
         }
         else {
-            $event->{args}->[1] = join(' ', ( map { /\s+/ ? ":$_" : $_ } @{ $line->{params} } ) );
+            $event->{args}->[1] = join(' ', ( map { /\x20/ ? ":$_" : $_ } @{ $line->{params} } ) );
         }
         $event->{args}->[2] = $line->{params};
     },
@@ -78,31 +78,33 @@ my %dcc_types = (
     qr/CHAT|SEND/ => sub {
         my ($nick, $type, $args) = @_;
         my ($file, $addr, $port, $size);
-        return if !(($file, $addr, $port, $size) = $args =~ /^(".+"|\S+) +(\d+) +(\d+)(?: +(\d+))?/);
+        return if !(($file, $addr, $port, $size) = $args =~ /^(".+"|[^ ]+) +(\d+) +(\d+)(?: +(\d+))?/);
         
-        $file =~ s/^"|"$//g;
+        if ($file =~ s/^"//) {
+            $file =~ s/"$//;
+            $file =~ s/\\"/"/g;
+        }
         $file = fileparse($file);
         
         return (
             $port,
             {
-                open => undef,
                 nick => $nick,
                 type => $type,
                 file => $file,
                 size => $size,
-                done => 0,
                 addr => $addr,
                 port => $port,
             },
             $file,
             $size,
+            $addr,
         );
     },
     qr/ACCEPT|RESUME/ => sub {
         my ($nick, $type, $args) = @_;
         my ($file, $port, $position);
-        return if !(($file, $port, $position) = $args =~ /^(".+"|\S+) +(\d+) +(\d+)/);
+        return if !(($file, $port, $position) = $args =~ /^(".+"|[^ ]+) +(\d+) +(\d+)/);
 
         $file =~ s/^"|"$//g;
         $file = fileparse($file);
@@ -110,13 +112,10 @@ my %dcc_types = (
         return (
             $port,
             {
-                open => undef,
                 nick => $nick,
                 type => $type,
                 file => $file,
                 size => $position,
-                done => 0,
-                addr => undef,
                 port => $port,
             },
             $file,
@@ -339,7 +338,7 @@ sub _get_ctcp {
             push @$events, {
                 name => 'dcc_request',
                 args => [
-                    $nick,
+                    $line->{prefix},
                     $dcc_type,
                     @dcc_args,
                 ],
@@ -362,7 +361,7 @@ sub _get_ctcp {
 
     if ($text && @$text) {
         my $what;
-        ($what) = $line->{raw_line} =~ /^(:\S+ +\w+ +\S+ +)/
+        ($what) = $line->{raw_line} =~ /^(:[^ ]+ +\w+ +[^ ]+ +)/
             or warn "What the heck? '".$line->{raw_line}."'\n" if $self->{debug};
         $text = (defined $what ? $what : '') . ':' . join '', @$text;
         $text =~ s/\cP/^P/g;
@@ -461,7 +460,7 @@ L<POE::Component::IRC|POE::Component::IRC> compatible event hashrefs. Yay.
 
 =head2 C<get_one_start>, C<get_one>
 
-These perform a similar function as C<get()> but enable the filter to work with
+These perform a similar function as C<get> but enable the filter to work with
 L<POE::Filter::Stackable|POE::Filter::Stackable>.
 
 =head2 C<put>

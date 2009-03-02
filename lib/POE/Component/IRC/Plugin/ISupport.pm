@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use POE::Component::IRC::Plugin qw(:ALL);
 
-our $VERSION = '0.58';
+our $VERSION = '5.98';
 
 sub new {
     return bless { }, shift;
@@ -185,7 +185,7 @@ define the capabilities support by the server.
 Takes no arguments.
 
 Returns a plugin object suitable for feeding to
-L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
+L<POE::Component::IRC|POE::Component::IRC>'s C<plugin_add> method.
 
 =head2 C<isupport>
 
@@ -196,7 +196,7 @@ capabilities is available at L<http://www.irc.org/tech_docs/005.html>.
 =head2 C<isupport_dump_keys>
 
 Takes no arguments, returns a list of the available server capabilities,
-which can be used with isupport().
+which can be used with C<isupport>.
 
 =head1 INPUT
 
@@ -217,7 +217,7 @@ it emits an C<irc_isupport> signal.
 
 Emitted by: the first signal received after C<irc_005>
 
-ARG0 will be the plugin object itself for ease of use.
+C<ARG0> will be the plugin object itself for ease of use.
 
 This is emitted when the support report has finished.
 

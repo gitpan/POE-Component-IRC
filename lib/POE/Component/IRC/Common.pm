@@ -3,7 +3,7 @@ package POE::Component::IRC::Common;
 use strict;
 use warnings;
 
-our $VERSION = '5.18';
+our $VERSION = '5.98';
 
 require Exporter;
 use base qw(Exporter);
@@ -474,8 +474,9 @@ Takes a list representing an IRC mode line. Returns a hashref. If the modeline
 couldn't be parsed the hashref will be empty. On success the following keys
 will be available in the hashref:
 
- 'modes', an arrayref of normalised modes;
- 'args', an arrayref of applicable arguments to the modes;
+B<'modes'>, an arrayref of normalised modes;
+
+B<'args'>, an arrayref of applicable arguments to the modes;
 
 Example:
 
@@ -504,7 +505,7 @@ Takes two parameters, a string representing an IRC mask ( it'll be processed
 with parse_ban_mask() to ensure that it is normalised ) and something to match
 against the IRC mask, such as a nick!user@hostname string. Returns a true
 value if they match, a false value otherwise. Optionally, one may pass the
-casemapping (see L<C<u_irc()>|/"u_irc">), as this function uses C<u_irc()>
+casemapping (see L<C<u_irc>|/"u_irc">), as this function uses C<u_irc>
 internally.
 
 =head2 C<matches_mask_array>
@@ -513,8 +514,8 @@ Takes two array references, the first being a list of strings representing
 IRC masks, the second a list of somethings to test against the masks. Returns
 an empty hashref if there are no matches. Otherwise, the keys will be the
 masks matched, each value being an arrayref of the strings that matched it.
-Optionally, one may pass the casemapping (see L<C<u_irc()>|/"u_irc">), as
-this function uses C<u_irc()> internally.
+Optionally, one may pass the casemapping (see L<C<u_irc>|/"u_irc">), as
+this function uses C<u_irc> internally.
 
 =head2 C<parse_user>
 

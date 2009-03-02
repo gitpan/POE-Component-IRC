@@ -1,5 +1,28 @@
 Revision history for Perl extension POE::Component::IRC.
 
+5.98 Mon Mar  2 22:51:27 GMT 2009
+    - Parse some IRC protocol messages more strictly. Always split on ASCII
+      space rather than \s, since tabs are not considered whitespace by the
+      IRC protocol. (Hinrik)
+    - DCC.pm: Most events now tell you what the peer's IP address is (Hinrik)
+    - DCC.pm: Document the timeout parameter to the dcc command, and fixed
+      some errors in the docs. (Hinrik)
+    - Compat.pm/DCC.pm: Actually provide the whole nick!user@host (not just
+      the nick) with every dcc_request, like the synopsis suggests (Hinrik)
+    - DCC.pm: Fix crash when closing a DCC connection with pending outgoing
+      data, reported by meneldor (Hinrik)
+    - Added test case for the above (Hinrik)
+    - DCC.pm: Don't crash if dcc_close is called with an invalid id, also
+      reported by meneldor (Hinrik)
+    - Logger.pm: Add DCC chat logging (Hinrik)
+    - IRC.pm: Document the 'account' key returned by irc_whois (Hinrik)
+    - IRC.pm: Allow plugins to respond to custom commands without them having
+      to be defined explicitly in IRC.pm. This allows the removal of the last
+      piece of DCC-specific code (Hinrik)
+    - AutoJoin.pm: Add an option for retrying joins when banned (Hinrik)
+    - NickServID.pm: Support ratbox-based ircds (Hinrik)
+    - Synchronised all the version numbering (bingos)
+
 5.96 Wed Jan 28 11:29:28 GMT 2009
     - Added delays to the two failing tests reported by CPAN Testers,
       believe we are seeing race conditions. (bingos)
