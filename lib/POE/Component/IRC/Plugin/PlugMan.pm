@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( :ALL );
 
-our $VERSION = '5.98';
+our $VERSION = '6.00';
 
 BEGIN { 
     # Turn on the debugger's symbol source tracing
@@ -90,7 +90,7 @@ sub S_public {
     my $what = ${ $_[2] };
     my $me = $irc->nick_name();
 
-    my ($command) = $what =~ m/^\s*\Q$me\E[\:\,\;\.]?\s*(.*)$/i;
+    my ($command) = $what =~ m/^\s*\Q$me\E[:,;.!?~]?\s*(.*)$/i;
     return PCI_EAT_NONE if !$command || !$self->_bot_owner($nick);
 
     my (@cmd) = split(/ +/, $command);
@@ -282,7 +282,8 @@ B<'debug'>, set to a true value to see when stuff goes wrong;
 Not setting a B<'botowner'> effectively disables the IRC interface. 
 
 If B<'botowner'> is specified the plugin checks that it is being loaded into a
-L<POE::Component::IRC::State> or sub-class and will fail to load otherwise.
+L<POE::Component::IRC::State|POE::Component::IRC::State> or sub-class and will
+fail to load otherwise.
 
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s C<plugin_add> method.
@@ -334,15 +335,15 @@ merely splits the line on spaces).
 
 =head2 C<plugin_add>
 
-Takes the same arguments as C<load>.
+Takes the same arguments as L<C<load>|/"load">.
 
 =head2 C<plugin_del>
 
-Takes the same arguments as C<unload>.
+Takes the same arguments as L<C<unload>|/"unload">.
 
 =head2 C<plugin_reload>
 
-Takes the same arguments as C<reload>.
+Takes the same arguments as L<C<reload>|/"reload">.
 
 =head2 C<plugin_loaded>
 

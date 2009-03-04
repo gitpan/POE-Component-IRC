@@ -12,7 +12,7 @@ use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting );
 use POSIX qw(strftime);
 
-our $VERSION = '5.98';
+our $VERSION = '6.00';
 
 sub new {
     my ($package) = shift;
@@ -88,9 +88,7 @@ sub PCI_register {
         topic_is     => sub { my ($chan, $topic) = @_;           "--- Topic for $chan is: $topic" },
         topic_change => sub { my ($nick, $topic) = @_;           "--- $nick changes the topic to: $topic" },
         privmsg      => sub { my ($nick, $msg) = @_;             "<$nick> $msg" },
-        dcc_privmsg  => sub { my ($nick, $msg) = @_;             "<$nick> $msg" },
         action       => sub { my ($nick, $action) = @_;          "* $nick $action" },
-        dcc_action   => sub { my ($nick, $action) = @_;          "* $nick $action" },
         dcc_start    => sub { my ($nick, $address) = @_;         "--> Opened DCC chat connection with $nick ($address)" },
         dcc_done     => sub { my ($nick, $address) = @_;         "<-- Closed DCC chat connection with $nick ($address)" },
         join         => sub { my ($nick, $userhost, $chan) = @_; "--> $nick ($userhost) joins $chan" },
@@ -120,8 +118,9 @@ sub PCI_register {
     } if !defined $self->{Format};
 
     $irc->plugin_register($self, 'SERVER', qw(001 332 333 chan_mode 
-        ctcp_action bot_ctcp_action bot_msg bot_public join kick msg nick part 
+        ctcp_action bot_action bot_msg bot_public join kick msg nick part 
         public quit topic dcc_start dcc_chat dcc_done));
+    $irc->plugin_register($self, 'USER', 'dcc_chat');
     return 1;
 }
 
@@ -170,14 +169,20 @@ sub S_ctcp_action {
     my $sender     = parse_user(${ $_[0] });
     my $recipients = ${ $_[1] };
     my $msg        = ${ $_[2] };
+    my $me         = $irc->nick_name();
 
     for my $recipient (@{ $recipients }) {
-        $self->_log_entry($recipient, action => $sender, $msg);
+        if ($recipient eq $me) {
+            $self->_log_entry($sender, action => $sender, $msg);
+        }
+        else {
+            $self->_log_entry($recipient, action => $sender, $msg);
+        }
     }
     return PCI_EAT_NONE;
 }
 
-sub S_bot_ctcp_action {
+sub S_bot_action {
     my ($self, $irc) = splice @_, 0, 2;
     my $recipients = ${ $_[0] };
     my $msg        = ${ $_[1] };
@@ -313,10 +318,31 @@ sub S_dcc_chat {
     my $msg  = ${ $_[3] };
 
     if (my ($action) = $msg =~ /\001ACTION (.*?)\001/) {
-        $self->_log_entry("=$nick", dcc_action => $nick, $action);
+        $self->_log_entry("=$nick", action => $nick, $action);
     }
     else {
-        $self->_log_entry("=$nick", dcc_privmsg => $nick, $msg);
+        $self->_log_entry("=$nick", privmsg => $nick, $msg);
+    }
+    return PCI_EAT_NONE;
+}
+
+sub U_dcc_chat {
+    my ($self, $irc) = splice @_, 0, 2;
+    my ($id, @lines) = @_;
+    $_ = $$_ for @lines;
+    my $me = $irc->nick_name();
+
+    my ($dcc) = grep { $_->isa('POE::Component::IRC::Plugin::DCC') } values %{ $irc->plugin_list() };
+    my $info = $dcc->dcc_info($$id);
+    my $nick = $info->{nick};
+   
+    for my $msg (@lines) { 
+        if (my ($action) = $msg =~ /\001ACTION (.*?)\001/) {
+            $self->_log_entry("=$nick", action => $me, $action);
+        }
+        else {
+            $self->_log_entry("=$nick", privmsg => $me, $msg);
+        }
     }
     return PCI_EAT_NONE;
 }
@@ -399,7 +425,7 @@ __END__
 =head1 NAME
 
 POE::Component::IRC::Plugin::Logger - A PoCo-IRC plugin which
-logs public and private messages to disk
+logs public, private, and DCC chat messages to disk
 
 =head1 SYNOPSIS
 
@@ -414,8 +440,8 @@ logs public and private messages to disk
 =head1 DESCRIPTION
 
 POE::Component::IRC::Plugin::Logger is a L<POE::Component::IRC|POE::Component::IRC>
-plugin. It logs messages and CTCP ACTIONs to either C<#some_channel.log> or
-C<some_nickname.log> in the supplied path. In the case of DCC chats, a '=' is 
+plugin. It logs messages and CTCP ACTIONs to either F<#some_channel.log> or
+F<some_nickname.log> in the supplied path. In the case of DCC chats, a '=' is 
 prepended to the nickname (like in irssi).
 
 The plugin tries to detect UTF-8 encoding of every message or else falls back

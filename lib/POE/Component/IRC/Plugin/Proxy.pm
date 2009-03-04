@@ -9,7 +9,7 @@ use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( :ALL );
 
-our $VERSION = '5.98';
+our $VERSION = '6.00';
 
 sub new {
     my ($package) = shift;
@@ -123,7 +123,7 @@ sub S_raw {
     my $line = ${ $_[0] };
 
     return PCI_EAT_NONE if !defined $line;
-    return PCI_EAT_ALL if $line =~ /^PING */;
+    return PCI_EAT_ALL if $line =~ /^PING/;
     
     for my $wheel_id ( keys %{ $self->{wheels} } ) {
         $self->_send_to_client( $wheel_id, $line );

@@ -2,13 +2,20 @@ use strict;
 use warnings;
 use lib 't/inc';
 use POE qw(Wheel::SocketFactory);
-use Socket;
 use POE::Component::IRC;
+use POE::Component::IRC::Plugin::BotCommand;
 use POE::Component::Server::IRC;
-use Test::More tests => 9;
+use Socket;
+use Test::More tests => 19;
 
-my $bot1 = POE::Component::IRC->spawn( plugin_debug => 1 );
-my $bot2 = POE::Component::IRC->spawn( plugin_debug => 1 );
+my $bot1 = POE::Component::IRC->spawn(
+    Flood        => 1,
+    plugin_debug => 1,
+);
+my $bot2 = POE::Component::IRC->spawn(
+    Flood        => 1,
+    plugin_debug => 1,
+);
 my $ircd = POE::Component::Server::IRC->spawn(
     Auth      => 0,
     AntiFlood => 0,
@@ -20,11 +27,11 @@ POE::Session->create(
             _start
             _config_ircd 
             _shutdown 
-            irc_001 
+            irc_001
             irc_join
+            irc_botcmd_cmd1
+            irc_botcmd_cmd2
             irc_disconnected
-            irc_dcc_request
-            irc_dcc_done
         )],
     ],
 );
@@ -32,7 +39,7 @@ POE::Session->create(
 $poe_kernel->run();
 
 sub _start {
-    my ($kernel, $heap) = @_[KERNEL,HEAP];
+    my ($kernel) = $_[KERNEL];
 
     my $wheel = POE::Wheel::SocketFactory->new(
         BindAddress  => '127.0.0.1',
@@ -44,8 +51,6 @@ sub _start {
     if ($wheel) {
         my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
         $kernel->yield(_config_ircd => $port);
-        $heap->{count} = 0;
-        $wheel = undef;
         $kernel->delay(_shutdown => 60);
         return;
     }
@@ -64,7 +69,6 @@ sub _shutdown {
 sub _config_ircd {
     my ($kernel, $port) = @_[KERNEL, ARG0];
     
-    $ircd->yield('add_i_line');
     $ircd->yield(add_listener => Port => $port);
     
     $bot1->yield(register => 'all');
@@ -73,55 +77,81 @@ sub _config_ircd {
         server  => '127.0.0.1',
         port    => $port,
         ircname => 'Test test bot',
-        nataddr => '127.0.0.100',
     });
-  
+    
     $bot2->yield(register => 'all');
     $bot2->yield(connect => {
         nick    => 'TestBot2',
         server  => '127.0.0.1',
         port    => $port,
         ircname => 'Test test bot',
-        nataddr => '127.0.0.100',
     });
 }
 
 sub irc_001 {
     my $irc = $_[SENDER]->get_heap();
+
     pass('Logged in');
     $irc->yield(join => '#testchannel');
+    return if $irc != $bot1;
+
+    my $plugin = POE::Component::IRC::Plugin::BotCommand->new(
+        Commands => {
+            cmd1 => 'First test command',
+            foo  => 'This will get removed',
+        },
+    );
+
+    ok($irc->plugin_add(BotCommand => $plugin), 'Add plugin with two commands');
+    ok($plugin->add(cmd2 => 'Second test command'), 'Add another command');
+    ok($plugin->remove('foo'), 'Remove command');
+
+    my %cmds = $plugin->list();
+    is(keys %cmds, 2, 'Correct number of commands');
+    ok($cmds{cmd1}, 'First command is present');
+    ok($cmds{cmd2}, 'Second command is present');
 }
 
 sub irc_join {
     my ($sender, $who, $where) = @_[SENDER, ARG0, ARG1];
-    
-    my $nick = ( split /!/, $who )[0];
+    my $nick = (split /!/, $who)[0];
     my $irc = $sender->get_heap();
 
-    if ( $nick eq $irc->nick_name() ) {
-        is($where,'#testchannel', 'Joined Channel Test');
-    }
-    else {
-        $irc->yield(dcc => $nick => CHAT => '' => '' => 15 );
-    }
+    pass('Joined channel');
+    return if $irc != $bot2;
+
+    $irc->yield(privmsg => $where, "TestBot1: cmd1 foo bar");
+    $irc->yield(privmsg => $where, "TestBot1: cmd2");
 }
 
-sub irc_dcc_request {
-    my ($sender, $cookie) = @_[SENDER, ARG3];
-    
-    pass('Got dcc request');
-    is($cookie->{addr}, '2130706532', 'NAT Address');
-    $sender->get_heap()->yield('quit');
+sub irc_botcmd_cmd1 {
+    my ($sender, $user, $where, $args) = @_[SENDER, ARG0..ARG2];
+    my $nick = (split /!/, $user)[0];
+    my $chan = $where->[0];
+    my $irc = $sender->get_heap();
+
+    is($nick, $bot2->nick_name(), 'cmd1 user');
+    is($chan, '#testchannel', 'cmd1 channel');
+    is($args, 'foo bar', 'cmd1 arguments');
 }
 
-sub irc_dcc_done {
-    pass('Got dcc timeout');
-    $_[SENDER]->get_heap()->yield('quit');
+sub irc_botcmd_cmd2 {
+    my ($sender, $user, $where, $args) = @_[SENDER, ARG0..ARG2];
+    my $nick = (split /!/, $user)[0];
+    my $chan = $where->[0];
+    my $irc = $sender->get_heap();
+
+    is($nick, $bot2->nick_name(), 'cmd2 user');
+    is($chan, '#testchannel', 'cmd2 channel');
+    ok(!defined $args, 'cmd1 arguments');
+
+    $bot1->yield('quit');
+    $bot2->yield('quit');
 }
 
 sub irc_disconnected {
     my ($kernel, $heap) = @_[KERNEL, HEAP];
     pass('irc_disconnected');
     $heap->{count}++;
-    $kernel->yield('_shutdown') if $heap->{count} == 2;
+    $poe_kernel->yield('_shutdown') if $heap->{count} == 2;
 }

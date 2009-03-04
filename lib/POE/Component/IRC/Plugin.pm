@@ -3,7 +3,7 @@ package POE::Component::IRC::Plugin;
 use strict;
 use warnings;
 
-our $VERSION = '5.98';
+our $VERSION = '6.00';
 
 require Exporter;
 use base qw(Exporter);
@@ -22,7 +22,7 @@ __END__
 
 =head1 NAME
 
-POE::Component::IRC::Plugin - Provides plugin documentation for 
+POE::Component::IRC::Plugin - Provides plugin constants and documentation for 
 L<POE::Component::IRC|POE::Component::IRC>
 
 =head1 SYNOPSIS

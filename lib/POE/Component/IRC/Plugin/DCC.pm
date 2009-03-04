@@ -9,7 +9,7 @@ use POE qw(Driver::SysRW Filter::Line Filter::Stream
 use POE::Component::IRC::Plugin qw(:ALL);
 use Socket;
 
-our $VERSION = '5.98';
+our $VERSION = '6.00';
 
 use constant {
     OUT_BLOCKSIZE  => 1024,   # Send DCC data in 1k chunks
@@ -81,6 +81,33 @@ sub nataddr {
     return;
 }
 
+# returns information about a connection
+sub dcc_info {
+    my ($self, $id) = @_;
+    
+    if (!$self->{dcc}->{$id}) {
+        warn "dcc_info: Unknown wheel ID: $id\n";
+        return;
+    }
+
+    my %info;
+    @info{qw(nick type port file size done peeraddr)}
+        = @{ $self->{dcc}->{$id} }{qw(
+            nick type port file size done peeraddr
+        )};
+    return \%info;
+}
+
+sub _quote_file {
+    my ($file) = @_;
+
+    if ($file =~ /[\s"]/) {
+        $file =~ s|"|\\"|g;
+        $file = qq{"$file"};
+    }
+    return $file;
+}
+
 sub S_disconnected {
     my ($self) = $_;
     # clean up old cookies for any ignored RESUME requests 
@@ -102,6 +129,7 @@ sub S_dcc_request {
         for my $cookie (values %{ $self->{dcc} }) {
             next if $cookie->{nick} ne $nick;
             next if $cookie->{port} ne $port;
+            $file = _quote_file($file);
             $irc->yield(ctcp => $nick => "DCC ACCEPT $file $port $size");
             last;
         }
@@ -217,10 +245,7 @@ sub _event_dcc {
     $addr = unpack 'N', $addr;
 
     my $basename = fileparse($file);
-    if ($basename =~ /[\s"]/) {
-        $basename =~ s/"/\\"/g;
-        $basename = qq{"$basename"};
-    }
+    $basename = _quote_file($basename);
 
     # Tell the other end that we're waiting for them to connect.
     $irc->yield(ctcp => $nick => "DCC $type $basename $addr $port" . ($size ? " $size" : ''));
@@ -325,12 +350,9 @@ sub _event_dcc_close {
         return;
     }
 
+    # pending data, wait till it has been flushed
     if ($self->{dcc}->{$id}->{wheel}->get_driver_out_octets()) {
-        $kernel->delay_set(
-            '_event_dcc_close',
-            2,
-            $id,
-        );
+        $kernel->delay_set(_event_dcc_close => 2, $id);
         return;
     }
 
@@ -361,7 +383,7 @@ sub _event_dcc_resume {
     my ($self, $cookie, $myfile) = @_[OBJECT, ARG0, ARG1];
     my $irc = $self->{irc};
 
-    my $sender_file = $cookie->{file};
+    my $sender_file = _quote_file($cookie->{file});
     $cookie->{file} = $myfile if defined $myfile;
     my $size = -s $cookie->{file};
     my $fraction = $size % IN_BLOCKSIZE;
@@ -669,6 +691,12 @@ an arrayref containing the port numbers.
 
 Sets the public NAT address to be used for DCC sends.
 
+=head2 C<dcc_info>
+
+Takes one argument, a DCC connection id (see below). Returns a hash of
+information about the connection. The keys are: B<'nick'>, B<'type'>,
+B<'port'>, B<'file'>, B<'size'>, B<'done,'>, and B<'peeradr'>.
+
 =head1 COMMANDS
 
 The plugin responds to the following
@@ -677,17 +705,17 @@ L<POE::Component::IRC|POE::Component::IRC> commands.
 =head2 C<dcc>
 
 Send a DCC SEND or CHAT request to another person. Takes at least two
-arguments: the nick!user@host of the person to send the request to and the
-type of DCC request (SEND or CHAT). For SEND requests, be sure to add
-a third argument for the filename you want to send. Optionally, you
-can add a fourth argument for the DCC transfer blocksize, but the
-default of 1024 should usually be fine. The fifth (and optional) argument
-is the request timeout value in seconds (default: 300).
+arguments: the nickname of the person to send the request to and the type
+of DCC request (SEND or CHAT). For SEND requests, be sure to add a third
+argument for the filename you want to send. Optionally, you can add a fourth
+argument for the DCC transfer blocksize, but the default of 1024 should
+usually be fine. The fifth (and optional) argument is the request timeout
+value in seconds (default: 300).
 
 Incidentally, you can send other weird nonstandard kinds of DCCs too;
 just put something besides 'SEND' or 'CHAT' (say, 'FOO') in the type
-field, and you'll get back C<irc_dcc_foo> events when activity happens
-on its DCC connection.
+field, and you'll get back C<irc_dcc_foo> events (with the same arguments as
+L<C<irc_dcc_chat>|/"irc_dcc_chat">) when data arrives on its DCC connection.
 
 If you are behind a firewall or Network Address Translation, you may want to
 consult L<POE::Component::IRC|POE::Component::IRC>'s
@@ -721,7 +749,7 @@ you wish to send (it'll be separated with newlines for you).
 Terminates a DCC SEND or GET connection prematurely, and causes DCC CHAT
 connections to close gracefully. Takes one argument: the wheel id of the
 connection which you got from an L<C<irc_dcc_start>|/"irc_dcc_start">
-event.
+(or similar) event.
 
 =head1 OUTPUT
 
@@ -752,11 +780,34 @@ to the peer explaining why you're not going to accept.
 
 =item * C<ARG3>: this connection's "magic cookie"
 
-=item * C<ARG4>: the file name
+=item * C<ARG4>: the file name (SEND only)
 
-=item * C<ARG5>: the file size
+=item * C<ARG5>: the file size (SEND only)
 
 =item * C<ARG6>: the IP address which the peer is listening on
+
+=back
+
+=head2 C<irc_dcc_start>
+
+This event notifies you that a DCC connection has been successfully
+established.
+
+=over 4
+
+=item * C<ARG0>: the connection's wheel id
+
+=item * C<ARG1>: the peer's nickname
+
+=item * C<ARG2>: the DCC type
+
+=item * C<ARG3>: the port number
+
+=item * C<ARG4>: the file name (SEND only)
+
+=item * C<ARG5>: the file size (SEND only)
+
+=item * C<ARG6>: the peer's IP address
 
 =back
 
@@ -776,60 +827,6 @@ client on the other end of a DCC CHAT connection.
 =item * C<ARG3>: the text they sent
 
 =item * C<ARG4>: the peer's IP address
-
-=back
-
-=head2 C<irc_dcc_done>
-
-You receive this event when a DCC connection terminates normally.
-Abnormal terminations are reported by L<C<irc_dcc_error>|/"irc_dcc_error">.
-
-=over 4
-
-=item * C<ARG0>: the connection's wheel id
-
-=item * C<ARG1>: the peer's nickname
-
-=item * C<ARG2>: the DCC type
-
-=item * C<ARG3>: the port number
-
-=item * C<ARG4>: the filename
-
-=item * C<ARG5>: file size
-
-=item * C<ARG6>: transferred file size
-
-=item * C<ARG7>: the peer's IP address
-
-=back
-
-=head2 C<irc_dcc_error>
-
-You get this event whenever a DCC connection or connection attempt
-terminates unexpectedly or suffers some fatal error. Some of the
-following values might be undefined depending the stage at which
-the connection/attempt failed.
-
-=over 4
-
-=item * C<ARG0>: the connection's wheel id
-
-=item * C<ARG1>: the error string
-
-=item * C<ARG2>: the peer's nickname
-
-=item * C<ARG3>: the DCC type
-
-=item * C<ARG4>: the port number
-
-=item * C<ARG5>: the file name
-
-=item * C<ARG6>: file size in bytes
-
-=item * C<ARG7>: transferred file size in bytes
-
-=item * C<ARG8>: the peer's IP address
 
 =back
 
@@ -880,10 +877,10 @@ connection.
 
 =back
 
-=head2 C<irc_dcc_start>
+=head2 C<irc_dcc_done>
 
-This event notifies you that a DCC connection has been successfully
-established.
+You receive this event when a DCC connection terminates normally.
+Abnormal terminations are reported by L<C<irc_dcc_error>|/"irc_dcc_error">.
 
 =over 4
 
@@ -895,11 +892,42 @@ established.
 
 =item * C<ARG3>: the port number
 
-=item * C<ARG4>: the file name
+=item * C<ARG4>: the filename (SEND only)
 
-=item * C<ARG5>: the file size
+=item * C<ARG5>: file size (SEND only)
 
-=item * C<ARG6>: the peer's IP address
+=item * C<ARG6>: transferred file size (SEND only)
+
+=item * C<ARG7>: the peer's IP address
+
+=back
+
+=head2 C<irc_dcc_error>
+
+You get this event whenever a DCC connection or connection attempt
+terminates unexpectedly or suffers some fatal error. Some of the
+following values might be undefined depending the stage at which
+the connection/attempt failed.
+
+=over 4
+
+=item * C<ARG0>: the connection's wheel id
+
+=item * C<ARG1>: the error string
+
+=item * C<ARG2>: the peer's nickname
+
+=item * C<ARG3>: the DCC type
+
+=item * C<ARG4>: the port number
+
+=item * C<ARG5>: the file name
+
+=item * C<ARG6>: file size in bytes
+
+=item * C<ARG7>: transferred file size in bytes
+
+=item * C<ARG8>: the peer's IP address
 
 =back
 
