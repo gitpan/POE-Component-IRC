@@ -16,7 +16,7 @@ use POE::Component::IRC::Common qw(:ALL);
 use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.00';
+our $VERSION = '6.02';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
 # u_irc() is used to create unique keys.
@@ -347,9 +347,6 @@ sub S_mode {
         # Lets make the channel mode nice
         if ( $self->{STATE}->{Chans}->{ $uchan }->{Mode} ) {
             $self->{STATE}->{Chans}->{ $uchan }->{Mode} = join('', sort {uc $a cmp uc $b} ( split( //, $self->{STATE}->{Chans}->{ $uchan }->{Mode} ) ) );
-        }
-        else {
-            delete $self->{STATE}->{Chans}->{ $uchan }->{Mode};
         }
     }
     else {

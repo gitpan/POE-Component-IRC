@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( :ALL );
 
-our $VERSION = '6.00';
+our $VERSION = '6.02';
 
 BEGIN { 
     # Turn on the debugger's symbol source tracing
@@ -97,7 +97,7 @@ sub S_public {
     my $cmd = uc (shift @cmd);
     
     if (defined $self->{commands}->{$cmd}) {
-        $self->{command}->{$cmd}->($self, 'privmsg', $channel, @cmd);
+        $self->{commands}->{$cmd}->($self, 'privmsg', $channel, @cmd);
     }
     
     return PCI_EAT_NONE;
@@ -114,7 +114,7 @@ sub S_msg {
     return PCI_EAT_NONE if !$self->_bot_owner($nick);
     
     if (defined $self->{commands}->{$cmd}) {
-        $self->{command}->{$cmd}->($self, 'notice', $nick, @cmd);
+        $self->{commands}->{$cmd}->($self, 'notice', $nick, @cmd);
     }
 
     return PCI_EAT_NONE;
