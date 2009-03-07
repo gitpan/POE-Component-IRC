@@ -1,12 +1,3 @@
-# $Id: Qnet.pm,v 1.2 2005/04/24 10:31:28 chris Exp $
-#
-# POE::Component::IRC::Qnet, by Chris Williams
-#
-# This module may be used, modified, and distributed under the same
-# terms as Perl itself. Please see the license that came with your Perl
-# distribution for details.
-#
-
 package POE::Component::IRC::Qnet;
 
 use strict;
@@ -16,7 +7,7 @@ use POE;
 use POE::Component::IRC::Constants qw(:ALL);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.02';
+our $VERSION = '6.04';
 
 sub _create {
     my $self = shift;

@@ -9,7 +9,7 @@ use POE qw(Driver::SysRW Filter::Line Filter::Stream
 use POE::Component::IRC::Plugin qw(:ALL);
 use Socket;
 
-our $VERSION = '6.02';
+our $VERSION = '6.04';
 
 use constant {
     OUT_BLOCKSIZE  => 1024,   # Send DCC data in 1k chunks
@@ -138,42 +138,15 @@ sub S_dcc_request {
     return PCI_EAT_NONE;
 }
 
-# the U_* handlers are stubs which call our POE event handlers
-# so that we can do stuff related to our POE session, e.g.
+# this is a stub handler for all U_dcc* events which redispatches them as
+# events to our own POE session so that we can do stuff related to it,
 # create wheels and set alarms/delays
-
-sub U_dcc {
-    my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
-    $poe_kernel->call($self->{session_id}, _event_dcc => @args);
-    return PCI_EAT_NONE;
-}
-
-sub U_dcc_accept {
-    my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
-    $poe_kernel->call($self->{session_id}, _event_dcc_accept => @args);
-    return PCI_EAT_NONE;
-}
-
-sub U_dcc_chat {
-    my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
-    $poe_kernel->call($self->{session_id}, _event_dcc_chat => @args);
-    return PCI_EAT_NONE;
-}
-
-sub U_dcc_close {
-    my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { ref =~ /REF|SCALAR/ && ${ $_ } } @_;
-    $poe_kernel->call($self->{session_id}, _event_dcc_close => @args);
-    return PCI_EAT_NONE;
-}
-
-sub U_dcc_resume {
-    my ($self, $irc) = splice @_, 0, 2;
-    my @args = map { ref && ${ $_ } } @_;
-    $poe_kernel->call($self->{session_id}, _event_dcc_resume => @args);
+sub _default {
+    my ($self, $irc, $event) = splice @_, 0, 3;
+    return if $event !~ /^U_dcc(_accept|_chat|_close|_resume)?$/;
+    $event =~ s/^U_//;
+    my @args = map { $$_ } @_;
+    $poe_kernel->call($self->{session_id}, "_event_$event" => @args);
     return PCI_EAT_NONE;
 }
 
@@ -252,17 +225,17 @@ sub _event_dcc {
 
     # Store the state for this connection.
     $self->{dcc}->{ $factory->ID } = {
-        open       => 0,
-        nick       => $nick,
-        type       => $type,
-        file       => $file,
-        size       => $size,
-        port       => $port,
-        addr       => $addr,
-        done       => 0,
-        blocksize  => ($blocksize || OUT_BLOCKSIZE),
-        listener   => 1,
-        factory    => $factory,
+        open      => 0,
+        nick      => $nick,
+        type      => $type,
+        file      => $file,
+        size      => $size,
+        port      => $port,
+        addr      => $addr,
+        done      => 0,
+        blocksize => ($blocksize || OUT_BLOCKSIZE),
+        listener  => 1,
+        factory   => $factory,
     };
     
     $kernel->alarm(
@@ -695,7 +668,7 @@ Sets the public NAT address to be used for DCC sends.
 
 Takes one argument, a DCC connection id (see below). Returns a hash of
 information about the connection. The keys are: B<'nick'>, B<'type'>,
-B<'port'>, B<'file'>, B<'size'>, B<'done,'>, and B<'peeradr'>.
+B<'port'>, B<'file'>, B<'size'>, B<'done,'>, and B<'peeraddr'>.
 
 =head1 COMMANDS
 

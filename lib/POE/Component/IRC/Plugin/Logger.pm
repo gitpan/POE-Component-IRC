@@ -12,7 +12,7 @@ use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting );
 use POSIX qw(strftime);
 
-our $VERSION = '6.02';
+our $VERSION = '6.04';
 
 sub new {
     my ($package) = shift;
@@ -361,7 +361,7 @@ sub S_dcc_done {
 
 sub _log_entry {
     my ($self, $context, $type, @args) = @_;
-    my ($date, $time) = split / /, (strftime '%F %T', localtime);
+    my ($date, $time) = split / /, (strftime '%Y-%m-%d %H:%M:%S ', localtime);
     $context = l_irc $context, $self->{irc}->isupport('CASEMAPPING');
 
     if ($context =~ /^[#&+!]/) {

@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POSIX qw(strftime);
 
-our $VERSION = '6.02';
+our $VERSION = '6.04';
 
 sub new {
     my ($package) = shift;
@@ -48,7 +48,7 @@ sub S_ctcp_time {
     my ($self, $irc) = splice @_, 0, 2;
     my $nick = ( split /!/, ${ $_[0] } )[0];
 
-    $irc->yield( ctcpreply => $nick => strftime( 'TIME %a %h %e %T %Y %Z', localtime ) );
+    $irc->yield(ctcpreply => $nick => strftime('TIME %a %b %d %H:%M:%S %Y %Z', localtime));
     
     return PCI_EAT_CLIENT if $self->eat();
     return PCI_EAT_NONE;

@@ -54,11 +54,11 @@ sub _start {
     if ($wheel) {
         my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
         $kernel->yield(_config_ircd => $port);
-        $kernel->delay(_shutdown => 60);
+        $kernel->delay(_shutdown => 60, 'Timed out');
         return;
     }
 
-    $kernel->yield('_shutdown');
+    $kernel->yield('_shutdown', "Couldn't bind to an unused port on localhost");
 }
 
 sub _config_ircd {
@@ -94,15 +94,13 @@ sub irc_join {
     my $nick = ( split /!/, $who )[0];
     my $irc = $sender->get_heap();
     
-    if ( $nick eq $irc->nick_name() ) {
-        is($where, '#testchannel', 'Joined Channel Test');
-    }
+    return if $nick ne $irc->nick_name();
+    is($where, '#testchannel', 'Joined Channel Test');
 
     $heap->{joined}++;
     if ($heap->{joined} == 2) {
         $bot2->yield(privmsg => $where, $bot1->nick_name() . ': plugin_add CTCP POE::Component::IRC::Plugin::CTCP');
         $bot2->yield(privmsg => $where, $bot1->nick_name() . ': plugin_reload CTCP');
-        # XXX: why does this cause a warning?
         $bot2->yield(privmsg => $where, $bot1->nick_name() . ': plugin_del CTCP');
     }
 }
@@ -130,7 +128,8 @@ sub irc_disconnected {
 }
 
 sub _shutdown {
-    my ($kernel) = $_[KERNEL];
+    my ($kernel, $reason) = @_[KERNEL, ARG0];
+    fail($reason) if defined $reason;
     
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');

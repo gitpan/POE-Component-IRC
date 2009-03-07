@@ -50,11 +50,11 @@ sub _start {
     if ($wheel) {
         my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
         $kernel->yield(_config_ircd => $port);
-        $kernel->delay(_shutdown => 60);
+        $kernel->delay(_shutdown => 60, 'Timed out');
         return;
     }
     
-    $kernel->yield('_shutdown');
+    $kernel->yield('_shutdown', "Couldn't bind to an unused port on localhost");
 }
 
 sub _config_ircd {
@@ -86,16 +86,16 @@ sub irc_001 {
 }
 
 sub irc_join {
-    my ($sender, $who, $where) = @_[SENDER, ARG0, ARG1];
+    my ($heap, $sender, $who, $where) = @_[HEAP, SENDER, ARG0, ARG1];
     my $nick = ( split /!/, $who )[0];
     my $irc = $sender->get_heap();
     
-    if ($nick eq $irc->nick_name()) {
-        is($where, '#testchannel', 'Joined Channel Test');
-    }
-    else {
-        $irc->yield(dcc => $nick => CHAT => undef, undef, 5);
-    }
+    return if $nick ne $irc->nick_name();
+    is($where, '#testchannel', 'Joined Channel Test');
+
+    $heap->{joined}++;
+    return if $heap->{joined} != 2;
+    $bot1->yield(dcc => $bot2->nick_name() => CHAT => undef, undef, 5);
 }
 
 sub irc_dcc_request {
@@ -119,7 +119,9 @@ sub irc_disconnected {
 }
 
 sub _shutdown {
-    my ($kernel) = $_[KERNEL];
+    my ($kernel, $reason) = @_[KERNEL, ARG0];
+    fail($reason) if defined $reason;
+    
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');
     $bot1->yield('shutdown');
