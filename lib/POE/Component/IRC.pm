@@ -16,8 +16,7 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '6.04';
-our $REVISION = do {my@r=(q$Revision: 876 $=~/\d+/g);sprintf"%d"."%04d"x$#r,@r};
+our $VERSION = '6.05_01';
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -1525,8 +1524,9 @@ sub S_290 {
 
 sub S_isupport {
     my ($self, $irc) = splice @_, 0, 2;
-    $self->{ircd_compat}->chantypes( $self->{isupport}->isupport('CHANTYPES') || [ '#', '&' ] );
-    $irc->yield(quote => 'CAPAB IDENTIFY-MSG') if $self->{isupport}->isupport('CAPAB');
+    my $isupport = ${ $_[0] };
+    $self->{ircd_compat}->chantypes( $isupport->isupport('CHANTYPES') || [ '#', '&' ] );
+    $irc->yield(sl_login => 'CAPAB IDENTIFY-MSG') if $isupport->isupport('CAPAB');
     return PCI_EAT_NONE;
 }
 
@@ -2651,9 +2651,9 @@ Similar to the above, except some keys will be missing.
 =head3 C<irc_raw>
 
 Enabled by passing C<< Raw => 1 >> to L<C<spawn>|/"spawn"> or
-L<C<connect>|/"connect">, C<ARG0> is the raw IRC string received by the
-component from the IRC server, before it has been mangled by filters and
-such like.
+L<C<connect>|/"connect">, or by calling L<C<raw_events>|/"raw_events"> with
+a true argument. C<ARG0> is the raw IRC string received by the component from
+the IRC server, before it has been mangled by filters and such like.
 
 =head3 C<irc_registered>
 
@@ -2802,11 +2802,30 @@ poco-ircs simultaneously.
 Any additional parameters passed to the signal will become your quit messages
 on each IRC network.
 
+=head1 ENCODING AND CHARACTER SETS
+
+The only requirement the IRC protocol places on its messages is that they be
+8-bits, and in ASCII. This has resulted in most of the Western world settling
+on ASCII-compatible Latin-1 as a convention. Recently, popular clients have
+begun sending a mixture of Latin-1 and UTF-8 over the wire to allow more
+characters without breaking backward compatability (too much). To decode such
+messages reliably, see
+L<C<irc_to_utf8>|POE::Component::IRC::Common/"irc_to_utf8"> in
+L<POE::Component::IRC::Common|POE::Component::IRC::Common>.
+
 =head1 BUGS
 
 A few have turned up in the past and they are sure to again. Please use
 L<http://rt.cpan.org/> to report any. Alternatively, email the current
 maintainer.
+
+=head1 DEVELOPMENT
+
+You can find the latest source on github:
+L<http://github.com/bingos/poe-component-irc>
+
+The project's developers usually hang out in the C<#poe> IRC channel on
+irc.freenode.org. Do drop us a line.
 
 =head1 MAINTAINERS
 
@@ -2861,7 +2880,5 @@ Some good examples reside in the POE cookbook which has a whole section
 devoted to IRC programming L<http://poe.perl.org/?POE_Cookbook>.
 
 The examples/ folder of this distribution.
-
-The C<#poe> channel on irc.freenode.org.
 
 =cut

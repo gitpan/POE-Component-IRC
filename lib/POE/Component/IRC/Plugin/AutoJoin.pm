@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user );
 
-our $VERSION = '6.04';
+our $VERSION = '6.05_01';
 
 sub new {
     my ($package) = shift;
@@ -34,7 +34,7 @@ sub PCI_register {
     }
 
     $self->{Rejoin_delay} = 5 if !defined $self->{Rejoin_delay};
-    $irc->plugin_register($self, 'SERVER', qw(004 474 chan_mode join kick part));
+    $irc->plugin_register($self, 'SERVER', qw(474 isupport chan_mode join kick part));
     return 1;
 }
 
@@ -42,9 +42,12 @@ sub PCI_unregister {
     return 1;
 }
 
-# we join channels after 004 rather than 001 so that the NickServID plugin
-# can check the server version and identify before we join channels
-sub S_004 {
+# we join channels after irc_isupport for two reasons:
+# a) the NickServID plugin needs to waits for irc_004 before identifying,
+# and users may want to be cloaked before joining any channels,
+# b) if the server supports CAPAB IDENTIFY-MSG (FreeNode), that will be
+# checked for after the irc_isupport (right before we try to join channels)
+sub S_isupport {
     my ($self, $irc) = splice @_, 0, 2;
     
     while (my ($chan, $key) = each %{ $self->{Channels} }) {

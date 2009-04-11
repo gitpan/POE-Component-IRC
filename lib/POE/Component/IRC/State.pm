@@ -3,28 +3,29 @@ package POE::Component::IRC::State;
 use strict;
 use warnings;
 use POE;
-use POE::Component::IRC::Common qw(:ALL);
-use POE::Component::IRC::Plugin qw(:ALL);
+use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
+use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.04';
+our $VERSION = '6.05_01';
 
-# Event handlers for tracking the STATE. $self->{STATE} is used as our namespace.
-# u_irc() is used to create unique keys.
+# Event handlers for tracking the STATE. $self->{STATE} is used as our
+# namespace. u_irc() is used to create unique keys.
 
 # RPL_WELCOME
-# Make sure we have a clean STATE when we first join the network and if we inadvertently get disconnected
+# Make sure we have a clean STATE when we first join the network and if we
+# inadvertently get disconnected.
 sub S_001 {
-    my $self = shift;
+    my ($self) = @_;
     delete $self->{STATE};
     $self->{STATE}->{usermode} = '';
-    $self->yield(mode => $self->{RealNick} );
+    $self->yield(mode => $self->nick_name());
     return PCI_EAT_NONE;
 }
 
 sub S_disconnected {
-    my $self = shift;
-    my $nickinfo = $self->nick_info( $self->{RealNick} );
+    my ($self) = @_;
+    my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
     delete $self->{STATE};
@@ -32,8 +33,8 @@ sub S_disconnected {
 }
 
 sub S_error {
-    my $self = shift;
-    my $nickinfo = $self->nick_info( $self->{RealNick} );
+    my ($self) = @_;
+    my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
     delete $self->{STATE};
@@ -41,8 +42,8 @@ sub S_error {
 }
 
 sub S_socketerr {
-    my $self = shift;
-    my $nickinfo = $self->nick_info( $self->{RealNick} );
+    my ($self) = @_;
+    my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
     delete $self->{STATE};
@@ -51,35 +52,42 @@ sub S_socketerr {
 
 sub S_join {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
     my ($nick, $user, $host) = split /[!@]/, ${ $_[0] };
-    my $channel = ${ $_[1] };
-    my $uchan = u_irc $channel, $mapping;
-    my $unick = u_irc $nick, $mapping;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $chan  = ${ $_[1] };
+    my $uchan = u_irc($chan, $map);
+    my $unick = u_irc($nick, $map);
 
-    if ( $unick eq u_irc ( $self->nick_name(), $mapping ) ) {
+    if ($unick eq u_irc($self->nick_name(), $map)) {
         delete $self->{STATE}->{Chans}->{ $uchan };
-        $self->{CHANNEL_SYNCH}->{ $uchan } = { MODE => 0, WHO => 0, BAN => 0, _time => time() };
-        $self->{STATE}->{Chans}->{ $uchan } = { Name => $channel, Mode => '' };
-        $self->yield(who => $channel );
-        $self->yield(mode => $channel );
-        $self->yield(mode => $channel => 'b');
+        $self->{CHANNEL_SYNCH}->{ $uchan } = {
+            MODE  => 0,
+            WHO   => 0,
+            BAN   => 0,
+            _time => time(),
+        };
+        $self->{STATE}->{Chans}->{ $uchan } = {
+            Name => $chan,
+            Mode => ''
+        };
+        $self->yield(who => $chan);
+        $self->yield(mode => $chan);
+        $self->yield(mode => $chan => 'b');
         
         if ($self->{awaypoll}) {
             $poe_kernel->state(_away_sync => $self);
-            $poe_kernel->delay_add(_away_sync => $self->{awaypoll} => $channel);
+            $poe_kernel->delay_add(_away_sync => $self->{awaypoll} => $chan);
         }
     }
     else {
         if ( (!exists $self->{whojoiners} || $self->{whojoiners})
             && !exists $self->{STATE}->{Nicks}->{ $unick }->{Real}) {
                 $self->yield(who => $nick);
-                push @{ $self->{NICK_SYNCH}->{ $unick } }, $channel;
+                push @{ $self->{NICK_SYNCH}->{ $unick } }, $chan;
         }
         else {
             # Fake 'irc_nick_sync'
-            $self->_send_event(irc_nick_sync => $nick, $channel);
+            $self->_send_event(irc_nick_sync => $nick, $chan);
         }
     }
 
@@ -94,12 +102,11 @@ sub S_join {
 
 sub S_part {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $nick = u_irc ( ( split /!/, ${ $_[0] } )[0], $mapping );
-    my $uchan = u_irc ${ $_[1] }, $mapping;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $nick  = u_irc((split /!/, ${ $_[0] } )[0], $map);
+    my $uchan = u_irc(${ $_[1] }, $map);
 
-    if ( $nick eq u_irc ( $self->nick_name(), $mapping ) ) {
+    if ($nick eq u_irc($self->nick_name(), $map)) {
         delete $self->{STATE}->{Nicks}->{ $nick }->{CHANS}->{ $uchan };
         delete $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $nick };
         
@@ -125,12 +132,12 @@ sub S_part {
 
 sub S_quit {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $nick = ( split /!/, ${ $_[0] } )[0];
-    my $msg = ${ $_[1] };
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $nick  = (split /!/, ${ $_[0] })[0];
+    my $msg   = ${ $_[1] };
+    my $unick = u_irc($nick, $map);
+
     push @{ $_[-1] }, [ $self->nick_channels( $nick ) ];
-    my $unick = u_irc $nick, $mapping;
 
     # Check if it is a netsplit
 #    if ($msg) {
@@ -142,7 +149,7 @@ sub S_quit {
 #        }
 #    }
 
-    if ( $unick eq u_irc ( $self->nick_name(), $mapping ) ) {
+    if ($unick eq u_irc($self->nick_name(), $map)) {
         delete $self->{STATE};
     }
     else {
@@ -158,15 +165,15 @@ sub S_quit {
 
 sub S_kick {
     my ($self, $irc) = splice @_, 0, 2;
+    my $chan  = ${ $_[1] };
+    my $nick  = ${ $_[2] };
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
+    my $uchan = u_irc($chan, $map);
     
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $channel = ${ $_[1] };
-    my $nick = ${ $_[2] };
     push @{ $_[-1] }, $self->nick_long_form( $nick );
-    my $unick = u_irc $nick, $mapping;
-    my $uchan = u_irc $channel, $mapping;
 
-    if ( $unick eq u_irc ( $self->nick_name(), $mapping ) ) {
+    if ( $unick eq u_irc($self->nick_name(), $map)) {
         delete $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan };
         delete $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick };
         
@@ -192,14 +199,15 @@ sub S_kick {
 
 sub S_nick {
     my ($self, $irc) = splice @_, 0, 2;
+    my $nick  = (split /!/, ${ $_[0] })[0];
+    my $new   = ${ $_[1] };
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
+    my $unew  = u_irc($new, $map);
 
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $nick = ( split /!/, ${ $_[0] } )[0];
-    my $new = ${ $_[1] };
     push @{ $_[-1] }, [ $self->nick_channels( $nick ) ];
-    my $unick = u_irc $nick, $mapping;
-    my $unew = u_irc $new, $mapping;
 
+    # what the baseclass would have done
     $self->{RealNick} = $new if $nick eq $self->{RealNick};
 
     if ($unick eq $unew) {
@@ -223,21 +231,19 @@ sub S_nick {
 
 sub S_chan_mode {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $who = ${ $_[0] };
-    my $channel = ${ $_[1] };
-    my $mynick = u_irc $self->nick_name(), $mapping;
-    pop @_;
+    my $who  = ${ $_[0] };
+    my $chan = ${ $_[1] };
     my $mode = ${ $_[2] };
-    my $arg = ${ $_[3] };
+    my $arg  = ${ $_[3] };
+    my $map  = $irc->isupport('CASEMAPPING');
+    my $me   = u_irc($self->nick_name(), $map);
     
-    return PCI_EAT_NONE if $mode !~ /\+[qoah]/ || $mynick ne u_irc( $arg, $mapping );
+    return PCI_EAT_NONE if $mode !~ /\+[qoah]/ || $me ne u_irc($arg, $map);
     
     my $excepts = $irc->isupport('EXCEPTS');
     my $invex = $irc->isupport('INVEX');
-    $irc->yield(mode => $channel, $excepts ) if $excepts;
-    $irc->yield(mode => $channel, $invex ) if $invex;
+    $irc->yield(mode => $chan, $excepts ) if $excepts;
+    $irc->yield(mode => $chan, $invex ) if $invex;
     
     return PCI_EAT_NONE;
 }
@@ -269,10 +275,10 @@ sub S_306 {
 ## no critic (Subroutines::ProhibitExcessComplexity ControlStructures::ProhibitCascadingIfElse)
 sub S_mode {
     my ($self, $irc) = splice @_, 0, 2;
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $who = ${ $_[0] };
-    my $channel = ${ $_[1] };
-    my $uchan = u_irc $channel, $mapping;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $who   = ${ $_[0] };
+    my $chan  = ${ $_[1] };
+    my $uchan = u_irc($chan, $map);
     pop @_;
     my @modes = map { ${ $_ } } @_[2 .. $#_];
 
@@ -284,31 +290,34 @@ sub S_mode {
     my $alwaysarg = join '', $statmodes,  @{ $chanmodes }[0 .. 1];
 
     # Do nothing if it is UMODE
-    if ( $uchan ne u_irc ( $self->{RealNick}, $mapping ) ) {
+    if ($uchan ne u_irc($irc->nick_name(), $map)) {
         my $parsed_mode = parse_mode_line( $prefix, $chanmodes, @modes );
         for my $mode (@{ $parsed_mode->{modes} }) {
             my $arg;
             $arg = shift ( @{ $parsed_mode->{args} } ) if ( $mode =~ /^(.[$alwaysarg]|\+[$chanmodes->[2]])/ );
 
-            $self->_send_event(irc_chan_mode => $who, $channel, $mode, $arg );
+            $self->_send_event(irc_chan_mode => $who, $chan, $mode, $arg );
             my $flag;
             
             if (($flag) = $mode =~ /\+([$statmodes])/ ) {
-                $arg = u_irc $arg, $mapping;
+                $arg = u_irc($arg, $map);
                 if (!$self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan } || $self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan } !~ /$flag/) {
                     $self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan } .= $flag;
                     $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $arg } = $self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan };
                 }
             }
             elsif (($flag) = $mode =~ /-([$statmodes])/ ) {
-                $arg = u_irc $arg, $mapping;
+                $arg = u_irc($arg, $map);
                 if ($self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan } =~ /$flag/) {
                     $self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan } =~ s/$flag//;
                     $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $arg } = $self->{STATE}->{Nicks}->{ $arg }->{CHANS}->{ $uchan };
                 }
             }
             elsif (($flag) = $mode =~ /\+([$chanmodes->[0]])/ ) {
-                $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $flag }->{ $arg } = { SetBy => $who, SetAt => time() };
+                $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $flag }->{ $arg } = {
+                    SetBy => $who,
+                    SetAt => time(),
+                };
             }
             elsif (($flag) = $mode =~ /-([$chanmodes->[0]])/ ) {
                 delete $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $flag }->{ $arg };
@@ -329,9 +338,7 @@ sub S_mode {
                 $self->{STATE}->{Chans}->{ $uchan }->{Mode} .= $flag if $self->{STATE}->{Chans}->{ $uchan }->{Mode} !~ /$flag/;
             }
             elsif (($flag) = $mode =~ /^-(.)/ ) {
-                if ($self->{STATE}->{Chans}->{ $uchan }->{Mode} =~ /$flag/) {
-                    $self->{STATE}->{Chans}->{ $uchan }->{Mode} =~ s/$flag//;
-                }
+                $self->{STATE}->{Chans}->{ $uchan }->{Mode} =~ s/$flag//;
             }
         }
         
@@ -343,13 +350,13 @@ sub S_mode {
     else {
         my $parsed_mode = parse_mode_line( @modes );
         for my $mode (@{ $parsed_mode->{modes} }) {
-            $self->_send_event(irc_user_mode => $who, $channel, $mode );
+            $self->_send_event(irc_user_mode => $who, $chan, $mode );
             my $flag;
             if ( ($flag) = $mode =~ /^\+(.)/ ) {
                 $self->{STATE}->{usermode} .= $flag if $self->{STATE}->{usermode} !~ /$flag/;
             }
             elsif ( ($flag) = $mode =~ /^-(.)/ ) {
-                $self->{STATE}->{usermode} =~ s/$flag// if $self->{STATE}->{usermode} =~ /$flag/;
+                $self->{STATE}->{usermode} =~ s/$flag//;
             }
         }
     }
@@ -357,16 +364,13 @@ sub S_mode {
     return PCI_EAT_NONE;
 }
 
-
-
 sub S_topic {
     my ($self, $irc) = splice @_, 0, 2;
-
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $who = ${ $_[0] };
-    my $channel = ${ $_[1] };
-    my $uchan = u_irc $channel, $mapping;
+    my $who   = ${ $_[0] };
+    my $chan  = ${ $_[1] };
     my $topic = ${ $_[2] };
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
     $self->{STATE}->{Chans}->{ $uchan }->{Topic} = {
         Value => $topic,
@@ -380,13 +384,11 @@ sub S_topic {
 # RPL_WHOREPLY
 sub S_352 {
     my ($self, $irc) = splice @_, 0, 2;
-
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my ($channel,$user,$host,$server,$nick,$status,$rest) = @{ ${ $_[2] } };
-    $rest =~ s/^://;
+    my ($chan, $user, $host, $server, $nick, $status, $rest) = @{ ${ $_[2] } };
     my ($hops, $real) = split /\x20/, $rest, 2;
-    my $unick = u_irc $nick, $mapping;
-    my $uchan = u_irc $channel, $mapping;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
+    my $uchan = u_irc($chan, $map);
 
     $self->{STATE}->{Nicks}->{ $unick }->{Nick} = $nick;
     $self->{STATE}->{Nicks}->{ $unick }->{User} = $user;
@@ -417,9 +419,9 @@ sub S_352 {
         $existing .= $whatever if !$existing || $existing !~ /$whatever/;
         $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan } = $existing;
         $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick } = $existing;
-        $self->{STATE}->{Chans}->{ $uchan }->{Name} = $channel;
+        $self->{STATE}->{Chans}->{ $uchan }->{Name} = $chan;
 
-        if ($self->{STATE}->{Chans}->{ $uchan }->{AWAY_SYNCH} && $unick ne u_irc($irc->nick_name(), $mapping)) {
+        if ($self->{STATE}->{Chans}->{ $uchan }->{AWAY_SYNCH} && $unick ne u_irc($irc->nick_name(), $map)) {
             if ( $status =~ /G/ && !$self->{STATE}->{Nicks}->{ $unick }->{Away} ) {
                 $self->yield(irc_user_away => $nick, [ $self->nick_channels( $nick ) ] );
             }
@@ -435,27 +437,25 @@ sub S_352 {
 # RPL_ENDOFWHO
 sub S_315 {
     my ($self, $irc) = splice @_, 0, 2;
-
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my $channel = ( split / :/, ${ $_[1] } )[0];
-    my $channel = ${ $_[2] }->[0];
-    my $uchan = u_irc $channel, $mapping;
+    my $chan  = ${ $_[2] }->[0];
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
     if ( exists $self->{STATE}->{Chans}->{ $uchan } ) {
-        if ( $self->_channel_sync($channel, 'WHO') ) {
+        if ( $self->_channel_sync($chan, 'WHO') ) {
             my $rec = delete $self->{CHANNEL_SYNCH}->{ $uchan };
-            $self->_send_event(irc_chan_sync => $channel, time() - $rec->{_time} );
+            $self->_send_event(irc_chan_sync => $chan, time() - $rec->{_time} );
         }
         elsif ( $self->{STATE}->{Chans}->{ $uchan }->{AWAY_SYNCH} ) {
             $self->{STATE}->{Chans}->{ $uchan }->{AWAY_SYNCH} = 0;
-            $self->_send_event(irc_away_sync_end => $channel );
-            $poe_kernel->delay_add(_away_sync => $self->{awaypoll} => $channel );
+            $self->_send_event(irc_away_sync_end => $chan );
+            $poe_kernel->delay_add(_away_sync => $self->{awaypoll} => $chan );
         }
     }
     else {
-        my $chan = shift @{ $self->{NICK_SYNCH}->{ $uchan } };
+        my $nick = shift @{ $self->{NICK_SYNCH}->{ $uchan } };
         delete $self->{NICK_SYNCH}->{ $uchan } if !@{ $self->{NICK_SYNCH}->{ $uchan } };
-        $self->_send_event(irc_nick_sync => $channel, $chan );
+        $self->_send_event(irc_nick_sync => $nick, $chan );
     }
 
     return PCI_EAT_NONE;
@@ -464,10 +464,10 @@ sub S_315 {
 # RPL_CREATIONTIME
 sub S_329 {
     my ($self, $irc) = splice @_, 0, 2;
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $channel = ${ $_[2] }->[0];
-    my $time = ${ $_[2] }->[1];
-    my $uchan = u_irc $channel, $mapping;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $chan  = ${ $_[2] }->[0];
+    my $time  = ${ $_[2] }->[1];
+    my $uchan = u_irc($chan, $map);
     
     $self->{STATE}->{Chans}->{ $uchan }->{CreationTime} = $time;
     return PCI_EAT_NONE;
@@ -476,31 +476,30 @@ sub S_329 {
 # RPL_BANLIST
 sub S_367 {
     my ($self, $irc) = splice @_, 0, 2;
-
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
+    my @args  = @{ ${ $_[2] } };
+    my $chan  = shift @args;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     my ($mask, $who, $when) = @args;
 
-    $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{b}->{ $mask } = { SetBy => $who, SetAt => $when };
+    $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{b}->{ $mask } = {
+        SetBy => $who,
+        SetAt => $when,
+    };
     return PCI_EAT_NONE;
 }
 
 # RPL_ENDOFBANLIST
 sub S_368 {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
+    my @args  = @{ ${ $_[2] } };
+    my $chan  = shift @args;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
-    if ( $self->_channel_sync($channel, 'BAN') ) {
+    if ($self->_channel_sync($chan, 'BAN')) {
         my $rec = delete $self->{CHANNEL_SYNCH}->{ $uchan };
-        $self->_send_event(irc_chan_sync => $channel, time() - $rec->{_time} );
+        $self->_send_event(irc_chan_sync => $chan, time() - $rec->{_time} );
     }
 
     return PCI_EAT_NONE;
@@ -509,13 +508,9 @@ sub S_368 {
 # RPL_INVITELIST
 sub S_346 {
     my ($self,$irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
-    my ($mask, $who, $when) = @args;
+    my ($chan, $mask, $who, $when) = @{ ${ $_[2] } };
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     my $invex = $irc->isupport('INVEX');
 
     $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $invex }->{ $mask } = {
@@ -529,32 +524,25 @@ sub S_346 {
 # RPL_ENDOFINVITELIST
 sub S_347 {
     my ($self, $irc) = splice @_, 0, 2;
+    my ($chan) = @{ ${ $_[2] } };
+    my $map    = $irc->isupport('CASEMAPPING');
+    my $uchan  = u_irc($chan, $map);
 
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
-
-    $self->_send_event(irc_chan_sync_invex => $channel );
+    $self->_send_event(irc_chan_sync_invex => $chan);
     return PCI_EAT_NONE;
 }
 
 # RPL_EXCEPTLIST
 sub S_348 {
-    my ($self,$irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
-    my ($mask, $who, $when) = @args;
+    my ($self, $irc) = splice @_, 0, 2;
+    my ($chan, $mask, $who, $when) = @{ ${ $_[2] } };
+    my $map     = $irc->isupport('CASEMAPPING');
+    my $uchan   = u_irc($chan, $map);
     my $excepts = $irc->isupport('EXCEPTS');
 
     $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $excepts }->{ $mask } = {
         SetBy => $who,
-        SetAt => $when
+        SetAt => $when,
     };
     return PCI_EAT_NONE;
 }
@@ -562,33 +550,28 @@ sub S_348 {
 # RPL_ENDOFEXCEPTLIST
 sub S_349 {
     my ($self, $irc) = splice @_, 0, 2;
+    my ($chan) = @{ ${ $_[2] } };
+    my $map    = $irc->isupport('CASEMAPPING');
+    my $uchan  = u_irc($chan, $map);
     
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
-    
-    $self->_send_event(irc_chan_sync_excepts => $channel );
+    $self->_send_event(irc_chan_sync_excepts => $chan);
     return PCI_EAT_NONE;
 }
 
 # RPL_CHANNELMODEIS
 sub S_324 {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my $channel = shift @args;
-    my $uchan = u_irc $channel, $mapping;
-    my $chanmodes = $irc->isupport('CHANMODES') || [ qw(beI k l imnpstaqr) ];
+    my @args  = @{ ${ $_[2] } };
+    my $chan  = shift @args;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    my $modes = $irc->isupport('CHANMODES') || [ qw(beI k l imnpstaqr) ];
 
     my $parsed_mode = parse_mode_line( @args );
     for my $mode (@{ $parsed_mode->{modes} }) {
         $mode =~ s/\+//;
         my $arg = '';
-        if ($mode =~ /[^$chanmodes->[3]]/) {
+        if ($mode =~ /[^$modes->[3]]/) {
             # doesn't match a mode with no args
             $arg = shift @{ $parsed_mode->{args} };
         }
@@ -607,9 +590,9 @@ sub S_324 {
         $self->{STATE}->{Chans}->{ $uchan }->{Mode} = join('', sort {uc $a cmp uc $b} split //, $self->{STATE}->{Chans}->{ $uchan }->{Mode} );
     }
     
-    if ( $self->_channel_sync($channel, 'MODE') ) {
+    if ( $self->_channel_sync($chan, 'MODE') ) {
         my $rec = delete $self->{CHANNEL_SYNCH}->{ $uchan };
-        $self->_send_event(irc_chan_sync => $channel, time() - $rec->{_time} );
+        $self->_send_event(irc_chan_sync => $chan, time() - $rec->{_time} );
     }
 
     return PCI_EAT_NONE;
@@ -618,11 +601,10 @@ sub S_324 {
 # RPL_TOPIC
 sub S_332 {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    my $channel = ${ $_[2] }->[0];
+    my $chan  = ${ $_[2] }->[0];
     my $topic = ${ $_[2] }->[1];
-    my $uchan = u_irc $channel, $mapping;
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
     $self->{STATE}->{Chans}->{ $uchan }->{Topic}->{Value} = $topic;
     return PCI_EAT_NONE;
@@ -631,12 +613,9 @@ sub S_332 {
 # RPL_TOPICWHOTIME
 sub S_333 {
     my ($self, $irc) = splice @_, 0, 2;
-    
-    my $mapping = $irc->isupport('CASEMAPPING');
-    #my @args = split / /, ${ $_[1] };
-    my @args = @{ ${ $_[2] } };
-    my ($channel, $who, $when) = @args;
-    my $uchan = u_irc $channel, $mapping;
+    my ($chan, $who, $when) = @{ ${ $_[2] } };
+    my $map   = $irc->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
     $self->{STATE}->{Chans}->{ $uchan }->{Topic}->{SetBy} = $who;
     $self->{STATE}->{Chans}->{ $uchan }->{Topic}->{SetAt} = $when;
@@ -649,14 +628,14 @@ sub S_333 {
 #
 
 sub umode {
-    my $self = shift;
+    my ($self) = @_;
     return $self->{STATE}->{usermode};
 }
 
 sub is_user_mode_set {
-    my $self = shift;
+    my ($self, $mode) = @_;
     
-    my $mode = ( split //, $_[0] )[0] || return;
+    $mode = (split //, $mode)[0] || return;
     $mode =~ s/[^A-Za-z]//g;
     return if !$mode;
     
@@ -665,23 +644,23 @@ sub is_user_mode_set {
 }
 
 sub _away_sync {
-    my ($self, $channel) = @_[OBJECT, ARG0];
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_[OBJECT, ARG0];
+    my $map = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     
     $self->{STATE}->{Chans}->{ $uchan }->{AWAY_SYNCH} = 1;
-    $self->_send_event(irc_away_sync_start => $channel);
-    $self->yield(who => $channel );
+    $self->_send_event(irc_away_sync_start => $chan);
+    $self->yield(who => $chan);
     
     return;
 }
 
 sub _channel_sync {
-    my ($self, $channel, $sync) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan, $sync) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
-    return if !$self->_channel_exists($channel) || !defined $self->{CHANNEL_SYNCH}->{ $uchan };
+    return if !$self->_channel_exists($chan) || !defined $self->{CHANNEL_SYNCH}->{ $uchan };
     $self->{CHANNEL_SYNCH}->{ $uchan }->{ $sync } = 1 if $sync;
 
     for my $item ( qw(BAN MODE WHO) ) {
@@ -693,30 +672,28 @@ sub _channel_sync {
 
 sub _nick_exists {
     my ($self, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $unick = u_irc $nick, $mapping;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
 
-    return if !defined $unick;
     return 1 if exists $self->{STATE}->{Nicks}->{ $unick };
     return;
 }
 
 sub _channel_exists {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
-    return if !defined $uchan;
     return 1 if exists $self->{STATE}->{Chans}->{ $uchan };
     return;
 }
 
 sub _nick_has_channel_mode {
-    my ($self, $channel, $nick, $flag) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
-    my $unick = u_irc $nick, $mapping;
-    $flag = ( split //, $flag )[0];
+    my ($self, $chan, $nick, $flag) = @_;
+    my $map = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    my $unick = u_irc($nick, $map);
+    $flag = (split //, $flag)[0];
 
     return if !$self->is_channel_member($uchan, $unick);
     return 1 if $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan } =~ /$flag/;
@@ -727,14 +704,13 @@ sub _nick_has_channel_mode {
 # whether it has operator, halfop or voice.
 sub channels {
     my ($self) = @_;
-    
-    my $mapping = $self->isupport('CASEMAPPING');
-    my %result;
-    my $realnick = u_irc $self->{RealNick}, $mapping;
+    my $map    = $self->isupport('CASEMAPPING');
+    my $unick  = u_irc($self->nick_name(), $map);
 
-    if ( $self->_nick_exists($realnick) ) {
-        for my $uchan ( keys %{ $self->{STATE}->{Nicks}->{ $realnick }->{CHANS} } ) {
-            $result{ $self->{STATE}->{Chans}->{ $uchan }->{Name} } = $self->{STATE}->{Nicks}->{ $realnick }->{CHANS}->{ $uchan };
+    my %result;
+    if (defined $unick && $self->_nick_exists($unick)) {
+        for my $uchan ( keys %{ $self->{STATE}->{Nicks}->{ $unick }->{CHANS} } ) {
+            $result{ $self->{STATE}->{Chans}->{ $uchan }->{Name} } = $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan };
         }
     }
     
@@ -748,8 +724,8 @@ sub nicks {
 
 sub nick_info {
     my ($self, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $unick = u_irc $nick, $mapping;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
     
     return if !$self->_nick_exists($nick);
 
@@ -763,8 +739,8 @@ sub nick_info {
 
 sub nick_long_form {
     my ($self, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $unick = u_irc $nick, $mapping;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
     
     return if !$self->_nick_exists($nick);
     
@@ -774,29 +750,28 @@ sub nick_long_form {
 
 sub nick_channels {
     my ($self, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $unick = u_irc $nick, $mapping;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
 
     return if !$self->_nick_exists($nick); 
     return map { $self->{STATE}->{Chans}->{$_}->{Name} } keys %{ $self->{STATE}->{Nicks}->{ $unick }->{CHANS} };
 }
 
 sub channel_list {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
     return map { $self->{STATE}->{Nicks}->{$_}->{Nick} } keys %{ $self->{STATE}->{Chans}->{ $uchan }->{Nicks} };
 }
 
 sub is_away {
     my ($self, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $unick = u_irc $nick, $mapping;
-    return if !defined $unick;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
 
-    if ($unick eq u_irc $self->{RealNick}) {
+    if ($unick eq u_irc($self->nick_name())) {
         # more accurate
         return 1 if $self->{STATE}->{away};
         return;
@@ -809,8 +784,8 @@ sub is_away {
 
 sub is_operator {
     my ($self, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $unick = u_irc $nick, $mapping;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $unick = u_irc($nick, $map);
     
     return if !$self->_nick_exists($nick);
     
@@ -819,12 +794,12 @@ sub is_operator {
 }
 
 sub is_channel_mode_set {
-    my ($self, $channel, $mode) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
-    $mode = ( split //, $mode )[0];
+    my ($self, $chan, $mode) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    $mode = (split //, $mode)[0];
 
-    return if !$self->_channel_exists($channel) || !$mode;
+    return if !$self->_channel_exists($chan) || !$mode;
     $mode =~ s/[^A-Za-z]//g;
 
     if (defined $self->{STATE}->{Chans}->{ $uchan }->{Mode}
@@ -836,29 +811,29 @@ sub is_channel_mode_set {
 }
 
 sub is_channel_synced {
-    my ($self, $channel) = @_;
-    return $self->_channel_sync($channel);
+    my ($self, $chan) = @_;
+    return $self->_channel_sync($chan);
 }
 
 sub channel_creation_time {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
 
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
     return if !exists $self->{STATE}->{Chans}->{ $uchan }->{CreationTime};
     
     return $self->{STATE}->{Chans}->{ $uchan }->{CreationTime};
 }
 
 sub channel_limit {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
 
-    if ( $self->is_channel_mode_set($channel, 'l')
+    if ( $self->is_channel_mode_set($chan, 'l')
         && defined $self->{STATE}->{Chans}->{ $uchan }->{ModeArgs}->{l} ) {
         return $self->{STATE}->{Chans}->{ $uchan }->{ModeArgs}->{l};
     }
@@ -867,12 +842,12 @@ sub channel_limit {
 }
 
 sub channel_key {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
-    return if !$self->_channel_exists($channel);
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    return if !$self->_channel_exists($chan);
 
-    if ( $self->is_channel_mode_set($channel, 'k')
+    if ( $self->is_channel_mode_set($chan, 'k')
         && defined $self->{STATE}->{Chans}->{ $uchan }->{ModeArgs}->{k} ) {
         return $self->{STATE}->{Chans}->{ $uchan }->{ModeArgs}->{k};
     }
@@ -881,10 +856,10 @@ sub channel_key {
 }
 
 sub channel_modes {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
-    return if !$self->_channel_exists($channel);
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    return if !$self->_channel_exists($chan);
 
     my %modes;
     if ( defined $self->{STATE}->{Chans}->{ $uchan }->{Mode} ) {
@@ -899,62 +874,62 @@ sub channel_modes {
 }
 
 sub is_channel_member {
-    my ($self, $channel, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
-    my $unick = u_irc $nick, $mapping;
+    my ($self, $chan, $nick) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    my $unick = u_irc($nick, $map);
 
-    return if !$self->_channel_exists($channel) || !$self->_nick_exists($nick);    
+    return if !$self->_channel_exists($chan) || !$self->_nick_exists($nick);    
     return 1 if defined $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick };
     return;
 }
 
 sub is_channel_operator {
-    my ($self, $channel, $nick) = @_;
-    return 1 if $self->_nick_has_channel_mode($channel, $nick, 'o');
+    my ($self, $chan, $nick) = @_;
+    return 1 if $self->_nick_has_channel_mode($chan, $nick, 'o');
     return;
 }
 
 sub has_channel_voice {
-    my ($self, $channel, $nick) = @_;
-    return 1 if $self->_nick_has_channel_mode($channel, $nick, 'v');
+    my ($self, $chan, $nick) = @_;
+    return 1 if $self->_nick_has_channel_mode($chan, $nick, 'v');
     return;
 }
 
 sub is_channel_halfop {
-    my ($self, $channel, $nick) = @_;
-    return 1 if $self->_nick_has_channel_mode($channel, $nick, 'h');
+    my ($self, $chan, $nick) = @_;
+    return 1 if $self->_nick_has_channel_mode($chan, $nick, 'h');
     return;
 }
 
 sub is_channel_owner {
-    my ($self, $channel, $nick) = @_;
-    return 1 if $self->_nick_has_channel_mode($channel, $nick, 'q');
+    my ($self, $chan, $nick) = @_;
+    return 1 if $self->_nick_has_channel_mode($chan, $nick, 'q');
     return;
 }
 
 sub is_channel_admin {
-    my ($self, $channel, $nick) = @_;
-    return 1 if $self->_nick_has_channel_mode($channel, $nick, 'a');
+    my ($self, $chan, $nick) = @_;
+    return 1 if $self->_nick_has_channel_mode($chan, $nick, 'a');
     return;
 }
 
 sub ban_mask {
-    my ($self, $channel, $mask) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
+    my ($self, $chan, $mask) = @_;
+    my $map = $self->isupport('CASEMAPPING');
     $mask = parse_ban_mask($mask);
     my @result;
 
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
 
     # Convert the mask from IRC to regex.
-    $mask = u_irc ( $mask, $mapping );
+    $mask = u_irc($mask, $map);
     $mask = quotemeta $mask;
     $mask =~ s/\\\*/[\x01-\xFF]{0,}/g;
     $mask =~ s/\\\?/[\x01-\xFF]{1,1}/g;
 
-    for my $nick ( $self->channel_list($channel) ) {
-        push @result, $nick if u_irc ( $self->nick_long_form($nick) ) =~ /^$mask$/;
+    for my $nick ( $self->channel_list($chan) ) {
+        push @result, $nick if u_irc($self->nick_long_form($nick)) =~ /^$mask$/;
     }
     
     return @result;
@@ -962,12 +937,12 @@ sub ban_mask {
 
 
 sub channel_ban_list {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     my %result;
 
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
 
     if ( defined $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{b} ) {
         %result = %{ $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{b} };
@@ -977,13 +952,13 @@ sub channel_ban_list {
 }
 
 sub channel_except_list {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map     = $self->isupport('CASEMAPPING');
+    my $uchan   = u_irc($chan, $map);
     my $excepts = $self->isupport('EXCEPTS');
     my %result;
 
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
 
     if ( defined $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $excepts } ) {
         %result = %{ $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $excepts } };
@@ -993,13 +968,13 @@ sub channel_except_list {
 }
 
 sub channel_invex_list {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     my $invex = $self->isupport('INVEX');
     my %result;
 
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
 
     if ( defined $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $invex } ) {
         %result = %{ $self->{STATE}->{Chans}->{ $uchan }->{Lists}->{ $invex } };
@@ -1009,12 +984,12 @@ sub channel_invex_list {
 }
 
 sub channel_topic {
-    my ($self, $channel) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
+    my ($self, $chan) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
     my %result;
 
-    return if !$self->_channel_exists($channel);
+    return if !$self->_channel_exists($chan);
 
     if ( defined $self->{STATE}->{Chans}->{ $uchan }->{Topic} ) {
         %result = %{ $self->{STATE}->{Chans}->{ $uchan }->{Topic} };
@@ -1024,12 +999,12 @@ sub channel_topic {
 }
 
 sub nick_channel_modes {
-    my ($self, $channel, $nick) = @_;
-    my $mapping = $self->isupport('CASEMAPPING');
-    my $uchan = u_irc $channel, $mapping;
-    my $unick = u_irc $nick, $mapping;
+    my ($self, $chan, $nick) = @_;
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = u_irc($chan, $map);
+    my $unick = u_irc($nick, $map);
 
-    return if !$self->is_channel_member($channel, $nick);
+    return if !$self->is_channel_member($chan, $nick);
 
     return $self->{STATE}->{Nicks}->{ $unick }->{CHANS}->{ $uchan };
 }
@@ -1165,14 +1140,61 @@ B<'Nick'>, B<'User'>, B<'Host'> and B<'Userhost'>.
 All of the L<POE::Component::IRC|POE::Component::IRC> methods are supported,
 plus the following:
 
-=head2 C<umode>
+=head2 C<ban_mask>
 
-Takes no parameters. Returns the current user mode set for the bot.
+Expects a channel and a ban mask, as passed to MODE +b-b. Returns a list of
+nicks on that channel that match the specified ban mask or an empty list if
+the channel doesn't exist in the state or there are no matches.
 
-=head2 C<is_user_mode_set>
+=head2 C<channel_ban_list>
 
-Expects single user mode flag C<[A-Za-z]>. Returns a true value if that user
-mode is set.
+Expects a channel as a parameter. Returns a hashref containing the banlist
+if the channel is in the state, a false value if not. The hashref keys are the
+entries on the list, each with the keys B<'SetBy'> and B<'SetAt'>. These keys
+will hold the nick!hostmask of the user who set the entry (or just the nick
+if it's all the ircd gives us), and the time at which it was set respectively.
+
+=head2 C<channel_creation_time>
+
+Expects a channel as parameter. Returns channel creation time or a false value.
+
+=head2 C<channel_except_list>
+
+Expects a channel as a parameter. Returns a hashref containing the ban
+exception list if the channel is in the state, a false value if not. The
+hashref keys are the entries on the list, each with the keys B<'SetBy'> and
+B<'SetAt'>. These keys will hold the nick!hostmask of the user who set the
+entry (or just the nick if it's all the ircd gives us), and the time at which
+it was set respectively.
+
+=head2 C<channel_invex_list>
+
+Expects a channel as a parameter. Returns a hashref containing the invite
+exception list if the channel is in the state, a false value if not. The
+hashref keys are the entries on the list, each with the keys B<'SetBy'> and
+B<'SetAt'>. These keys will hold the nick!hostmask of the user who set the
+entry (or just the nick if it's all the ircd gives us), and the time at which
+it was set respectively.
+
+=head2 C<channel_key>
+
+Expects a channel as parameter. Returns the channel key or a false value.
+
+=head2 C<channel_limit>
+
+Expects a channel as parameter. Returns the channel limit or a false value.
+
+=head2 C<channel_list>
+
+Expects a channel as parameter. Returns a list of all nicks on the specified
+channel. If the component happens to not be on that channel an empty list will
+be returned.
+
+=head2 C<channel_modes>
+
+Expects a channel as parameter. Returns a hash ref keyed on channel mode, with
+the mode argument (if any) as the value. Returns a false value instead if the
+channel is not in the state.
 
 =head2 C<channels>
 
@@ -1184,19 +1206,22 @@ has voice on that channel.
      $irc->yield( 'privmsg' => $channel => 'm00!' );
  }
 
+=head2 C<channel_topic>
+
+Expects a channel as a parameter. Returns a hashref containing topic
+information if the channel is in the state, a false value if not. The hashref
+contains the following keys: B<'Value'>, B<'SetBy'>, B<'SetAt'>. These keys
+will hold the topic itself, the nick!hostmask of the user who set it (or just
+the nick if it's all the ircd gives us), and the time at which it was set
+respectively.
+
 If the component happens to not be on any channels an empty hashref is returned.
 
-=head2 C<nicks>
+=head2 C<has_channel_voice>
 
-Takes no parameters. Returns a list of all the nicks, including itself, that it
-knows about. If the component happens to be on no channels then an empty list
-is returned.
-
-=head2 C<channel_list>
-
-Expects a channel as parameter. Returns a list of all nicks on the specified
-channel. If the component happens to not be on that channel an empty list will
-be returned.
+Expects a channel and a nickname as parameters. Returns a true value if
+the nick has voice on the specified channel. Returns false if the nick does
+not have voice on the channel or if the nick/channel does not exist in the state.
 
 =head2 C<is_away>
 
@@ -1205,58 +1230,11 @@ Returns a false value if the nick is not away or not in the state. This will
 only work for your IRC user unless you specified a value for B<'AwayPoll'> in
 L<C<spawn>|POE::Component::IRC/"spawn">.
 
-=head2 C<is_operator>
-
-Expects a nick as parameter. Returns a true value if the specified nick is
-an IRC operator. Returns a false value if the nick is not an IRC operator
-or is not in the state.
-
-=head2 C<is_channel_mode_set>
-
-Expects a channel and a single mode flag C<[A-Za-z]>. Returns a true value
-if that mode is set on the channel.
-
-=head2 C<channel_creation_time>
-
-Expects a channel as parameter. Returns channel creation time or a false value.
-
-=head2 C<channel_modes>
-
-Expects a channel as parameter. Returns a hash ref keyed on channel mode, with
-the mode argument (if any) as the value. Returns a false value instead if the
-channel is not in the state.
-
-=head2 C<channel_limit>
-
-Expects a channel as parameter. Returns the channel limit or a false value.
-
-=head2 C<channel_key>
-
-Expects a channel as parameter. Returns the channel key or a false value.
-
-=head2 C<is_channel_member>
-
-Expects a channel and a nickname as parameters. Returns a true value if
-the nick is on the specified channel. Returns false if the nick is not on the
-channel or if the nick/channel does not exist in the state.
-
-=head2 C<is_channel_owner>
-
-Expects a channel and a nickname as parameters. Returns a true value if
-the nick is an owner on the specified channel. Returns false if the nick is
-not an owner on the channel or if the nick/channel does not exist in the state.
-
 =head2 C<is_channel_admin>
 
 Expects a channel and a nickname as parameters. Returns a true value if
 the nick is an admin on the specified channel. Returns false if the nick is
 not an admin on the channel or if the nick/channel does not exist in the state.
-
-=head2 C<is_channel_operator>
-
-Expects a channel and a nickname as parameters. Returns a true value if
-the nick is an operator on the specified channel. Returns false if the nick is
-not an operator on the channel or if the nick/channel does not exist in the state.
 
 =head2 C<is_channel_halfop>
 
@@ -1265,21 +1243,50 @@ the nick is a half-operator on the specified channel. Returns false if the nick
 is not a half-operator on the channel or if the nick/channel does not exist in
 the state.
 
+=head2 C<is_channel_member>
+
+Expects a channel and a nickname as parameters. Returns a true value if
+the nick is on the specified channel. Returns false if the nick is not on the
+channel or if the nick/channel does not exist in the state.
+
+=head2 C<is_channel_mode_set>
+
+Expects a channel and a single mode flag C<[A-Za-z]>. Returns a true value
+if that mode is set on the channel.
+
+=head2 C<is_channel_operator>
+
+Expects a channel and a nickname as parameters. Returns a true value if
+the nick is an operator on the specified channel. Returns false if the nick is
+not an operator on the channel or if the nick/channel does not exist in the state.
+
+=head2 C<is_channel_owner>
+
+Expects a channel and a nickname as parameters. Returns a true value if
+the nick is an owner on the specified channel. Returns false if the nick is
+not an owner on the channel or if the nick/channel does not exist in the state.
+
 =head2 C<is_channel_synced>
 
 Expects a channel as a parameter. Returns true if the channel has been synced.
 Returns false if it has not been synced or if the channel is not in the state.
 
-=head2 C<has_channel_voice>
+=head2 C<is_operator>
 
-Expects a channel and a nickname as parameters. Returns a true value if
-the nick has voice on the specified channel. Returns false if the nick does
-not have voice on the channel or if the nick/channel does not exist in the state.
+Expects a nick as parameter. Returns a true value if the specified nick is
+an IRC operator. Returns a false value if the nick is not an IRC operator
+or is not in the state.
 
-=head2 C<nick_long_form>
+=head2 C<is_user_mode_set>
 
-Expects a nickname. Returns the long form of that nickname, ie. C<nick!user@host>
-or a false value if the nick is not in the state.
+Expects single user mode flag C<[A-Za-z]>. Returns a true value if that user
+mode is set.
+
+=head2 C<nick_channel_modes>
+
+Expects a channel and a nickname as parameters. Returns the modes of the
+specified nick on the specified channel (ie. qaohv). If the nick is not on the
+channel in the state, a false value will be returned.
 
 =head2 C<nick_channels>
 
@@ -1296,52 +1303,20 @@ state. The hashref contains the following keys:
 B<'Nick'>, B<'User'>, B<'Host'>, B<'Userhost'>, B<'Hops'>, B<'Real'>,
 B<'Server'> and, if applicable, B<'IRCop'>.
 
-=head2 C<ban_mask>
+=head2 C<nick_long_form>
 
-Expects a channel and a ban mask, as passed to MODE +b-b. Returns a list of
-nicks on that channel that match the specified ban mask or an empty list if
-the channel doesn't exist in the state or there are no matches.
+Expects a nickname. Returns the long form of that nickname, ie. C<nick!user@host>
+or a false value if the nick is not in the state.
 
-=head2 C<channel_ban_list>
+=head2 C<nicks>
 
-Expects a channel as a parameter. Returns a hashref containing the banlist
-if the channel is in the state, a false value if not. The hashref keys are the
-entries on the list, each with the keys B<'SetBy'> and B<'SetAt'>. These keys
-will hold the nick!hostmask of the user who set the entry (or just the nick
-if it's all the ircd gives us), and the time at which it was set respectively.
+Takes no parameters. Returns a list of all the nicks, including itself, that it
+knows about. If the component happens to be on no channels then an empty list
+is returned.
 
-=head2 C<channel_invex_list>
+=head2 C<umode>
 
-Expects a channel as a parameter. Returns a hashref containing the invite
-exception list if the channel is in the state, a false value if not. The
-hashref keys are the entries on the list, each with the keys B<'SetBy'> and
-B<'SetAt'>. These keys will hold the nick!hostmask of the user who set the
-entry (or just the nick if it's all the ircd gives us), and the time at which
-it was set respectively.
-
-=head2 C<channel_except_list>
-
-Expects a channel as a parameter. Returns a hashref containing the ban
-exception list if the channel is in the state, a false value if not. The
-hashref keys are the entries on the list, each with the keys B<'SetBy'> and
-B<'SetAt'>. These keys will hold the nick!hostmask of the user who set the
-entry (or just the nick if it's all the ircd gives us), and the time at which
-it was set respectively.
-
-=head2 C<channel_topic>
-
-Expects a channel as a parameter. Returns a hashref containing topic
-information if the channel is in the state, a false value if not. The hashref
-contains the following keys: B<'Value'>, B<'SetBy'>, B<'SetAt'>. These keys
-will hold the topic itself, the nick!hostmask of the user who set it (or just
-the nick if it's all the ircd gives us), and the time at which it was set
-respectively.
-
-=head2 C<nick_channel_modes>
-
-Expects a channel and a nickname as parameters. Returns the modes of the
-specified nick on the specified channel (ie. qaohv). If the nick is not on the
-channel in the state, a false value will be returned.
+Takes no parameters. Returns the current user mode set for the bot.
 
 =head1 OUTPUT
 
@@ -1352,7 +1327,7 @@ events.
 
 =head3 C<irc_quit>
 
-See also C<irc_quit|POE::Component::IRC/"irc_quit"> in
+See also L<C<irc_quit>|POE::Component::IRC/"irc_quit">> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional paramater C<ARG2> contains an arrayref of channel names that are
@@ -1360,7 +1335,7 @@ common to the quitting client and the component.
 
 =head3 C<irc_nick>
 
-See also C<irc_nick|POE::Component::IRC/"irc_nick"> in
+See also L<C<irc_nick>|POE::Component::IRC/"irc_nick"> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional paramter C<ARG2> contains an arrayref of channel names that are
@@ -1368,7 +1343,7 @@ common to the nick hanging client and the component.
 
 =head3 C<irc_kick>
 
-See also C<irc_kick|POE::Component::IRC/"irc_kick"> in
+See also L<C<irc_kick>|POE::Component::IRC/"irc_kick"> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional parameter C<ARG4> contains the full nick!user@host of the kicked
@@ -1380,9 +1355,10 @@ individual.
 
 =head3 C<irc_socketerr>
 
-These three all have two additional parameters. ARG1 is a hash of information
-about your IRC user (see L<C<nick_info>|/"nick_info">, while ARG2 is a hash
-of the channels you were on (see L<C<channels>|/"channels">).
+These three all have two additional parameters. C<ARG1> is a hash of
+information about your IRC user (see L<C<nick_info>|/"nick_info">, while
+C<ARG2> is a hash of the channels you were on (see 
+L<C<channels>|/"channels">).
 
 =head2 New events
 
@@ -1400,6 +1376,13 @@ specified a value for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/"spawn">.
 Sent whenever the component has completed synchronising the away statuses of
 channel members. C<ARG0> is the channel name. You will only receive this event if
 you specified a value for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/"spawn">.
+
+=head3 C<irc_chan_mode>
+
+This is almost identical to L<C<irc_mode>|POE::Component::IRC/"irc_mode">,
+except that it's sent once for each individual mode with it's respective
+argument if it has one (ie. the banmask if it's +b or -b). However, this
+event is only sent for channel modes.
 
 =head3 C<irc_chan_sync>
 
@@ -1425,18 +1408,6 @@ Sent whenever the component has completed synchronising a user who has joined
 a channel the component is on. C<ARG0> is the user's nickname and C<ARG1> the
 channel they have joined.
 
-=head3 C<irc_chan_mode>
-
-This is almost identical to L<C<irc_mode>|POE::Component::IRC/"irc_mode">,
-except that it's sent once for each individual mode with it's respective
-argument if it has one (ie. the banmask if it's +b or -b). However, this
-event is only sent for channel modes.
-
-=head3 C<irc_user_mode>
-
-This is almost identical to L<C<irc_mode>|POE::Component::IRC/"irc_mode">,
-except it is sent for each individual umode that is being set.
-
 =head3 C<irc_user_away>
 
 Sent when an IRC user sets his/her status to away. C<ARG0> is the nickname,
@@ -1455,13 +1426,18 @@ The following two C<irc_*> events are the same as their
 L<POE::Component::IRC|POE::Component::IRC> counterparts, with the additional
 parameters:
 
+=head3 C<irc_user_mode>
+
+This is almost identical to L<C<irc_mode>|POE::Component::IRC/"irc_mode">,
+except it is sent for each individual umode that is being set.
+
 =head1 CAVEATS
 
 The component gathers information by registering for C<irc_quit>, C<irc_nick>,
 C<irc_join>, C<irc_part>, C<irc_mode>, C<irc_kick> and various numeric replies.
 When the component is asked to join a channel, when it joins it will issue
 'WHO #channel', 'MODE #channel', and 'MODE #channel b'. These will solicit
-between them the numerics, C<irc_352>, C<irc_324> and C<irc_329>, respectively.
+between them the numerics, >C<irc_352>, C<irc_324> and C<irc_329>, respectively.
 When someone joins a channel the bot is on, it issues a 'WHO nick'. You may
 want to ignore these. 
 

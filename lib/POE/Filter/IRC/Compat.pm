@@ -7,7 +7,7 @@ use POE::Filter::IRCD;
 use File::Basename qw(fileparse);
 use base qw(POE::Filter);
 
-our $VERSION = '6.04';
+our $VERSION = '6.05_01';
 
 my %irc_cmds = (
     qr/^\d{3}$/ => sub {
@@ -22,7 +22,7 @@ my %irc_cmds = (
         }
         $event->{args}->[2] = $line->{params};
     },
-    qr/notice/ => sub {
+    qr/^notice$/ => sub {
         my ($self, $event, $line) = @_;
 
         if ($line->{prefix}) {
@@ -40,7 +40,7 @@ my %irc_cmds = (
             $event->{args}->[0] = $line->{params}->[1];
         }
     },
-    qr/privmsg/ => sub {
+    qr/^privmsg$/ => sub {
         my ($self, $event, $line) = @_;
         if ( grep { index( $line->{params}->[0], $_ ) >= 0 } @{ $self->{chantypes} } ) {
             $event->{args} = [
@@ -65,7 +65,7 @@ my %irc_cmds = (
             $event->{name} = 'msg';
         }
     },
-    qr/invite/ => sub {
+    qr/^invite$/ => sub {
         my ($self, $event, $line) = @_;
         shift( @{ $line->{params} } );
         unshift( @{ $line->{params} }, _decolon( $line->{prefix} || '' ) ) if $line->{prefix};
@@ -75,7 +75,7 @@ my %irc_cmds = (
 
 # the magic cookie jar
 my %dcc_types = (
-    qr/CHAT|SEND/ => sub {
+    qr/^(?:CHAT|SEND)$/ => sub {
         my ($nick, $type, $args) = @_;
         my ($file, $addr, $port, $size);
         return if !(($file, $addr, $port, $size) = $args =~ /^(".+"|[^ ]+) +(\d+) +(\d+)(?: +(\d+))?/);
@@ -101,7 +101,7 @@ my %dcc_types = (
             $addr,
         );
     },
-    qr/ACCEPT|RESUME/ => sub {
+    qr/^(?:ACCEPT|RESUME)$/ => sub {
         my ($nick, $type, $args) = @_;
         my ($file, $port, $position);
         return if !(($file, $port, $position) = $args =~ /^(".+"|[^ ]+) +(\d+) +(\d+)/);
@@ -238,7 +238,7 @@ sub _ctcp_dequote {
     # CHUNG! CHUNG! CHUNG!
 
     if (!defined $msg) {
-        croak 'Not enough arguments to POE::Filter::IRC::Compat->_ctcp_dequote';
+        croak 'Not enough arguments to POE::Filter::IRC::Compat::_ctcp_dequote';
     }
 
     # Strip out any low-level quoting in the text.
@@ -359,15 +359,18 @@ sub _get_ctcp {
         }
     }
 
-    if ($text && @$text) {
-        my $what;
-        ($what) = $line->{raw_line} =~ /^(:[^ ]+ +\w+ +[^ ]+ +)/
-            or warn "What the heck? '".$line->{raw_line}."'\n" if $self->{debug};
-        $text = (defined $what ? $what : '') . ':' . join '', @$text;
-        $text =~ s/\cP/^P/g;
-        warn "CTCP: $text\n" if $self->{debug};
-        push @$events, @{ $self->{_ircd}->get([$text]) };
-    }
+    # XXX: I'm not quite sure what this is for, but on FreeNode it adds an
+    # extra bogus event and displays a debug message, so I have disabled it.
+    # FreeNode precedes PRIVMSG and CTCP ACTION messages with '+' or '-'.
+    #if ($text && @$text) {
+    #    my $what;
+    #    ($what) = $line->{raw_line} =~ /^(:[^ ]+ +\w+ +[^ ]+ +)/
+    #        or warn "What the heck? '".$line->{raw_line}."'\n" if $self->{debug};
+    #    $text = (defined $what ? $what : '') . ':' . join '', @$text;
+    #    $text =~ s/\cP/^P/g;
+    #    warn "CTCP: $text\n" if $self->{debug};
+    #    push @$events, @{ $self->{_ircd}->get([$text]) };
+    #}
     
     return $events;
 }

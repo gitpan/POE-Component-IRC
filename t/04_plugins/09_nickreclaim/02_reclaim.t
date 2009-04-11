@@ -81,6 +81,7 @@ sub _config_ircd {
 sub irc_001 {
     my $irc = $_[SENDER]->get_heap();
     pass($irc->session_alias() . ' logged in');
+    diag($irc->session_alias() . ' logged in');
     return if $irc != $bot1;
     
     $bot2->yield(register => 'all');
@@ -94,10 +95,9 @@ sub irc_001 {
 
 sub irc_433 {
     my $irc = $_[SENDER]->get_heap();
-    my $other = $irc == $bot1 ? $bot2 : $bot1;
-
     pass($irc->session_alias . ' nick collision');
-    $other->yield('quit');
+    diag($irc->session_alias . ' nick collision');
+    $bot1->yield('quit');
 }
 
 sub irc_nick {
@@ -105,6 +105,7 @@ sub irc_nick {
     my $irc = $sender->get_heap();
 
     is($new_nick, 'TestBot1', $irc->session_alias . ' nick reclaimed');
+    diag($irc->session_alias . ' nick reclaimed');
     $irc->yield('quit');
 }
 
@@ -113,6 +114,7 @@ sub irc_disconnected {
     my $irc = $sender->get_heap();
     
     pass($irc->session_alias() . ' disconnected');
+    diag($irc->session_alias() . ' disconnected');
     $heap->{count}++;
     $kernel->yield('_shutdown') if $heap->{count} == 2;
 }
