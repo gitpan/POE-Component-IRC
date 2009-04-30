@@ -4,17 +4,12 @@ package Module::Install::Metadata;
 use strict 'vars';
 use Module::Install::Base;
 
-use vars qw{$VERSION @ISA $ISCORE};
+use vars qw{$VERSION $ISCORE @ISA};
 BEGIN {
-	$VERSION = '0.81';
-	@ISA     = qw{Module::Install::Base};
+	$VERSION = '0.80';
 	$ISCORE  = 1;
+	@ISA     = qw{Module::Install::Base};
 }
-
-my @boolean_keys = qw{
-	sign
-	mymeta
-};
 
 my @scalar_keys = qw{
 	name
@@ -42,43 +37,16 @@ my @resource_keys = qw{
 	repository
 };
 
-my @array_keys = qw{
-	keywords
-};
-
 sub Meta              { shift          }
-sub Meta_BooleanKeys  { @boolean_keys  }
 sub Meta_ScalarKeys   { @scalar_keys   }
 sub Meta_TupleKeys    { @tuple_keys    }
 sub Meta_ResourceKeys { @resource_keys }
-sub Meta_ArrayKeys    { @array_keys    }
-
-foreach my $key ( @boolean_keys ) {
-	*$key = sub {
-		my $self = shift;
-		if ( defined wantarray and not @_ ) {
-			return $self->{values}->{$key};
-		}
-		$self->{values}->{$key} = ( @_ ? $_[0] : 1 );
-		return $self;
-	};
-}
 
 foreach my $key ( @scalar_keys ) {
 	*$key = sub {
 		my $self = shift;
-		return $self->{values}->{$key} if defined wantarray and !@_;
-		$self->{values}->{$key} = shift;
-		return $self;
-	};
-}
-
-foreach my $key ( @array_keys ) {
-	*$key = sub {
-		my $self = shift;
-		return $self->{values}->{$key} if defined wantarray and !@_;
-		$self->{values}->{$key} ||= [];
-		push @{$self->{values}->{$key}}, @_;
+		return $self->{values}{$key} if defined wantarray and !@_;
+		$self->{values}{$key} = shift;
 		return $self;
 	};
 }
@@ -87,12 +55,12 @@ foreach my $key ( @resource_keys ) {
 	*$key = sub {
 		my $self = shift;
 		unless ( @_ ) {
-			return () unless $self->{values}->{resources};
+			return () unless $self->{values}{resources};
 			return map  { $_->[1] }
 			       grep { $_->[0] eq $key }
-			       @{ $self->{values}->{resources} };
+			       @{ $self->{values}{resources} };
 		}
-		return $self->{values}->{resources}->{$key} unless @_;
+		return $self->{values}{resources}{$key} unless @_;
 		my $uri = shift or die(
 			"Did not provide a value to $key()"
 		);
@@ -101,19 +69,54 @@ foreach my $key ( @resource_keys ) {
 	};
 }
 
-foreach my $key ( grep { $_ ne "resources" } @tuple_keys) {
-	*$key = sub {
-		my $self = shift;
-		return $self->{values}->{$key} unless @_;
-		my @added;
-		while ( @_ ) {
-			my $module  = shift or last;
-			my $version = shift || 0;
-			push @added, [ $module, $version ];
-		}
-		push @{ $self->{values}->{$key} }, @added;
-		return map {@$_} @added;
-	};
+sub requires {
+	my $self = shift;
+	while ( @_ ) {
+		my $module  = shift or last;
+		my $version = shift || 0;
+		push @{ $self->{values}{requires} }, [ $module, $version ];
+	}
+	$self->{values}{requires};
+}
+
+sub build_requires {
+	my $self = shift;
+	while ( @_ ) {
+		my $module  = shift or last;
+		my $version = shift || 0;
+		push @{ $self->{values}{build_requires} }, [ $module, $version ];
+	}
+	$self->{values}{build_requires};
+}
+
+sub configure_requires {
+	my $self = shift;
+	while ( @_ ) {
+		my $module  = shift or last;
+		my $version = shift || 0;
+		push @{ $self->{values}{configure_requires} }, [ $module, $version ];
+	}
+	$self->{values}{configure_requires};
+}
+
+sub recommends {
+	my $self = shift;
+	while ( @_ ) {
+		my $module  = shift or last;
+		my $version = shift || 0;
+		push @{ $self->{values}{recommends} }, [ $module, $version ];
+	}
+	$self->{values}{recommends};
+}
+
+sub bundles {
+	my $self = shift;
+	while ( @_ ) {
+		my $module  = shift or last;
+		my $version = shift || 0;
+		push @{ $self->{values}{bundles} }, [ $module, $version ];
+	}
+	$self->{values}{bundles};
 }
 
 # Resource handling
@@ -132,22 +135,29 @@ sub resources {
 		if ( $name eq lc $name and ! $lc_resource{$name} ) {
 			die("Unsupported reserved lowercase resource '$name'");
 		}
-		$self->{values}->{resources} ||= [];
-		push @{ $self->{values}->{resources} }, [ $name, $value ];
+		$self->{values}{resources} ||= [];
+		push @{ $self->{values}{resources} }, [ $name, $value ];
 	}
-	$self->{values}->{resources};
+	$self->{values}{resources};
 }
 
 # Aliases for build_requires that will have alternative
 # meanings in some future version of META.yml.
-sub test_requires     { shift->build_requires(@_) }
-sub install_requires  { shift->build_requires(@_) }
+sub test_requires      { shift->build_requires(@_) }
+sub install_requires   { shift->build_requires(@_) }
 
 # Aliases for installdirs options
-sub install_as_core   { $_[0]->installdirs('perl')   }
-sub install_as_cpan   { $_[0]->installdirs('site')   }
-sub install_as_site   { $_[0]->installdirs('site')   }
-sub install_as_vendor { $_[0]->installdirs('vendor') }
+sub install_as_core    { $_[0]->installdirs('perl')   }
+sub install_as_cpan    { $_[0]->installdirs('site')   }
+sub install_as_site    { $_[0]->installdirs('site')   }
+sub install_as_vendor  { $_[0]->installdirs('vendor') }
+
+sub sign {
+	my $self = shift;
+	return $self->{values}{sign} if defined wantarray and ! @_;
+	$self->{values}{sign} = ( @_ ? $_[0] : 1 );
+	return $self;
+}
 
 sub dynamic_config {
 	my $self = shift;
@@ -155,13 +165,13 @@ sub dynamic_config {
 		warn "You MUST provide an explicit true/false value to dynamic_config\n";
 		return $self;
 	}
-	$self->{values}->{dynamic_config} = $_[0] ? 1 : 0;
+	$self->{values}{dynamic_config} = $_[0] ? 1 : 0;
 	return 1;
 }
 
 sub perl_version {
 	my $self = shift;
-	return $self->{values}->{perl_version} unless @_;
+	return $self->{values}{perl_version} unless @_;
 	my $version = shift or die(
 		"Did not provide a value to perl_version()"
 	);
@@ -174,41 +184,20 @@ sub perl_version {
 		die "Module::Install only supports 5.005 or newer (use ExtUtils::MakeMaker)\n";
 	}
 
-	$self->{values}->{perl_version} = $version;
+	$self->{values}{perl_version} = $version;
 }
-
-#Stolen from M::B
-my %license_urls = (
-    perl         => 'http://dev.perl.org/licenses/',
-    apache       => 'http://apache.org/licenses/LICENSE-2.0',
-    artistic     => 'http://opensource.org/licenses/artistic-license.php',
-    artistic_2   => 'http://opensource.org/licenses/artistic-license-2.0.php',
-    lgpl         => 'http://opensource.org/licenses/lgpl-license.php',
-    lgpl2        => 'http://opensource.org/licenses/lgpl-2.1.php',
-    lgpl3        => 'http://opensource.org/licenses/lgpl-3.0.html',
-    bsd          => 'http://opensource.org/licenses/bsd-license.php',
-    gpl          => 'http://opensource.org/licenses/gpl-license.php',
-    gpl2         => 'http://opensource.org/licenses/gpl-2.0.php',
-    gpl3         => 'http://opensource.org/licenses/gpl-3.0.html',
-    mit          => 'http://opensource.org/licenses/mit-license.php',
-    mozilla      => 'http://opensource.org/licenses/mozilla1.1.php',
-    open_source  => undef,
-    unrestricted => undef,
-    restrictive  => undef,
-    unknown      => undef,
-);
 
 sub license {
 	my $self = shift;
-	return $self->{values}->{license} unless @_;
+	return $self->{values}{license} unless @_;
 	my $license = shift or die(
 		'Did not provide a value to license()'
 	);
-	$self->{values}->{license} = $license;
+	$self->{values}{license} = $license;
 
 	# Automatically fill in license URLs
-	if ( $license_urls{$license} ) {
-		$self->resources( license => $license_urls{$license} );
+	if ( $license eq 'perl' ) {
+		$self->resources( license => 'http://dev.perl.org/licenses/' );
 	}
 
 	return 1;
@@ -250,7 +239,7 @@ sub all_from {
 
 sub provides {
 	my $self     = shift;
-	my $provides = ( $self->{values}->{provides} ||= {} );
+	my $provides = ( $self->{values}{provides} ||= {} );
 	%$provides = (%$provides, @_) if @_;
 	return $provides;
 }
@@ -279,7 +268,7 @@ sub auto_provides {
 sub feature {
 	my $self     = shift;
 	my $name     = shift;
-	my $features = ( $self->{values}->{features} ||= [] );
+	my $features = ( $self->{values}{features} ||= [] );
 	my $mods;
 
 	if ( @_ == 1 and ref( $_[0] ) ) {
@@ -307,16 +296,16 @@ sub features {
 	while ( my ( $name, $mods ) = splice( @_, 0, 2 ) ) {
 		$self->feature( $name, @$mods );
 	}
-	return $self->{values}->{features}
-		? @{ $self->{values}->{features} }
+	return $self->{values}{features}
+		? @{ $self->{values}{features} }
 		: ();
 }
 
 sub no_index {
 	my $self = shift;
 	my $type = shift;
-	push @{ $self->{values}->{no_index}->{$type} }, @_ if $type;
-	return $self->{values}->{no_index};
+	push @{ $self->{values}{no_index}{$type} }, @_ if $type;
+	return $self->{values}{no_index};
 }
 
 sub read {
@@ -469,18 +458,10 @@ sub license_from {
 	return 'unknown';
 }
 
-sub _extract_bugtracker {
-	my @links   = $_[0] =~ m#L<(\Qhttp://rt.cpan.org/\E[^>]+)>#g;
-	my %links;
-	@links{@links}=();
-	@links=keys %links;
-	return @links;
-}
-
 sub bugtracker_from {
 	my $self    = shift;
 	my $content = Module::Install::_read($_[0]);
-	my @links   = _extract_bugtracker($content);
+	my @links   = $content =~ m/L\<(http\:\/\/rt\.cpan\.org\/[^>]+)\>/g;
 	unless ( @links ) {
 		warn "Cannot determine bugtracker info from $_[0]\n";
 		return 0;
@@ -493,17 +474,6 @@ sub bugtracker_from {
 	# Set the bugtracker
 	bugtracker( $links[0] );
 	return 1;
-}
-
-sub requires_from {
-	my $self     = shift;
-	my $content  = Module::Install::_readperl($_[0]);
-	my @requires = $content =~ m/^use\s+([^\W\d]\w*(?:::\w+)*)\s+([\d\.]+)/mg;
-	while ( @requires ) {
-		my $module  = shift @requires;
-		my $version = shift @requires;
-		$self->requires( $module => $version );
-	}
 }
 
 # Convert triple-part versions (eg, 5.6.1 or 5.8.9) to
@@ -529,7 +499,7 @@ sub _perl_version {
 # MYMETA.yml Support
 
 sub WriteMyMeta {
-	die "WriteMyMeta has been deprecated";
+	$_[0]->write_mymeta;
 }
 
 sub write_mymeta {
@@ -573,8 +543,7 @@ sub write_mymeta {
 	}
 
 	# Save as the MYMETA.yml file
-	print "Writing MYMETA.yml\n";
-	YAML::Tiny::DumpFile('MYMETA.yml', $meta);	
+	YAML::Tiny::DumpFile('MYMETA.yml', $meta);
 }
 
 1;

@@ -7,7 +7,7 @@ use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.05_01';
+our $VERSION = '6.06';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our
 # namespace. u_irc() is used to create unique keys.
@@ -28,7 +28,6 @@ sub S_disconnected {
     my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
-    delete $self->{STATE};
     return PCI_EAT_NONE;
 }
 
@@ -37,7 +36,6 @@ sub S_error {
     my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
-    delete $self->{STATE};
     return PCI_EAT_NONE;
 }
 
@@ -46,7 +44,6 @@ sub S_socketerr {
     my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
-    delete $self->{STATE};
     return PCI_EAT_NONE;
 }
 

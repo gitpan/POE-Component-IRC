@@ -5,7 +5,7 @@ use warnings;
 use Carp;
 use POE::Component::IRC::Plugin qw(:ALL);
 
-our $VERSION = '6.05_01';
+our $VERSION = '6.06';
 
 sub new {
     my ($package) = shift;
@@ -54,7 +54,7 @@ sub PCI_register {
 ##############
 sub U_nick {
     my $self = shift;
-    my ($nick) = $ {$_[1 ]} =~ /^NICK +(.+)/i;
+    my ($nick) = ${ $_[1 ] } =~ /^NICK +(.+)/i;
     
     return PCI_EAT_NONE if exists $self->{_claims}{ $nick };
 
@@ -83,7 +83,7 @@ sub S_001 {
     return PCI_EAT_NONE;
 }
 
-
+# ERR_NICKNAMEINUSE
 sub S_433 {
     my ($self,$irc) = splice @_, 0, 2;
     
@@ -132,7 +132,7 @@ your nickname
  use strict;
  use warnings;
  use POE qw(Component::IRC Component::IRC::Plugin::NickReclaim);
-i
+
  my $nickname = 'Flibble' . $$;
  my $ircname = 'Flibble the Sailor Bot';
  my $ircserver = 'irc.blahblahblah.irc';

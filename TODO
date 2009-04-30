@@ -22,28 +22,6 @@ verbose test output, so I'd know which test ran more often than it should have.
 
 
 ~~~~~~~~
-* FAIL  3430716 5.8.9 on Solaris 2.11 (i86pc-solaris-64int)
-* FAIL  3429953 5.10.0 on Solaris 2.11 (i86pc-solaris-64int)
-* FAIL  3415576 5.10.0 on Darwin 8.10.1 (darwin-thread-multi-2level)
-* FAIL  3413342 5.8.9 on Darwin 8.11.0 (darwin-thread-multi-64int-2level)
-* FAIL  3413327 5.8.8 on Darwin 8.11.0 (darwin-thread-multi-64int-2level)
-* FAIL  3413307 5.8.6 on Darwin 8.11.0 (darwin-thread-multi-64int-2level)
-* FAIL  3413288 5.10.0 on Darwin 8.11.0 (darwin-thread-multi-64int-2level)
-~~~~~~~~
-
-    #   Failed test 'Timed out'
-    #   at t/04_plugins/06_plugman/03_irc_interface.t line 132.
-    # Looks like you planned 12 tests but ran 8.
-    # Looks like you failed 1 test of 8 run.
-    t/04_plugins/06_plugman/03_irc_interface.t .. 
-    Dubious, test returned 1 (wstat 256, 0x100)
-    Failed 5/12 subtests 
-
-Timeout after 7 tests. That means the plugman bot didn't receive any channel
-messages. Weird.
-
-
-~~~~~~~~
 * FAIL  3425997 5.10.0 on MSWin32 5.1 (MSWin32-x86-multi-thread)
 ~~~~~~~~
 
@@ -68,6 +46,7 @@ something to do with spaces in filenames on Windows?
 
 ~~~~~~~~
 * FAIL  3420198 5.10.0 on Darwin 9.1.0 (darwin-thread-multi-2level)
+* FAIL  3712547 5.8.9 on Linux 2.6.18-92.1.18.el5 (s390x-linux)
 ~~~~~~~~
 
     #   Failed test 'Line 14'
