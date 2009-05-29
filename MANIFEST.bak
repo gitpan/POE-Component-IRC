@@ -22,7 +22,6 @@ inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
 inc/Module/Install/Fetch.pm
-inc/Module/Install/GithubMeta.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install/Win32.pm
@@ -63,12 +62,11 @@ lib/POE/Component/IRC/State.pm
 lib/POE/Filter/IRC.pm
 lib/POE/Filter/IRC/Compat.pm
 LICENSE
-Makefile
 Makefile.PL
 MANIFEST			This list of files
-MANIFEST.bak
 META.yml
 README
+TODO
 t/01_base/01_compile.t
 t/01_base/02_filters.t
 t/01_base/03_common.t
@@ -146,7 +144,6 @@ t/inc/POE/Component/Server/IRC/Common.pm
 t/inc/POE/Component/Server/IRC/OperServ.pm
 t/inc/POE/Component/Server/IRC/Pipeline.pm
 t/inc/POE/Component/Server/IRC/Plugin.pm
-TODO
 xt/perl_critic.t
 xt/perl_critic_t.t
 xt/perlcriticrc

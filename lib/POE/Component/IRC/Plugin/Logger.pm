@@ -12,7 +12,7 @@ use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting irc_to_utf8);
 use POSIX qw(strftime);
 
-our $VERSION = '6.06';
+our $VERSION = '6.08';
 
 sub new {
     my ($package) = shift;
@@ -435,6 +435,7 @@ logs public, private, and DCC chat messages to disk
 
  $irc->plugin_add('Logger', POE::Component::IRC::Plugin::Logger->new(
      Path    => '/home/me/irclogs',
+     DCC     => 0,
      Private => 0,
      Public  => 1,
  ));

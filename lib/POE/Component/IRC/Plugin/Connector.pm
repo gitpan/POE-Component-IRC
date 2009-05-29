@@ -6,7 +6,7 @@ use Carp;
 use POE;
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '6.06';
+our $VERSION = '6.08';
 
 sub new {
     my ($package) = shift;
@@ -28,7 +28,8 @@ sub PCI_register {
         ],
     )->ID();
 
-    $irc->plugin_register( $self, 'SERVER', qw(all) );
+    $irc->raw_events(1);
+    $irc->plugin_register( $self, 'SERVER', qw(connected disconnected 001 error socketerr pong raw) );
 
     return 1;
 }
@@ -83,7 +84,7 @@ sub S_pong {
     return PCI_EAT_NONE;
 }
 
-sub _default {
+sub S_raw {
     my ($self,$irc) = splice @_, 0, 2;
     $self->{seen_traffic} = 1;
     return PCI_EAT_NONE;

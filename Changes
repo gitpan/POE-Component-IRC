@@ -1,5 +1,12 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.08 Fri May 29 11:46:45 GMT 2009
+    - CTCP.pm: Return an RFC822 date in response to CTCP TIME (Hinrik)
+    - BotCommand.pm: Fix RT #46065, help message wasn't being printed (Hinrik)
+    - Connector.pm: Make the traffic-noticing code more accurate (Hinrik)
+    - PlugMan.pm: Allow custom auth checks for the IRC interface (Hinrik)
+    - PlugMan.pm: Silence some warnings (bingos)
+
 6.06 Thu Apr 30 12:05:04 GMT 2009
     - NickServID.pm: Update a paragraph in the Pod (Hinrik)
     - State.pm: Don't delete all state in S_(error|socketerr|disconnected)

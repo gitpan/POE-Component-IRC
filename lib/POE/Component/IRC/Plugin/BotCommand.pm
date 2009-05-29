@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Common qw( parse_user );
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '6.06';
+our $VERSION = '6.08';
 
 sub new {
     my ($package) = shift;
@@ -22,10 +22,10 @@ sub new {
 sub PCI_register {
     my ($self, $irc) = splice @_, 0, 2;
     
-    $self->{Addressed} = 1 if !defined $self->{Addressed};
-    $self->{Prefix} = '!' if !defined $self->{Prefix};
-    $self->{In_channels} = 1 if !defined $self->{In_channels};
-    $self->{In_private} = 1 if !defined $self->{In_private};
+    $self->{Addressed}     = 1 if !defined $self->{Addressed};
+    $self->{Prefix}        = '!' if !defined $self->{Prefix};
+    $self->{In_channels}   = 1 if !defined $self->{In_channels};
+    $self->{In_private}    = 1 if !defined $self->{In_private};
     $self->{irc} = $irc;
     
     $irc->plugin_register( $self, 'SERVER', qw(msg public) );
@@ -95,22 +95,25 @@ sub _handle_cmd {
         $irc->send_event("irc_botcmd_$cmd" => $who, $where, $args);
     }
     elsif ($cmd =~ /^help$/i) {
-        my @help = $self->_get_help($cmd);
+        my @help = $self->_get_help($args);
         $irc->yield(notice => $where => $_) for @help;
     }
     else {
-        return;
+        return if $self->{Ignore_unknown};
+        my @help = $self->_get_help($cmd);
+        $irc->yield(notice => $where => $_) for @help;
     }
 
     return 1;
 }
 
 sub _get_help {
-    my ($self, $cmd) = @_;
+    my ($self, $args) = @_;
     my $irc = $self->{irc};
     
     my @help;
-    if (defined $cmd) {
+    if (defined $args) {
+        my $cmd = (split /\s+/, $args, 2)[0];
         if (exists $self->{Commands}->{$cmd}) {
             @help = split /\015?\012/, $self->{Commands}->{$cmd};
         }
@@ -120,8 +123,13 @@ sub _get_help {
         }
     }
     else {
-        push @help, 'Commands: ' . join ', ', keys %{ $self->{Commands} };
-        push @help, 'You can do: /msg ' . $irc->nick_name() . ' help <command>';
+        if (keys %{ $self->{Commands} }) {
+            push @help, 'Commands: ' . join ', ', keys %{ $self->{Commands} };
+            push @help, 'You can do: /msg ' . $irc->nick_name() . ' help <command>';
+        }
+        else {
+            push @help, 'No commands are defined';
+        }
     }
 
     return @help;
@@ -271,6 +279,9 @@ B<'Prefix'>, if B<'Addressed'> is false, all channel commands must be prefixed
 with this string. Default is '!'. You can set it to '' to allow bare channel
 commands.
 
+B<'Ignore_unknown'>, if true, the plugin will ignore undefined commands,
+rather than printing a help message upon receiving them. Default is false.
+
 B<'Eat'>, set to true to make the plugin hide
 L<C<irc_public>|POE::Component::IRC/"irc_public"> events from other plugins if
 they contain a valid command. Default is false.
@@ -305,6 +316,36 @@ user who issued the command. C<ARG1> is the name of the channel in which the
 command was issued, or the sender's nickname if this was a private message.
 If the command was followed by any arguments, C<ARG2> will be a string
 containing them, otherwise it will be undefined.
+
+=head1 TODO
+
+Add permissions/authorization. E.g. allow the user to specify if commands are
+only available ops, or only to users matching some IRC masks, etc.
+
+It would have to support permissions/auth on a per-command level, so that
+a bot can get by with a single BotCommand plugin, with respect to easily
+listing the available commands in a help message. Maybe augmenting the
+C<add()> method to accept an optional hash reference argument detailing
+authorization requirements is appropriate here. I suppose plugins that call
+C<add()> to add new commands should accept a hash reference like that as an
+B<'auth'> argument to their constructor.
+
+I considered having the auth settings apply to all commands, and using
+multiple BotCommand plugins to group commands by who is allowed to issue them,
+but this approach is more complex if we want the bot to complain about
+undefined commands, or when someone wants a list of all commands. Plugins
+which define new commands would accept a B<'botcmd'> parameter to choose which
+BotCommand plugin they should call C<add()>/C<remove()> on.
+
+Some prior art to consider:
+
+=over 4
+
+=item L<POE::Component::IRC::Plugin::BaseWrap|POE::Component::IRC::PluginBaseWrap>
+
+=item L<Bot::BasicBot::Pluggable::Module::Auth|Bot::BasicBot::Pluggable::Module::Auth> 
+
+=back
 
 =head1 AUTHOR
 

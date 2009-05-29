@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( matches_mask parse_user );
 
-our $VERSION = '6.06';
+our $VERSION = '6.08';
 
 BEGIN { 
     # Turn on the debugger's symbol source tracing
@@ -87,7 +87,7 @@ sub S_public {
     my $me      = $irc->nick_name();
 
     my ($command) = $what =~ m/^\s*\Q$me\E[:,;.!?~]?\s*(.*)$/i;
-    return PCI_EAT_NONE if !$command || !matches_mask($self->{botowner}, $who);
+    return PCI_EAT_NONE if !$command || !$self->_authed($who, $channel);
 
     my (@cmd) = split(/ +/, $command);
     my $cmd = uc (shift @cmd);
@@ -108,7 +108,7 @@ sub S_msg {
     my (@cmd)   = split(/ +/,$command);
     my $cmd     = uc (shift @cmd);
     
-    return PCI_EAT_NONE if !matches_mask($self->{botowner}, $who);
+    return PCI_EAT_NONE if !$self->_authed($who, $channel);
     
     if (defined $self->{commands}->{$cmd}) {
         $self->{commands}->{$cmd}->($self, 'notice', $nick, @cmd);
@@ -178,7 +178,7 @@ sub unload {
 
 sub _unload_subs {
     my $self = shift;
-    my $file = shift;
+    my $file = shift || return;
 
     for my $sym ( grep { index( $_, "$file:" ) == 0 } keys %DB::sub ) {
         eval { undef &$sym };
@@ -186,7 +186,7 @@ sub _unload_subs {
         delete $DB::sub{$sym};
     }
 
-    return $self;
+    return 1;
 }
 
 sub reload {
@@ -206,6 +206,14 @@ sub reload {
 sub loaded {
     my $self = shift;
     return keys %{ $self->{plugins} };
+}
+
+sub _authed {
+    my ($self, $who, $chan) = @_;
+
+    return $self->{auth_sub}->($self->{irc}, $who, $chan) if $self->{auth_sub};
+    return 1 if matches_mask($self->{botowner}, $who);
+    return;
 }
 
 1;
@@ -262,10 +270,17 @@ Takes two optional arguments:
 
 B<'botowner'>, an IRC mask to match against for people issuing commands via the
 IRC interface;
+
+B<'auth_sub'>, a sub reference which will be called to determine if a user
+may issue commands via the IRC interface. Overrides B<'botowner'>. It will be
+called with three arguments: the IRC component object, the nick!user@host and
+the channel name as arguments. It should return a true value if the user is
+authorized, a false one otherwise.
  
 B<'debug'>, set to a true value to see when stuff goes wrong;
 
-Not setting a B<'botowner'> effectively disables the IRC interface. 
+Not setting B<'botowner'> or B<'auth_sub'> effectively disables the IRC
+interface.
 
 If B<'botowner'> is specified the plugin checks that it is being loaded into a
 L<POE::Component::IRC::State|POE::Component::IRC::State> or sub-class and will
