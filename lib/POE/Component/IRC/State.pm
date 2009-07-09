@@ -7,7 +7,7 @@ use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.08';
+our $VERSION = '6.09_01';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our
 # namespace. u_irc() is used to create unique keys.
@@ -77,7 +77,15 @@ sub S_join {
         }
     }
     else {
-        if ( (!exists $self->{whojoiners} || $self->{whojoiners})
+        if ( exists $self->{NETSPLIT}->{Chans}->{ $uchan }->{NICKS}->{ $unick } ) {
+            # restore state from NETSPLIT
+            $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick } = 
+              delete $self->{NETSPLIT}->{Chans}->{ $uchan }->{NICKS}->{ $unick };
+            $self->{STATE}->{Nicks}->{ $unick } = 
+              delete $self->{NETSPLIT}->{Nicks}->{ $unick }
+              if exists $self->{NETSPLIT}->{Nicks}->{ $unick };
+        }
+        elsif ( (!exists $self->{whojoiners} || $self->{whojoiners})
             && !exists $self->{STATE}->{Nicks}->{ $unick }->{Real}) {
                 $self->yield(who => $nick);
                 push @{ $self->{NICK_SYNCH}->{ $unick } }, $chan;
@@ -133,31 +141,34 @@ sub S_quit {
     my $nick  = (split /!/, ${ $_[0] })[0];
     my $msg   = ${ $_[1] };
     my $unick = u_irc($nick, $map);
+    my $netsplit = 0;
 
     push @{ $_[-1] }, [ $self->nick_channels( $nick ) ];
 
     # Check if it is a netsplit
-#    if ($msg) {
-#        SWITCH: {
-#            my @args = split /\x20/, $msg;
-#            if ( @args != 2 ) {
-#                last SWITCH;
-#           }
-#        }
-#    }
+    $netsplit = 1 if _is_netsplit( $msg );
 
     if ($unick eq u_irc($self->nick_name(), $map)) {
         delete $self->{STATE};
     }
     else {
         for my $uchan ( keys %{ $self->{STATE}->{Nicks}->{ $unick }->{CHANS} } ) {
-            delete $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick };
+            my $chanstate = delete $self->{STATE}->{Chans}->{ $uchan }->{Nicks}->{ $unick };
+            $self->{NETSPLIT}->{Chans}->{ $uchan }->{NICKS}->{ $unick } = $chanstate
+              if $netsplit;
         }
         
-        delete $self->{STATE}->{Nicks}->{ $unick };
+        my $nickstate = delete $self->{STATE}->{Nicks}->{ $unick };
+        $self->{NETSPLIT}->{Nicks}->{ $unick } = $nickstate if $netsplit;
     }
 
     return PCI_EAT_NONE;
+}
+
+sub _is_netsplit {
+  my $msg = shift || return;
+  return 1 if $msg =~ /^\s*\S+\.[a-z]{2,} \S+\.[a-z]{2,}$/i;
+  return 0;
 }
 
 sub S_kick {
