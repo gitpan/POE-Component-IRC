@@ -7,7 +7,7 @@ use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.09_04';
+our $VERSION = '6.09_05';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our
 # namespace. u_irc() is used to create unique keys.
@@ -85,6 +85,7 @@ sub S_join {
             my $nuser = delete $self->{NETSPLIT}->{Users}->{ $netsplit };
             if ( ( time - $nuser->{stamp} ) < ( 60 * 60 ) ) {
               $self->{STATE}->{Nicks}->{ $unick } = $nuser->{meta};
+              $self->_send_event(irc_nick_sync => $nick, $chan);
               last SWITCH;
             }
         }
