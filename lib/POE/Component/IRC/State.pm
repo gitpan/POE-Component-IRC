@@ -7,7 +7,7 @@ use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.09_06';
+our $VERSION = '6.09_07';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our
 # namespace. u_irc() is used to create unique keys.
@@ -1456,7 +1456,7 @@ The component gathers information by registering for C<irc_quit>, C<irc_nick>,
 C<irc_join>, C<irc_part>, C<irc_mode>, C<irc_kick> and various numeric replies.
 When the component is asked to join a channel, when it joins it will issue
 'WHO #channel', 'MODE #channel', and 'MODE #channel b'. These will solicit
-between them the numerics, >C<irc_352>, C<irc_324> and C<irc_329>, respectively.
+between them the numerics, C<irc_352>, C<irc_324> and C<irc_329>, respectively.
 When someone joins a channel the bot is on, it issues a 'WHO nick'. You may
 want to ignore these. 
 
