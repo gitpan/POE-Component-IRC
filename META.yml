@@ -23,82 +23,82 @@ no_index:
 provides:
   POE::Component::IRC:
     file: lib/POE/Component/IRC.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Common:
     file: lib/POE/Component/IRC/Common.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Constants:
     file: lib/POE/Component/IRC/Constants.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin:
     file: lib/POE/Component/IRC/Plugin.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::AutoJoin:
     file: lib/POE/Component/IRC/Plugin/AutoJoin.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::BotAddressed:
     file: lib/POE/Component/IRC/Plugin/BotAddressed.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::BotCommand:
     file: lib/POE/Component/IRC/Plugin/BotCommand.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::BotTraffic:
     file: lib/POE/Component/IRC/Plugin/BotTraffic.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::CTCP:
     file: lib/POE/Component/IRC/Plugin/CTCP.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::Connector:
     file: lib/POE/Component/IRC/Plugin/Connector.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::Console:
     file: lib/POE/Component/IRC/Plugin/Console.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::CycleEmpty:
     file: lib/POE/Component/IRC/Plugin/CycleEmpty.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::DCC:
     file: lib/POE/Component/IRC/Plugin/DCC.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::FollowTail:
     file: lib/POE/Component/IRC/Plugin/FollowTail.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::ISupport:
     file: lib/POE/Component/IRC/Plugin/ISupport.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::Logger:
     file: lib/POE/Component/IRC/Plugin/Logger.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::NickReclaim:
     file: lib/POE/Component/IRC/Plugin/NickReclaim.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::NickServID:
     file: lib/POE/Component/IRC/Plugin/NickServID.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::PlugMan:
     file: lib/POE/Component/IRC/Plugin/PlugMan.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::Proxy:
     file: lib/POE/Component/IRC/Plugin/Proxy.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Plugin::Whois:
     file: lib/POE/Component/IRC/Plugin/Whois.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Qnet:
     file: lib/POE/Component/IRC/Qnet.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::Qnet::State:
     file: lib/POE/Component/IRC/Qnet/State.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Component::IRC::State:
     file: lib/POE/Component/IRC/State.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Filter::IRC:
     file: lib/POE/Filter/IRC.pm
-    version: 6.09_10
+    version: 6.09_11
   POE::Filter::IRC::Compat:
     file: lib/POE/Filter/IRC/Compat.pm
-    version: 6.09_10
+    version: 6.09_11
 requires:
   Encode: 0
   Encode::Guess: 0
@@ -116,4 +116,4 @@ resources:
   homepage: http://github.com/bingos/poe-component-irc/tree
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.09_10
+version: 6.09_11
