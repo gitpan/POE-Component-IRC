@@ -9,7 +9,7 @@ use POE qw(Driver::SysRW Filter::Line Filter::Stream
 use POE::Component::IRC::Plugin qw(:ALL);
 use Socket;
 
-our $VERSION = '6.10';
+our $VERSION = '6.11_01';
 
 use constant {
     OUT_BLOCKSIZE  => 1024,   # Send DCC data in 1k chunks
@@ -188,9 +188,6 @@ sub _U_dcc {
     }
     
     $bindaddr = $irc->localaddr();
-    if ($bindaddr && $bindaddr =~ tr/a-zA-Z.//) {
-        $bindaddr = inet_aton($bindaddr);
-    }
 
     if ($self->{dccports}) {
         $bindport = shift @{ $self->{dccports} };
