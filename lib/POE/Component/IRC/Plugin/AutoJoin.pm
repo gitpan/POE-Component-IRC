@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw(:ALL);
 use POE::Component::IRC::Common qw(parse_user l_irc);
 
-our $VERSION = '6.11_01';
+our $VERSION = '6.12';
 
 sub new {
     my ($package) = shift;
@@ -111,7 +111,7 @@ sub S_join {
     my $chan   = ${ $_[1] };
     my $lchan  = l_irc($chan, $irc->isupport('MAPPING'));
 
-    return if $joiner ne $irc->nick_name();
+    return PCI_EAT_NONE if $joiner ne $irc->nick_name();
 
     if (defined $self->{tried_keys}{$lchan}) {
         $self->{Channels}->{$lchan} = $self->{tried_keys}{$lchan};
