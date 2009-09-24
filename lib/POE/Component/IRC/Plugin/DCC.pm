@@ -9,7 +9,7 @@ use POE qw(Driver::SysRW Filter::Line Filter::Stream
 use POE::Component::IRC::Plugin qw(:ALL);
 use Socket;
 
-our $VERSION = '6.12';
+our $VERSION = '6.14';
 
 use constant {
     OUT_BLOCKSIZE  => 1024,   # Send DCC data in 1k chunks
@@ -143,7 +143,7 @@ sub S_dcc_request {
 # namely create wheels and set alarms/delays
 sub _default {
     my ($self, $irc, $event) = splice @_, 0, 3;
-    return if $event !~ /^U_dcc(_accept|_chat|_close|_resume)?$/;
+    return PCI_EAT_NONE if $event !~ /^U_dcc(_accept|_chat|_close|_resume)?$/;
     $event =~ s/^U_/_U_/;
     my @args = map { $$_ } @_;
     $poe_kernel->call($self->{session_id}, $event, @args);

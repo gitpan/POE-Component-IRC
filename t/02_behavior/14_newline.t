@@ -21,10 +21,6 @@ my $ircd = POE::Component::Server::IRC->spawn(
     AntiFlood => 0,
 );
 
-$bot2->plugin_add(AutoJoin => POE::Component::IRC::Plugin::AutoJoin->new(
-    Retry_when_banned => 1,
-));
-
 POE::Session->create(
     package_states => [
         main => [qw(
@@ -33,9 +29,8 @@ POE::Session->create(
             _shutdown 
             irc_001 
             irc_join
+            irc_public
             irc_disconnected
-            irc_chan_mode
-            irc_474
         )],
     ],
 );
@@ -87,45 +82,39 @@ sub _config_ircd {
 sub irc_001 {
     my $irc = $_[SENDER]->get_heap();
     pass('Logged in');
-    
-    if ($irc == $bot1) {
-        $irc->yield(join => '#testchannel');
-    }
+    $irc->yield(join => '#testchannel');
 }
 
 sub irc_join {
-    my ($sender, $who, $where) = @_[SENDER, ARG0, ARG1];
+    my ($sender, $heap, $who, $where) = @_[SENDER, HEAP, ARG0, ARG1];
     my $nick = ( split /!/, $who )[0];
     my $irc = $sender->get_heap();
     
     return if $nick ne $irc->nick_name();
     is($where, '#testchannel', 'Joined Channel Test');
 
-    if ($nick eq 'TestBot1') {
-        $irc->yield(mode => $where, '+b TestBot2!*@*');
+    $heap->{joined}++;
+    return if $heap->{joined} != 2;
+
+    $irc->yield(quote => "PRIVMSG $where :one\nPRIVMSG $where :two");
+    $irc->yield(privmsg => $where, "foo\nbar");
+}
+
+sub irc_public {
+    my ($heap, $msg) = @_[HEAP, ARG2];
+
+    $heap->{got_msg}++;
+    if ($heap->{got_msg} == 1) {
+        is($msg, 'one', 'First message');
     }
-    else {
+    elsif ($heap->{got_msg} == 2) {
+        is($msg, 'foo', 'Second message');
+    }
+    elsif ($heap->{got_msg} == 3) {
+        is($msg, 'bar', 'Third message');
         $bot1->yield('quit');
         $bot2->yield('quit');
     }
-}
-
-sub irc_chan_mode {
-    my ($chan, $mode) = @_[ARG1, ARG2];
-
-    if ($mode eq '+b') {
-        pass('Ban set');
-        $bot2->yield(join => $chan);
-    }
-    elsif ($mode eq '-b') {
-        pass('Ban removed');
-    }
-}
-
-sub irc_474 {
-    my ($chan) = $_[ARG2]->[0];
-    pass("Can't join due to ban");
-    $bot1->yield(mode => $chan, '-b TestBot2!*@*');
 }
 
 sub irc_disconnected {

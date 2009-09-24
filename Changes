@@ -1,5 +1,16 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.14  Thu Sep 24 15:07:05 GMT 2009
+    - More "return" -> "return PCI_EAT_NONE" fixes. This eliminates some
+      harmless (but annoying) warnings. (Hinrik)
+    - State.pm: Fix AwayPoll, which wasn't working at all. Also added a
+      test for it and made the documentation clearer. Thanks to David E.
+      Wheeler for spotting that one. (Hinrik)
+    - IRC.pm: Document which spawn() options can not be passed to the
+      'connect' event. (Hinrik)
+    - IRC.pm: Split PRIVMSGs with newlines into multiple messages. For other
+      commands, don't pass user-supplied newlines through to the IRC server
+      as it allows the user to submit raw IRC commands. (Hinrik)
 
 6.12  Thu Sep 10 09:25:02 BST 2009
     - Fix localaddr() issue reported in RT #48791 by Michael Andreen

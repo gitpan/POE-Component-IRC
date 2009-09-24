@@ -6,7 +6,7 @@ use Socket;
 use POE::Component::IRC::State;
 use POE::Component::IRC::Plugin::AutoJoin;
 use POE::Component::Server::IRC;
-use Test::More tests => 9;
+use Test::More tests => 10;
 
 my $bot1 = POE::Component::IRC::State->spawn(
     Flood        => 1,
@@ -15,15 +15,12 @@ my $bot1 = POE::Component::IRC::State->spawn(
 my $bot2 = POE::Component::IRC::State->spawn(
     Flood        => 1,
     plugin_debug => 1,
+    AwayPoll     => 1,
 );
 my $ircd = POE::Component::Server::IRC->spawn(
     Auth      => 0,
     AntiFlood => 0,
 );
-
-$bot2->plugin_add(AutoJoin => POE::Component::IRC::Plugin::AutoJoin->new(
-    Retry_when_banned => 1,
-));
 
 POE::Session->create(
     package_states => [
@@ -33,9 +30,10 @@ POE::Session->create(
             _shutdown 
             irc_001 
             irc_join
+            irc_chan_sync
+            irc_user_away
+            irc_user_back
             irc_disconnected
-            irc_chan_mode
-            irc_474
         )],
     ],
 );
@@ -86,7 +84,7 @@ sub _config_ircd {
 
 sub irc_001 {
     my $irc = $_[SENDER]->get_heap();
-    pass('Logged in');
+    pass($irc->nick_name . ' logged in');
     
     if ($irc == $bot1) {
         $irc->yield(join => '#testchannel');
@@ -99,38 +97,52 @@ sub irc_join {
     my $irc = $sender->get_heap();
     
     return if $nick ne $irc->nick_name();
-    is($where, '#testchannel', 'Joined Channel Test');
+    is($where, '#testchannel', $irc->nick_name . ' joined channel');
+}
 
-    if ($nick eq 'TestBot1') {
-        $irc->yield(mode => $where, '+b TestBot2!*@*');
+sub irc_chan_sync {
+    my ($sender, $where) = @_[SENDER, ARG0];
+    my $irc = $sender->get_heap();
+
+    is($where, '#testchannel', $irc->nick_name . ' synced channel');
+
+    if ($irc == $bot1) {
+        $bot2->yield(join => $where);
     }
     else {
-        $bot1->yield('quit');
-        $bot2->yield('quit');
+        $bot1->yield(away => "I'm gone now");
+        $bot2->yield(away => "I'm gone now");
     }
 }
 
-sub irc_chan_mode {
-    my ($chan, $mode) = @_[ARG1, ARG2];
+sub irc_user_away {
+    my ($sender, $nick) = @_[SENDER, ARG0];
+    my $irc = $sender->get_heap();
 
-    if ($mode eq '+b') {
-        pass('Ban set');
-        $bot2->yield(join => $chan);
+    if ($irc == $bot1) {
+        fail("Shouldn't get irc_user_away when AwayPoll is off");
     }
-    elsif ($mode eq '-b') {
-        pass('Ban removed');
-    }
+
+    is($nick, $bot1->nick_name(), $bot1->nick_name() .' went away');
+    $bot1->yield('away');
+    $bot2->yield('away');
 }
 
-sub irc_474 {
-    my ($chan) = $_[ARG2]->[0];
-    pass("Can't join due to ban");
-    $bot1->yield(mode => $chan, '-b TestBot2!*@*');
+sub irc_user_back {
+    my ($sender, $nick) = @_[SENDER, ARG0];
+    my $irc = $sender->get_heap();
+
+    if ($irc == $bot1) {
+        fail("Shouldn't get irc_user_back when AwayPoll is off");
+    }
+    
+    is($nick, $bot1->nick_name(), $bot1->nick_name() .' came back');
+    $_->yield('quit') for ($bot1, $bot2);
 }
 
 sub irc_disconnected {
-    my ($kernel, $heap) = @_[KERNEL, HEAP];
-    pass('irc_disconnected');
+    my ($kernel, $heap, $info) = @_[KERNEL, HEAP, ARG1];
+    pass($info->{Nick} . ' disconnected');
     $heap->{count}++;
     $kernel->yield('_shutdown') if $heap->{count} == 2;
 }

@@ -12,7 +12,7 @@ use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting irc_to_utf8);
 use POSIX qw(strftime);
 
-our $VERSION = '6.12';
+our $VERSION = '6.14';
 
 sub new {
     my ($package) = shift;
@@ -307,7 +307,7 @@ sub S_dcc_start {
     my $port = ${ $_[3] };
     my $addr = ${ $_[6] };
 
-    return if $type ne 'CHAT';
+    return PCI_EAT_NONE if $type ne 'CHAT';
     $self->_log_entry("=$nick", dcc_start => $nick, "$addr:$port");
     return PCI_EAT_NONE;
 }
@@ -354,7 +354,7 @@ sub S_dcc_done {
     my $port = ${ $_[3] };
     my $addr = ${ $_[7] };
 
-    return if $type ne 'CHAT';
+    return PCI_EAT_NONE if $type ne 'CHAT';
     $self->_log_entry("=$nick", dcc_done => $nick, "$addr:$port");
     return PCI_EAT_NONE;
 }

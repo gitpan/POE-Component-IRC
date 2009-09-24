@@ -84,10 +84,12 @@ t/02_behavior/10_signal.t
 t/02_behavior/11_multi_signal.t
 t/02_behavior/12_delays.t
 t/02_behavior/13_activity.t
+t/02_behavior/14_newline.t
 t/03_subclasses/01_state.t
 t/03_subclasses/02_qnet.t
 t/03_subclasses/03_qnet_state.t
 t/03_subclasses/04_netsplit.t
+t/03_subclasses/05_state_awaypoll.t
 t/04_plugins/01_ctcp/01_load.t
 t/04_plugins/01_ctcp/02_replies.t
 t/04_plugins/02_connector/01_load.t
@@ -145,7 +147,6 @@ t/inc/POE/Component/Server/IRC/Common.pm
 t/inc/POE/Component/Server/IRC/OperServ.pm
 t/inc/POE/Component/Server/IRC/Pipeline.pm
 t/inc/POE/Component/Server/IRC/Plugin.pm
-TODO
 xt/perl_critic.t
 xt/perl_critic_t.t
 xt/perlcriticrc
