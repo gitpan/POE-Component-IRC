@@ -8,7 +8,7 @@ use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD
            Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 
-our $VERSION = '6.14';
+our $VERSION = '6.16';
 
 sub new {
     my ($package) = shift;
@@ -31,12 +31,12 @@ sub PCI_register {
         $self,
         'SERVER',
         qw(
-            S_connected
-            S_disconnected
-            S_001
-            S_error
-            S_socketerr
-            S_raw
+            connected
+            disconnected
+            001
+            error
+            socketerr
+            raw
         )
     );
 

@@ -24,6 +24,7 @@ my $ircd = POE::Component::Server::IRC->spawn(
 
 $bot2->plugin_add(Logger => POE::Component::IRC::Plugin::Logger->new(
     Path => 'logger_test',
+    Notices => 1,
 ));
 
 my $file = catfile('logger_test', '#testchannel.log');
@@ -32,6 +33,7 @@ unlink $file if -e $file;
 my @correct = (
     qr/^--> TestBot2 \(\S+@\S+\) joins #testchannel$/,
     '<TestBot1> Oh hi',
+    '>TestBot1< Hello',
     '--- TestBot1 disables topic protection',
     '--- TestBot1 enables secret channel status',
     '--- TestBot1 enables channel moderation',
@@ -73,6 +75,12 @@ $poe_kernel->run();
 sub _start {
     my ($kernel) = $_[KERNEL];
 
+    my $ircd_port = get_port() or $kernel->yield(_shutdown => 'No free port');
+    $kernel->yield(_config_ircd => $ircd_port);
+    $kernel->delay(_shutdown => 60, 'Timed out');
+}
+
+sub get_port {
     my $wheel = POE::Wheel::SocketFactory->new(
         BindAddress  => '127.0.0.1',
         BindPort     => 0,
@@ -80,19 +88,13 @@ sub _start {
         FailureEvent => '_fake_failure',
     );
 
-    if ($wheel) {
-        my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
-        $kernel->yield(_config_ircd => $port);
-        $kernel->delay(_shutdown => 60, 'Timed out');
-        return;
-    }
-    
-    $kernel->yield('_shutdown', "Couldn't bind to an unused port on localhost");
+    return (unpack_sockaddr_in($wheel->getsockname))[0] if $wheel;
+    return;
 }
 
 sub _shutdown {
-    my ($kernel, $reason) = @_[KERNEL, ARG0];
-    fail($reason) if defined $reason;
+    my ($kernel, $error) = @_[KERNEL, ARG0];
+    fail($error) if defined $error;
     
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');
@@ -110,7 +112,6 @@ sub _config_ircd {
         nick    => 'TestBot1',
         server  => '127.0.0.1',
         port    => $port,
-        ircname => 'Test test bot',
     });
     
     $bot2->yield(register => 'all');
@@ -118,7 +119,6 @@ sub _config_ircd {
         nick    => 'TestBot2',
         server  => '127.0.0.1',
         port    => $port,
-        ircname => 'Test test bot',
     });
 }
 
@@ -154,6 +154,7 @@ sub irc_join {
 
     if ($irc == $bot2) {
         $bot1->yield(privmsg => $where, 'Oh hi');
+        $bot1->yield(notice => $where, 'Hello');
         $bot1->yield(mode => $where, '-t');
         $bot1->yield(mode => $where, '+s');
         $bot1->yield(mode => $where, '+m');
@@ -166,7 +167,6 @@ sub irc_join {
         $bot1->yield(mode => $where, '+o TestBot2');
 
         $bot1->yield(topic => $where, 'Testing, 1 2 3');
-        $bot1->yield(notice => $where, 'Hello');
         $bot1->yield(nick => 'NewNick');
         $bot1->yield(part => $where);
     }

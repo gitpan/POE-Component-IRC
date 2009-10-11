@@ -6,7 +6,7 @@ use Socket;
 use POE::Component::IRC;
 use POE::Component::IRC::Plugin::CTCP;
 use POE::Component::Server::IRC;
-use Test::More tests => 5;
+use Test::More tests => 6;
 
 my $bot = POE::Component::IRC->spawn(
     Flood        => 1,
@@ -18,9 +18,10 @@ my $ircd = POE::Component::Server::IRC->spawn(
 );
 
 $bot->plugin_add(CTCP => POE::Component::IRC::Plugin::CTCP->new(
-    version  => 'Test version',
-    userinfo => 'Test userinfo',
-    source   => 'Test source',
+    version    => 'Test version',
+    userinfo   => 'Test userinfo',
+    clientinfo => 'Test clientinfo',
+    source     => 'Test source',
 ));
 
 POE::Session->create(
@@ -33,6 +34,7 @@ POE::Session->create(
             irc_disconnected
             irc_ctcpreply_version
             irc_ctcpreply_userinfo
+            irc_ctcpreply_clientinfo
             irc_ctcpreply_source
         )],
     ],
@@ -41,8 +43,14 @@ POE::Session->create(
 $poe_kernel->run();
 
 sub _start {
-    my ($kernel, $heap) = @_[KERNEL, HEAP];
+    my ($kernel) = $_[KERNEL];
 
+    my $ircd_port = get_port() or $kernel->yield(_shutdown => 'No free port');
+    $kernel->yield(_config_ircd => $ircd_port);
+    $kernel->delay(_shutdown => 60, 'Timed out');
+}
+
+sub get_port {
     my $wheel = POE::Wheel::SocketFactory->new(
         BindAddress  => '127.0.0.1',
         BindPort     => 0,
@@ -50,14 +58,8 @@ sub _start {
         FailureEvent => '_fake_failure',
     );
 
-    if ($wheel) {
-        my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
-        $kernel->yield(_config_ircd => $port);
-        $kernel->delay(_shutdown => 60, 'Timed out');
-        return;
-    }
-
-    $kernel->yield('_shutdown', "Couldn't bind to an unused port on localhost");
+    return (unpack_sockaddr_in($wheel->getsockname))[0] if $wheel;
+    return;
 }
 
 sub _config_ircd {
@@ -70,7 +72,6 @@ sub _config_ircd {
         nick    => 'TestBot1',
         server  => '127.0.0.1',
         port    => $port,
-        ircname => 'Test test bot',
     });
 }
 
@@ -79,6 +80,7 @@ sub irc_001 {
     pass('Logged in');
     $irc->yield(ctcp => $irc->nick_name(), 'VERSION');
     $irc->yield(ctcp => $irc->nick_name(), 'USERINFO');
+    $irc->yield(ctcp => $irc->nick_name(), 'CLIENTINFO');
     $irc->yield(ctcp => $irc->nick_name(), 'SOURCE');
 }
 
@@ -86,21 +88,28 @@ sub irc_ctcpreply_version {
     my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
     $heap->{replies}++;
     is($msg, 'Test version', 'CTCP VERSION reply');
-    $sender->get_heap()->yield('quit') if $heap->{replies} == 3;
+    $sender->get_heap()->yield('quit') if $heap->{replies} == 4;
 }
 
 sub irc_ctcpreply_userinfo {
     my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
     $heap->{replies}++;
     is($msg, 'Test userinfo', 'CTCP USERINFO reply');
-    $sender->get_heap()->yield('quit') if $heap->{replies} == 3;
+    $sender->get_heap()->yield('quit') if $heap->{replies} == 4;
+}
+
+sub irc_ctcpreply_clientinfo {
+    my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
+    $heap->{replies}++;
+    is($msg, 'Test clientinfo', 'CTCP CLIENTINFO reply');
+    $sender->get_heap()->yield('quit') if $heap->{replies} == 4;
 }
 
 sub irc_ctcpreply_source {
     my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
     $heap->{replies}++;
     is($msg, 'Test source', 'CTCP SOURCE reply');
-    $sender->get_heap()->yield('quit') if $heap->{replies} == 3;
+    $sender->get_heap()->yield('quit') if $heap->{replies} == 4;
 }
 
 sub irc_disconnected {
@@ -110,8 +119,8 @@ sub irc_disconnected {
 }
 
 sub _shutdown {
-    my ($kernel, $reason) = @_[KERNEL, ARG0];
-    fail($reason) if defined $reason;
+    my ($kernel, $error) = @_[KERNEL, ARG0];
+    fail($error) if defined $error;
     
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');

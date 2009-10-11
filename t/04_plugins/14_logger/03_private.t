@@ -24,6 +24,7 @@ my $ircd = POE::Component::Server::IRC->spawn(
 
 $bot2->plugin_add(Logger => POE::Component::IRC::Plugin::Logger->new(
     Path => 'logger_test',
+    Notices => 1,
 ));
 
 my $file = catfile('logger_test', 'testbot1.log');
@@ -34,6 +35,8 @@ my @correct = (
     '<TestBot2> Hi yourself',
     '* TestBot1 is talking',
     '* TestBot2 is too',
+    '>TestBot1< This is a notice',
+    '>TestBot2< So is this',
 );
 
 plan tests => 8 + @correct;
@@ -47,6 +50,7 @@ POE::Session->create(
             irc_001
             irc_msg
             irc_ctcp_action
+            irc_notice
             irc_disconnected
         )],
     ],
@@ -57,6 +61,12 @@ $poe_kernel->run();
 sub _start {
     my ($kernel) = $_[KERNEL];
 
+    my $ircd_port = get_port() or $kernel->yield(_shutdown => 'No free port');
+    $kernel->yield(_config_ircd => $ircd_port);
+    $kernel->delay(_shutdown => 60, 'Timed out');
+}
+
+sub get_port {
     my $wheel = POE::Wheel::SocketFactory->new(
         BindAddress  => '127.0.0.1',
         BindPort     => 0,
@@ -64,19 +74,13 @@ sub _start {
         FailureEvent => '_fake_failure',
     );
 
-    if ($wheel) {
-        my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
-        $kernel->yield(_config_ircd => $port);
-        $kernel->delay(_shutdown => 60, 'Timed out');
-        return;
-    }
-    
-    $kernel->yield('_shutdown', "Couldn't bind to an unused port on localhost");
+    return (unpack_sockaddr_in($wheel->getsockname))[0] if $wheel;
+    return;
 }
 
 sub _shutdown {
-    my ($kernel, $reason) = @_[KERNEL, ARG0];
-    fail($reason) if defined $reason;
+    my ($kernel, $error) = @_[KERNEL, ARG0];
+    fail($error) if defined $error;
     
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');
@@ -94,7 +98,6 @@ sub _config_ircd {
         nick    => 'TestBot1',
         server  => '127.0.0.1',
         port    => $port,
-        ircname => 'Test test bot',
     });
     
     $bot2->yield(register => 'all');
@@ -102,7 +105,6 @@ sub _config_ircd {
         nick    => 'TestBot2',
         server  => '127.0.0.1',
         port    => $port,
-        ircname => 'Test test bot',
     });
 }
 
@@ -141,6 +143,19 @@ sub irc_ctcp_action {
         $heap->{msg}++;
     }
     elsif ($heap->{msg} == 4) {
+        $bot1->yield(notice => $bot2->nick_name(), 'This is a notice');
+        $heap->{msg}++;
+    }
+}
+
+sub irc_notice {
+    my $heap = $_[HEAP];
+
+    if ($heap->{msg} == 5) {
+        $bot2->yield(notice => $bot1->nick_name(), 'So is this');
+        $heap->{msg}++;
+    }
+    elsif ($heap->{msg} == 6) {
         $bot1->yield('quit');
         $bot2->yield('quit');
     }

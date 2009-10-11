@@ -16,7 +16,7 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '6.14';
+our $VERSION = '6.16';
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -647,7 +647,7 @@ sub commasep {
         $args .= ' ' . join ',', @args;
     }
     elsif ( $state eq 'part' and @args > 1 ) {
-        my $chantypes = join('', @{ $self->isupport('CHANTYPES') }) || '#&';
+        my $chantypes = join('', @{ $self->isupport('CHANTYPES') || ['#', '&']});
         my $message;
         if ($args[-1] =~ / +/ || $args[-1] !~ /^[$chantypes]/) {
             $message = pop @args;

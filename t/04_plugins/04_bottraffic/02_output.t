@@ -6,7 +6,7 @@ use POE::Component::IRC;
 use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::Server::IRC;
 use Socket;
-use Test::More tests => 6;
+use Test::More tests => 7;
 
 my $bot = POE::Component::IRC->spawn(
     Flood        => 1,
@@ -30,6 +30,7 @@ POE::Session->create(
             irc_bot_public
             irc_bot_msg
             irc_bot_action
+            irc_bot_notice
         )],
     ],
 );
@@ -37,8 +38,14 @@ POE::Session->create(
 $poe_kernel->run();
 
 sub _start {
-    my ($kernel, $heap) = @_[KERNEL, HEAP];
+    my ($kernel) = $_[KERNEL];
 
+    my $ircd_port = get_port() or $kernel->yield(_shutdown => 'No free port');
+    $kernel->yield(_config_ircd => $ircd_port);
+    $kernel->delay(_shutdown => 60, 'Timed out');
+}
+
+sub get_port {
     my $wheel = POE::Wheel::SocketFactory->new(
         BindAddress  => '127.0.0.1',
         BindPort     => 0,
@@ -46,14 +53,8 @@ sub _start {
         FailureEvent => '_fake_failure',
     );
 
-    if ($wheel) {
-        my $port = ( unpack_sockaddr_in( $wheel->getsockname ) )[0];
-        $kernel->yield(_config_ircd => $port);
-        $kernel->delay(_shutdown => 60, 'Timed out');
-        return;
-    }
-    
-    $kernel->yield('_shutdown', "Couldn't bind to an unused port on localhost");
+    return (unpack_sockaddr_in($wheel->getsockname))[0] if $wheel;
+    return;
 }
 
 sub _config_ircd {
@@ -66,7 +67,6 @@ sub _config_ircd {
         nick    => 'TestBot1',
         server  => '127.0.0.1',
         port    => $port,
-        ircname => 'Test test bot',
     });
 }
 
@@ -82,11 +82,11 @@ sub irc_join {
     my $irc = $sender->get_heap();
 
     pass('Joined channel');
-    $irc->yield(privmsg => '#testchannel', 'A public message');
+    $irc->yield(privmsg => $where, 'A public message');
 }
 
 sub irc_bot_public {
-    my ($sender, $targets, $text) = @_[SENDER, ARG0, ARG1];
+    my ($sender, $text) = @_[SENDER, ARG1];
     my $irc = $sender->get_heap();
 
     is($text, 'A public message', 'irc_bot_public');
@@ -94,7 +94,7 @@ sub irc_bot_public {
 }
 
 sub irc_bot_msg {
-    my ($sender, $targets, $text) = @_[SENDER, ARG0, ARG1];
+    my ($sender, $text) = @_[SENDER, ARG1];
     my $irc = $sender->get_heap();
 
     is($text, 'A private message', 'irc_bot_msg');
@@ -102,10 +102,18 @@ sub irc_bot_msg {
 }
 
 sub irc_bot_action {
-    my ($sender, $targets, $text) = @_[SENDER, ARG0, ARG1];
+    my ($sender, $text) = @_[SENDER, ARG1];
     my $irc = $sender->get_heap();
 
     is($text, 'some action', 'irc_bot_action');
+    $irc->yield(notice => 'TestBot1', 'some notice');
+}
+
+sub irc_bot_notice {
+    my ($sender, $text) = @_[SENDER, ARG1];
+    my $irc = $sender->get_heap();
+
+    is($text, 'some notice', 'irc_bot_action');
     $irc->yield('quit');
 }
 
@@ -116,8 +124,8 @@ sub irc_disconnected {
 }
 
 sub _shutdown {
-    my ($kernel, $reason) = @_[KERNEL, ARG0];
-    fail($reason) if defined $reason;
+    my ($kernel, $error) = @_[KERNEL, ARG0];
+    fail($error) if defined $error;
     
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');
