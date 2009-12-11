@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.18  Fri Dec 11 19:23:24 GMT 2009
+    - NickReclaim.pm: Reclaim nick immediately when possible (Hinrik)
+    - Depend on POE::Filter::IRCD 2.42. Fixes parsing of 005 numeric replies
+      from some servers (Hinrik)
+
 6.16  Sun Oct 11 08:57:18 GMT 2009
     - BotTraffic.pm: Emit 'irc_bot_notice' events for bot notices (Hinrik)
     - Logger.pm: Log NOTICEs if requested (Hinrik)

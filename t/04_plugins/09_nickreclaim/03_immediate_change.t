@@ -4,37 +4,40 @@ use lib 't/inc';
 use POE qw(Wheel::SocketFactory);
 use Socket;
 use POE::Component::IRC;
-use POE::Component::IRC::Plugin::BotAddressed;
+use POE::Component::IRC::Plugin::NickReclaim;
 use POE::Component::Server::IRC;
 use Test::More tests => 9;
 
 my $bot1 = POE::Component::IRC->spawn(
     Flood        => 1,
     plugin_debug => 1,
+    alias        => 'bot1',
 );
 my $bot2 = POE::Component::IRC->spawn(
     Flood        => 1,
     plugin_debug => 1,
+    alias        => 'bot2',
 );
 my $ircd = POE::Component::Server::IRC->spawn(
     Auth      => 0,
     AntiFlood => 0,
 );
 
-$bot2->plugin_add(BotAddressed => POE::Component::IRC::Plugin::BotAddressed->new());
+$bot2->plugin_add(NickReclaim => POE::Component::IRC::Plugin::NickReclaim->new(
+    poll => 65,     # longer than the test timeout
+));
 
 POE::Session->create(
     package_states => [
         main => [qw(
             _start
-            _config_ircd 
-            _shutdown 
+            _config_ircd
+            _shutdown
             irc_001
-            irc_disconnected
+            irc_433
             irc_join
-            irc_bot_addressed
-            irc_bot_mentioned
-            irc_bot_mentioned_action
+            irc_nick
+            irc_disconnected
         )],
     ],
 );
@@ -63,20 +66,14 @@ sub get_port {
 }
 
 sub _config_ircd {
-    my ($kernel, $port) = @_[KERNEL, ARG0];
+    my ($kernel, $heap, $port) = @_[KERNEL, HEAP, ARG0];
+    $heap->{port} = $port;
 
     $ircd->yield(add_listener => Port => $port);
-    
+
     $bot1->yield(register => 'all');
     $bot1->yield(connect => {
         nick    => 'TestBot1',
-        server  => '127.0.0.1',
-        port    => $port,
-    });
-  
-    $bot2->yield(register => 'all');
-    $bot2->yield(connect => {
-        nick    => 'TestBot2',
         server  => '127.0.0.1',
         port    => $port,
     });
@@ -84,52 +81,55 @@ sub _config_ircd {
 
 sub irc_001 {
     my $irc = $_[SENDER]->get_heap();
-    pass($irc->nick_name() . ' logged in');
+    pass($irc->session_alias() . ' (nick=' . $irc->nick_name() .') logged in');
     $irc->yield(join => '#testchannel');
 }
 
 sub irc_join {
-    my ($sender, $heap, $who, $where) = @_[SENDER, HEAP, ARG0, ARG1];
-    my $nick = (split /!/, $who)[0];
+    my ($sender, $who, $where) = @_[SENDER, ARG0, ARG1];
+    my $nick = ( split /!/, $who )[0];
     my $irc = $sender->get_heap();
 
     return if $nick ne $irc->nick_name();
-    $heap->{joined}++;
-    pass($irc->nick_name() . ' joined channel');
-    return if $heap->{joined} != 2;
-    
-    $bot1->yield(privmsg => $where, $bot2->nick_name . ': y halo thar');
-    $bot1->yield(privmsg => $where, 'y halo thar, ' . $bot2->nick_name());
-    $bot1->yield(ctcp => $where, 'ACTION greets ' . $bot2->nick_name());
+    pass($irc->session_alias().' (nick='.$irc->nick_name().") joined $where");
+
+    if ($irc == $bot1) {
+        $bot2->yield(register => 'all');
+        $bot2->yield(connect => {
+            nick    => 'TestBot1',
+            server  => '127.0.0.1',
+            port    => $_[HEAP]->{port},
+        });
+    }
+    else {
+        $bot1->yield(nick => 'TestBot2');
+    }
 }
 
-sub irc_bot_addressed {
-    my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
-    my $irc = $sender->get_heap();
-
-    is($msg, 'y halo thar', 'irc_bot_addressed');
+sub irc_433 {
+    my $irc = $_[SENDER]->get_heap();
+    pass($irc->session_alias . ' (nick=' . $irc->nick_name() .') nick collision');
 }
 
-sub irc_bot_mentioned {
-    my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
+sub irc_nick {
+    my ($sender, $new_nick) = @_[SENDER, ARG1];
     my $irc = $sender->get_heap();
 
-    is($msg, 'y halo thar, ' . $irc->nick_name(), 'irc_bot_mentioned');
-}
-
-sub irc_bot_mentioned_action {
-    my ($sender, $heap, $msg) = @_[SENDER, HEAP, ARG2];
-    my $irc = $sender->get_heap();
-
-    is($msg, 'greets ' . $irc->nick_name(), 'irc_bot_mentioned_action');
-
-    $bot1->yield('quit');
-    $bot2->yield('quit');
+    if ($irc == $bot1 && $new_nick eq 'TestBot2') {
+        pass($irc->session_alias().' (nick='.$irc->nick_name().') changed nicks');
+    }
+    elsif ($irc == $bot2 && $new_nick eq 'TestBot1') {
+        pass($irc->session_alias().' (nick='.$irc->nick_name().') reclaimed nick');
+        $bot1->yield('quit');
+        $bot2->yield('quit');
+    }
 }
 
 sub irc_disconnected {
-    my ($kernel, $heap) = @_[KERNEL, HEAP];
-    pass('irc_disconnected');
+    my ($kernel, $sender, $heap) = @_[KERNEL, SENDER, HEAP];
+    my $irc = $sender->get_heap();
+
+    pass($irc->session_alias . ' (nick=' . $irc->nick_name() .') disconnected');
     $heap->{count}++;
     $kernel->yield('_shutdown') if $heap->{count} == 2;
 }
@@ -137,7 +137,7 @@ sub irc_disconnected {
 sub _shutdown {
     my ($kernel, $error) = @_[KERNEL, ARG0];
     fail($error) if defined $error;
-    
+
     $kernel->alarm_remove_all();
     $ircd->yield('shutdown');
     $bot1->yield('shutdown');

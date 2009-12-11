@@ -6,7 +6,7 @@ use Carp;
 use POE;
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '6.16';
+our $VERSION = '6.18';
 
 sub new {
     my ($package) = shift;
@@ -22,11 +22,11 @@ sub PCI_register {
     my ($self, $irc) = splice @_, 0, 2;
 
     $self->{irc} = $irc;
-    $self->{SESSION_ID} = POE::Session->create(
+    POE::Session->create(
         object_states => [
             $self => [ qw(_start _auto_ping _reconnect _shutdown _start_ping _start_time_out _stop_ping _time_out) ],
         ],
-    )->ID();
+    );
 
     $irc->raw_events(1);
     $irc->plugin_register( $self, 'SERVER', qw(connected disconnected 001 error socketerr pong raw) );

@@ -1,4 +1,4 @@
-use 5.006;
+use 5.008;
 use strict;
 use inc::Module::Install;
 
@@ -18,7 +18,7 @@ license 'perl';
 author 'Chris Williams <chris@bingosnet.co.uk>';
 version_from 'lib/POE/Component/IRC.pm';
 abstract_from 'lib/POE/Component/IRC.pm';
-perl_version '5.006';
+perl_version '5.008';
 requires 'POE'    => 0.3202;
 requires 'POE::Component::Pluggable' => '1.24';
 requires 'POE::Wheel::SocketFactory' => 0;
@@ -27,7 +27,7 @@ requires 'POE::Driver::SysRW' => 0;
 requires 'POE::Filter::Line' => 0;
 requires 'POE::Filter::Stream' => 0;
 requires 'POE::Filter::Stackable' => 0;
-requires 'POE::Filter::IRCD' => 1.7;
+requires 'POE::Filter::IRCD' => 2.42;
 requires 'Encode' => 0;
 requires 'Encode::Guess' => 0;
 test_requires 'Test::More' => '0.47';
