@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POSIX qw(strftime);
 
-our $VERSION = '6.18';
+our $VERSION = '6.20';
 
 sub new {
     my ($package) = shift;
@@ -57,8 +57,9 @@ sub S_ctcp_time {
 sub S_ctcp_ping {
     my ($self,$irc) = splice @_, 0, 2;
     my $nick = ( split /!/, ${ $_[0] } )[0];
+    my $timestamp = ${ $_[2] };
     
-    $irc->yield( ctcpreply => $nick => "PING " . time() );
+    $irc->yield( ctcpreply => $nick => 'PING ' . $timestamp );
     
     return PCI_EAT_CLIENT if $self->eat();
     return PCI_EAT_NONE;

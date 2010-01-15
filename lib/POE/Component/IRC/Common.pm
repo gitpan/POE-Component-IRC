@@ -5,7 +5,7 @@ use warnings;
 
 use Encode qw(decode);
 use Encode::Guess;
-our $VERSION = '6.18';
+our $VERSION = '6.20';
 
 require Exporter;
 use base qw(Exporter);
@@ -238,8 +238,8 @@ sub strip_formatting {
 
 sub irc_to_utf8 {
     my ($line) = @_;
-    my $utf8 = guess_encoding($line, 'UTF-8');
-    return ref $utf8 ? decode('UTF-8', $line) : decode('cp1252', $line);
+    my $utf8 = guess_encoding($line, 'utf8');
+    return ref $utf8 ? decode('utf8', $line) : decode('cp1252', $line);
 }
 
 #------------------------------------------------------------------------------
@@ -557,7 +557,7 @@ formatting codes, 0 otherwise.
 
 =head2 C<strip_color>
 
-Takes one paramter, a string of IRC text. Returns the string stripped of all
+Takes one parameter, a string of IRC text. Returns the string stripped of all
 IRC color codes. Due to the fact that both color and formatting codes can
 be cancelled with the same character, this might strip more than you hoped for
 if the string contains both color and formatting codes. Stripping both will
@@ -565,7 +565,7 @@ always do what you expect it to.
 
 =head2 C<strip_formatting>
 
-Takes one paramter, a string of IRC text. Returns the string stripped of all
+Takes one parameter, a string of IRC text. Returns the string stripped of all
 IRC formatting codes. Due to the fact that both color and formatting codes can
 be cancelled with the same character, this might strip more than you hoped for
 if the string contains both color and formatting codes. Stripping both will

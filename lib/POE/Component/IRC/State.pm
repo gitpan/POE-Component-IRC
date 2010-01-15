@@ -7,7 +7,7 @@ use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
 
-our $VERSION = '6.18';
+our $VERSION = '6.20';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our
 # namespace. u_irc() is used to create unique keys.
@@ -1399,7 +1399,7 @@ common to the quitting client and the component.
 See also L<C<irc_nick>|POE::Component::IRC/"irc_nick"> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
-Additional paramter C<ARG2> contains an arrayref of channel names that are
+Additional parameter C<ARG2> contains an arrayref of channel names that are
 common to the nick hanging client and the component.
 
 =head3 C<irc_kick>

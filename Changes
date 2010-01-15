@@ -1,5 +1,15 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.20  Fri Jan 15 18:38:44 GMT 2010
+    - NickServID.pm: Identify correctly when switching nicks on ratbox IRC
+      servers (Hinrik)
+    - Common.pm: Encode::Guess::guess_encoding() doesn't work well with
+      'UTF-8', revert back to 'utf8'. Added tests for it. (Hinrik)
+    - CTCP.pm: It was sending "ARRAY(0x#######)" in reply to CTCP PING.
+      Fixed it and added test for that and CTCP TIME. (Hinrik).
+    - Depend on POE 1.284 so we won't get FAIL test reports from CPAN testers
+      because of the FollowTail plugin. (Hinrik)
+
 6.18  Fri Dec 11 19:23:24 GMT 2009
     - NickReclaim.pm: Reclaim nick immediately when possible (Hinrik)
     - Depend on POE::Filter::IRCD 2.42. Fixes parsing of 005 numeric replies
