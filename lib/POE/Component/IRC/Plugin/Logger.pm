@@ -12,7 +12,7 @@ use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting irc_to_utf8);
 use POSIX qw(strftime);
 
-our $VERSION = '6.20';
+our $VERSION = '6.22';
 
 sub new {
     my ($package) = shift;
@@ -37,12 +37,12 @@ sub PCI_register {
     }
     
     if ($self->{Restricted}) {
-        $self->{dir_perm} = oct 755;
-        $self->{file_perm} = oct 644;
-    }
-    else {
         $self->{dir_perm} = oct 700;
         $self->{file_perm} = oct 600;
+    }
+    else {
+        $self->{dir_perm} = oct 755;
+        $self->{file_perm} = oct 644;
 
     }
 
@@ -516,7 +516,7 @@ Defaults to 0.
 
 B<'Restricted'>, set this to 1 if you want all directories/files to be created
 without read permissions for other users (i.e. 700 for dirs and 600 for files).
-Defaults to 0.
+Defaults to 1.
 
 B<'Format'>, a hash reference representing the log format, if you want to define
 your own. See the source for details.
