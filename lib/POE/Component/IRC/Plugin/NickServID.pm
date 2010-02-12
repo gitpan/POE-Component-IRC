@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( u_irc );
 
-our $VERSION = '6.22';
+our $VERSION = '6.24';
 
 sub new {
     my ($package) = shift;
@@ -20,6 +20,7 @@ sub new {
 sub PCI_register {
     my ($self, $irc) = @_;
     $self->{nick} = $irc->{nick};
+    $self->{irc} = $irc;
     $irc->plugin_register($self, 'SERVER', qw(004 nick));
     return 1;
 }
