@@ -16,7 +16,7 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -1565,6 +1565,8 @@ sub _pluggable_event {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 

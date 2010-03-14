@@ -3,7 +3,7 @@ package POE::Component::IRC::Plugin;
 use strict;
 use warnings;
 
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 
 require Exporter;
 use base qw(Exporter);
@@ -19,6 +19,8 @@ use constant {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 

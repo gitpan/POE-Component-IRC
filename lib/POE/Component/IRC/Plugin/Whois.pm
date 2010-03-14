@@ -6,7 +6,7 @@ use POE;
 use POE::Component::IRC::Plugin qw( PCI_EAT_NONE );
 use POE::Component::IRC::Common qw(:ALL);
 
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 
 sub new {
     return bless { }, shift;
@@ -175,6 +175,8 @@ sub S_369 {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 

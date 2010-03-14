@@ -6,7 +6,7 @@ use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
 
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 
 sub new {
     my ($package) = @_;
@@ -63,6 +63,8 @@ sub U_privmsg {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 

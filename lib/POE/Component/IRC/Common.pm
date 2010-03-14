@@ -5,7 +5,7 @@ use warnings;
 
 use Encode qw(decode);
 use Encode::Guess;
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 
 require Exporter;
 use base qw(Exporter);
@@ -380,6 +380,8 @@ sub irc_ip_is_ipv6 {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 

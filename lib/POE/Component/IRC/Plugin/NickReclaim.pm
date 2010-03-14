@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Common qw(parse_user);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 
 sub new {
     my ($package) = shift;
@@ -146,6 +146,8 @@ sub S_nick {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 

@@ -18,7 +18,6 @@ examples/rot13_multi.pl
 examples/simpleclient.pl
 examples/tinyurl.pl
 inc/Module/Install.pm
-inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
 inc/Module/Install/Fetch.pm
@@ -33,7 +32,7 @@ lib/POE/Component/IRC/Constants.pm
 lib/POE/Component/IRC/Cookbook.pod
 lib/POE/Component/IRC/Cookbook/BasicBot.pod
 lib/POE/Component/IRC/Cookbook/Disconnecting.pod
-lib/POE/Component/IRC/Cookbook/MegaHAL.pod
+lib/POE/Component/IRC/Cookbook/Hailo.pod
 lib/POE/Component/IRC/Cookbook/Reload.pod
 lib/POE/Component/IRC/Cookbook/Resolver.pod
 lib/POE/Component/IRC/Cookbook/Seen.pod

@@ -6,7 +6,7 @@ use Carp;
 use POE qw(Wheel::FollowTail);
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '6.26';
+our $VERSION = '6.28';
 
 sub new {
     my ($package) = shift;
@@ -89,6 +89,8 @@ sub _reset {
 
 1;
 __END__
+
+=encoding utf8
 
 =head1 NAME
 
