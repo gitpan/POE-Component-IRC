@@ -6,7 +6,7 @@ use Carp;
 use POE::Component::IRC::Common qw( parse_user strip_color strip_formatting );
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '6.28';
+our $VERSION = '6.30';
 
 sub new {
     my ($package) = shift;
@@ -128,13 +128,13 @@ sub _get_help {
         }
         else {
             push @help, "Unknown command: $cmd";
-            push @help, 'To get a list of commands, do: /msg '. $irc->nick_name() . ' help';
+            push @help, 'To get a list of commands, use: /msg '. $irc->nick_name() . ' help';
         }
     }
     else {
         if (keys %{ $self->{Commands} }) {
             push @help, 'Commands: ' . join ', ', keys %{ $self->{Commands} };
-            push @help, 'You can do: /msg ' . $irc->nick_name() . ' help <command>';
+            push @help, 'For more details, use: /msg ' . $irc->nick_name() . ' help <command>';
         }
         else {
             push @help, 'No commands are defined';

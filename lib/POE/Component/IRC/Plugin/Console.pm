@@ -6,7 +6,7 @@ use Carp;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw( :ALL );
 
-our $VERSION = '6.28';
+our $VERSION = '6.30';
 
 sub new {
     my $package = shift;
@@ -244,7 +244,7 @@ lightweight debugging and control console for your bot
  }
 
  sub irc_console_connect {
-     my ($peeradr, $peerport, $wheel_id) = @_[ARG0, .. ARG2];
+     my ($peeradr, $peerport, $wheel_id) = @_[ARG0 .. ARG2];
      return;
  }
 

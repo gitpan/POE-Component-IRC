@@ -8,7 +8,7 @@ use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD
            Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 
-our $VERSION = '6.28';
+our $VERSION = '6.30';
 
 sub new {
     my ($package) = shift;
@@ -409,7 +409,7 @@ Takes a number of arguments:
 
 B<'password'>, the password to require from connecting clients;
 
-B<'bindaddr'>, a local address to bind the listener to, default is 'localhost';
+B<'bindaddress'>, a local address to bind the listener to, default is 'localhost';
 
 B<'bindport'>, what port to bind to, default is 0, ie. randomly allocated by OS;
 

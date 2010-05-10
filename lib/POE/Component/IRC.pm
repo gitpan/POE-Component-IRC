@@ -16,7 +16,7 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '6.28';
+our $VERSION = '6.30';
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -1040,7 +1040,7 @@ sub onlytwoargs {
 sub privandnotice {
     my ($kernel, $state, $to) = @_[KERNEL, STATE, ARG0];
     my $message = join ' ', @_[ARG1 .. $#_];
-    my @messages = split /\n/, $message;
+    my @messages = split /[\n\r]/, $message;
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
     $state =~ s/privmsglo/privmsg/;
