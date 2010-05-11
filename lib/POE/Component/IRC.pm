@@ -16,7 +16,7 @@ use POE::Component::IRC::Plugin::Whois;
 use Socket;
 use base qw(POE::Component::Pluggable);
 
-our $VERSION = '6.30';
+our $VERSION = '6.32';
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
 BEGIN {
@@ -946,6 +946,8 @@ sub noargs {
         warn "The '$state' event takes no arguments\n";
         return;
     }
+
+    $state = uc $state;
     $kernel->yield(sl_prioritized => $pri, $state);
     return;
 }
@@ -1038,9 +1040,7 @@ sub onlytwoargs {
 
 # Handler for privmsg or notice events.
 sub privandnotice {
-    my ($kernel, $state, $to) = @_[KERNEL, STATE, ARG0];
-    my $message = join ' ', @_[ARG1 .. $#_];
-    my @messages = split /[\n\r]/, $message;
+    my ($kernel, $state, $to, $msg) = @_[KERNEL, STATE, ARG0, ARG1];
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
 
     $state =~ s/privmsglo/privmsg/;
@@ -1048,7 +1048,7 @@ sub privandnotice {
     $state =~ s/noticelo/notice/;
     $state =~ s/noticehi/notice/;
 
-    if (!defined $to || !defined $message) {
+    if (!defined $to || !defined $msg) {
         warn "The '$state' event requires two arguments\n";
         return;
     }
@@ -1056,9 +1056,7 @@ sub privandnotice {
     $to = join ',', @$to if ref $to eq 'ARRAY';
     $state = uc $state;
 
-    for my $msg (@messages) {
-        $kernel->yield(sl_prioritized => $pri, "$state $to :$msg");
-    }
+    $kernel->yield(sl_prioritized => $pri, "$state $to :$msg");
     return;
 }
 
@@ -1214,14 +1212,14 @@ sub sl_prioritized {
 
     my $now = time();
     $self->{send_time} = $now if $self->{send_time} < $now;
+
+    # if we find a newline in the message, take that to be the end of it
+    $msg =~ s/[\015\012].*//s;
     
     if (bytes::length($msg) > $self->{msg_length} - bytes::length($self->nick_name())) {
         $msg = bytes::substr($msg, 0, $self->{msg_length} - bytes::length($self->nick_name()));
     }
 
-    # if we find a newline in the message, take that to be the end of it
-    $msg =~ s/\n.*//gm;
-    
     if (@{ $self->{send_queue} }) {
         my $i = @{ $self->{send_queue} };
         $i-- while ($i && $priority < $self->{send_queue}->[$i-1]->[MSG_PRI]);
@@ -2190,8 +2188,7 @@ it will be treated as a PART message and dealt with accordingly.
 Sends a public or private message to the nick(s) or channel(s) which
 you specify. Takes 2 arguments: the nick or channel to send a message
 to (use an array reference here to specify multiple recipients), and
-the text of the message to send. If the message contains newlines, it
-will be split up into multiple messages.
+the text of the message to send.
 
 Have a look at the constants in
 L<POE::Component::IRC::Common|POE::Component::IRC::Common> if you would
