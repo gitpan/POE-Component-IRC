@@ -1,59 +1,62 @@
-use 5.008;
+
 use strict;
-use inc::Module::Install;
+use warnings;
 
-my $mi = '0.94';
-if ($inc::Module::Install::VERSION lt $mi) {
-    die "Your Module::Install is older than $mi, please upgrade it";
+ BEGIN { require 5.008; } 
+
+use ExtUtils::MakeMaker 6.31;
+
+
+
+my %WriteMakefileArgs = (
+  'ABSTRACT' => 'A fully event-driven IRC client module',
+  'AUTHOR' => 'Chris Williams <chris@bingosnet.co.uk>, Hinrik Örn Sigurðsson <hinrik.sig@gmail.com>',
+  'BUILD_REQUIRES' => {},
+  'CONFIGURE_REQUIRES' => {
+    'ExtUtils::MakeMaker' => '6.31'
+  },
+  'DISTNAME' => 'POE-Component-IRC',
+  'EXE_FILES' => [],
+  'LICENSE' => 'perl',
+  'NAME' => 'POE::Component::IRC',
+  'PREREQ_PM' => {
+    'POE' => '1.287',
+    'POE::Component::Client::DNS' => '0.99',
+    'POE::Component::Pluggable' => '1.24',
+    'POE::Driver::SysRW' => '0',
+    'POE::Filter::IRCD' => '2.42',
+    'POE::Filter::Line' => '0',
+    'POE::Filter::Stackable' => '0',
+    'POE::Filter::Stream' => '0',
+    'POE::Session' => '0',
+    'POE::Wheel::ReadWrite' => '0',
+    'POE::Wheel::SocketFactory' => '0',
+    'Test::More' => '0.47'
+  },
+  'VERSION' => '6.33',
+  'test' => {
+    'TESTS' => 't/*.t t/01_base/*.t t/02_behavior/*.t t/03_subclasses/*.t t/04_plugins/01_ctcp/*.t t/04_plugins/02_connector/*.t t/04_plugins/03_botaddressed/*.t t/04_plugins/04_bottraffic/*.t t/04_plugins/05_isupport/*.t t/04_plugins/06_plugman/*.t t/04_plugins/07_console/*.t t/04_plugins/08_proxy/*.t t/04_plugins/09_nickreclaim/*.t t/04_plugins/10_followtail/*.t t/04_plugins/11_cycleempty/*.t t/04_plugins/12_autojoin/*.t t/04_plugins/13_botcommand/*.t t/04_plugins/14_logger/*.t t/04_plugins/15_nickservid/*.t t/04_plugins/16_whois/*.t t/04_plugins/17_dcc/*.t t/05_regression/*.t'
+  }
+);
+
+
+unless ( eval { ExtUtils::MakeMaker->VERSION(6.56) } ) {
+  my $br = delete $WriteMakefileArgs{BUILD_REQUIRES};
+  my $pp = $WriteMakefileArgs{PREREQ_PM};
+  for my $mod ( keys %$br ) {
+    if ( exists $pp->{$mod} ) {
+      $pp->{$mod} = $br->{$mod} if $br->{$mod} > $pp->{$mod};
+    }
+    else {
+      $pp->{$mod} = $br->{$mod};
+    }
+  }
 }
 
-print <<NOTICE;
+delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
+  unless eval { ExtUtils::MakeMaker->VERSION(6.52) };
 
----------------------------------------------------------------
-A lot of the tests make use of the loopback interface. If this
-is firewalled then these tests will fail. 
----------------------------------------------------------------
+WriteMakefile(%WriteMakefileArgs);
 
-NOTICE
 
-_no_dns() unless can_use('POE::Component::Client::DNS', 0.99);
 
-name             'POE-Component-IRC';
-license          'perl';
-author           'Chris Williams <chris@bingosnet.co.uk>';
-version_from     'lib/POE/Component/IRC.pm';
-abstract_from    'lib/POE/Component/IRC.pm';
-homepage         'http://search.cpan.org/dist/POE-Component-IRC';
-githubmeta;
-bugtracker       'https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC';
-resources        'Ratings' => 'http://cpanratings.perl.org/d/POE-Component-IRC';
-perl_version     '5.008';
-requires         'POE'                       => '1.287';
-requires         'POE::Component::Pluggable' => '1.24';
-requires         'POE::Wheel::SocketFactory' => 0;
-requires         'POE::Wheel::ReadWrite'     => 0;
-requires         'POE::Driver::SysRW'        => 0;
-requires         'POE::Filter::Line'         => 0;
-requires         'POE::Filter::Stream'       => 0;
-requires         'POE::Filter::Stackable'    => 0;
-requires         'POE::Filter::IRCD'         => 2.42;
-requires         'Encode'                    => 0;
-requires         'Encode::Guess'             => 0;
-test_requires    'Test::More' => '0.47';
-tests_recursive;
-clean_files 'README.send Changes.resume followtail logger_test';
-auto_provides;
-WriteAll();
-exit 0;
-
-sub _no_dns {
-  print <<NO_DNS;
-
-----------------------------------------------------------------
-Hmmm. POE::Component::Client::DNS 0.99 isn't installed. Its use
-is recommended but not necessary. Consider installing it. Thanks
-----------------------------------------------------------------
-
-NO_DNS
-  return;
-}

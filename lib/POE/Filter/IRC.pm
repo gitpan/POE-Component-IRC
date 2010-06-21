@@ -1,12 +1,16 @@
 package POE::Filter::IRC;
+BEGIN {
+  $POE::Filter::IRC::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Filter::IRC::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use POE::Filter::Stackable;
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package, %opts) = @_;

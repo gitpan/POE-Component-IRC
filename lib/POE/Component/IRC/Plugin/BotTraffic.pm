@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::BotTraffic;
+BEGIN {
+  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::BotTraffic::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = @_;

@@ -1,4 +1,10 @@
 package POE::Component::IRC::State;
+BEGIN {
+  $POE::Component::IRC::State::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
@@ -6,8 +12,6 @@ use POE;
 use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
-
-our $VERSION = '6.32';
 
 # Event handlers for tracking the STATE. $self->{STATE} is used as our
 # namespace. u_irc() is used to create unique keys.

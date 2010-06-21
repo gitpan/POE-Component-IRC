@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::Whois;
+BEGIN {
+  $POE::Component::IRC::Plugin::Whois::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::Whois::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use POE;
 use POE::Component::IRC::Plugin qw( PCI_EAT_NONE );
 use POE::Component::IRC::Common qw(:ALL);
-
-our $VERSION = '6.32';
 
 sub new {
     return bless { }, shift;

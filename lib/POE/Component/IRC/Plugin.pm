@@ -1,9 +1,13 @@
 package POE::Component::IRC::Plugin;
+BEGIN {
+  $POE::Component::IRC::Plugin::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
-
-our $VERSION = '6.32';
 
 require Exporter;
 use base qw(Exporter);

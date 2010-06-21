@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::NickServID;
+BEGIN {
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( u_irc );
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = shift;

@@ -1,5 +1,16 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.33  Mon Jun 21 20:27:42 GMT 2010
+    - BotCommand.pm: Allow user to choose how help messages are delivered
+    - BotCommand.pm: Require the command prefix in private messages
+    - BotCommand.pm: Make the help messages more context-sensitive
+    - BotCommand.pm: Add support for custom auth checks
+    - BotCommand.pm: If Eat == 1, we eat everything that looks like a command
+    - Cookbook: Add Gtk2 example by Damian Kaczmarek
+    - Logger.pm: Support a hook for custom log storage
+    - IRC.pm: Remove redundant version() method
+    - Convert distribution over to Dist::Zilla
+
 6.32  Tue May 11 13:43:50 GMT 2010
     - IRC.pm: Filter out \r in arguments to non-PRIVMSG commands too
     - IRC.pm: Uppercase REHASH/DIE/RESTART commands before sending them

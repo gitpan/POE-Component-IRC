@@ -1,4 +1,10 @@
 package POE::Component::IRC::Plugin::Proxy;
+BEGIN {
+  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::Proxy::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
@@ -7,8 +13,6 @@ use Socket;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD 
            Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = shift;

@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::CTCP;
+BEGIN {
+  $POE::Component::IRC::Plugin::CTCP::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::CTCP::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POSIX qw(strftime);
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = shift;

@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::FollowTail;
+BEGIN {
+  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::FollowTail::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use Carp;
 use POE qw(Wheel::FollowTail);
 use POE::Component::IRC::Plugin qw( :ALL );
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = shift;

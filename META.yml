@@ -2,13 +2,12 @@
 abstract: 'A fully event-driven IRC client module'
 author:
   - 'Chris Williams <chris@bingosnet.co.uk>'
-build_requires:
-  ExtUtils::MakeMaker: 6.42
-  Test::More: 0.47
+  - 'Hinrik Örn Sigurðsson <hinrik.sig@gmail.com>'
+build_requires: {}
 configure_requires:
-  ExtUtils::MakeMaker: 6.42
-distribution_type: module
-generated_by: 'Module::Install version 0.95'
+  ExtUtils::MakeMaker: 6.31
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.101612, CPAN::Meta::Converter version 2.101670'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -17,105 +16,27 @@ name: POE-Component-IRC
 no_index:
   directory:
     - examples
-    - inc
     - t
     - xt
-provides:
-  POE::Component::IRC:
-    file: lib/POE/Component/IRC.pm
-    version: 6.32
-  POE::Component::IRC::Common:
-    file: lib/POE/Component/IRC/Common.pm
-    version: 6.32
-  POE::Component::IRC::Constants:
-    file: lib/POE/Component/IRC/Constants.pm
-    version: 6.32
-  POE::Component::IRC::Plugin:
-    file: lib/POE/Component/IRC/Plugin.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::AutoJoin:
-    file: lib/POE/Component/IRC/Plugin/AutoJoin.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::BotAddressed:
-    file: lib/POE/Component/IRC/Plugin/BotAddressed.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::BotCommand:
-    file: lib/POE/Component/IRC/Plugin/BotCommand.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::BotTraffic:
-    file: lib/POE/Component/IRC/Plugin/BotTraffic.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::CTCP:
-    file: lib/POE/Component/IRC/Plugin/CTCP.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::Connector:
-    file: lib/POE/Component/IRC/Plugin/Connector.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::Console:
-    file: lib/POE/Component/IRC/Plugin/Console.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::CycleEmpty:
-    file: lib/POE/Component/IRC/Plugin/CycleEmpty.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::DCC:
-    file: lib/POE/Component/IRC/Plugin/DCC.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::FollowTail:
-    file: lib/POE/Component/IRC/Plugin/FollowTail.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::ISupport:
-    file: lib/POE/Component/IRC/Plugin/ISupport.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::Logger:
-    file: lib/POE/Component/IRC/Plugin/Logger.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::NickReclaim:
-    file: lib/POE/Component/IRC/Plugin/NickReclaim.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::NickServID:
-    file: lib/POE/Component/IRC/Plugin/NickServID.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::PlugMan:
-    file: lib/POE/Component/IRC/Plugin/PlugMan.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::Proxy:
-    file: lib/POE/Component/IRC/Plugin/Proxy.pm
-    version: 6.32
-  POE::Component::IRC::Plugin::Whois:
-    file: lib/POE/Component/IRC/Plugin/Whois.pm
-    version: 6.32
-  POE::Component::IRC::Qnet:
-    file: lib/POE/Component/IRC/Qnet.pm
-    version: 6.32
-  POE::Component::IRC::Qnet::State:
-    file: lib/POE/Component/IRC/Qnet/State.pm
-    version: 6.32
-  POE::Component::IRC::State:
-    file: lib/POE/Component/IRC/State.pm
-    version: 6.32
-  POE::Filter::IRC:
-    file: lib/POE/Filter/IRC.pm
-    version: 6.32
-  POE::Filter::IRC::Compat:
-    file: lib/POE/Filter/IRC/Compat.pm
-    version: 6.32
 requires:
-  Encode: 0
-  Encode::Guess: 0
   POE: 1.287
+  POE::Component::Client::DNS: 0.99
   POE::Component::Pluggable: 1.24
   POE::Driver::SysRW: 0
   POE::Filter::IRCD: 2.42
   POE::Filter::Line: 0
   POE::Filter::Stackable: 0
   POE::Filter::Stream: 0
+  POE::Session: 0
   POE::Wheel::ReadWrite: 0
   POE::Wheel::SocketFactory: 0
-  perl: 5.8.0
+  Test::More: 0.47
+  perl: 5.008
 resources:
-  Ratings: http://cpanratings.perl.org/d/POE-Component-IRC
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC
   homepage: http://search.cpan.org/dist/POE-Component-IRC
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.32
+  x_Ratings: http://cpanratings.perl.org/d/POE-Component-IRC
+version: 6.33
+x_authority: cpan:HINRIK

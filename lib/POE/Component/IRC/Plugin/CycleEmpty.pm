@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::CycleEmpty;
+BEGIN {
+  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::CycleEmpty::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user u_irc );
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = shift;

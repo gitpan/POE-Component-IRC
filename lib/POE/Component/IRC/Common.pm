@@ -1,11 +1,16 @@
 package POE::Component::IRC::Common;
+BEGIN {
+  $POE::Component::IRC::Common::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 
 use Encode qw(decode);
 use Encode::Guess;
-our $VERSION = '6.32';
 
 require Exporter;
 use base qw(Exporter);

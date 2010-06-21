@@ -1,4 +1,10 @@
 package POE::Component::IRC::Qnet::State;
+BEGIN {
+  $POE::Component::IRC::Qnet::State::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
@@ -7,8 +13,6 @@ use POE;
 use POE::Component::IRC::Common qw(:ALL);
 use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC::State POE::Component::IRC::Qnet);
-
-our $VERSION = '6.32';
 
 sub _create {
     my $self = shift;

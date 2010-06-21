@@ -1,11 +1,15 @@
 package POE::Component::IRC::Plugin::BotAddressed;
+BEGIN {
+  $POE::Component::IRC::Plugin::BotAddressed::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::BotAddressed::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
-
-our $VERSION = '6.32';
 
 sub new {
     my ($package) = shift;

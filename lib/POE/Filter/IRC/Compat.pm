@@ -1,4 +1,10 @@
 package POE::Filter::IRC::Compat;
+BEGIN {
+  $POE::Filter::IRC::Compat::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
@@ -6,8 +12,6 @@ use Carp;
 use POE::Filter::IRCD;
 use File::Basename qw(fileparse);
 use base qw(POE::Filter);
-
-our $VERSION = '6.32';
 
 my %irc_cmds = (
     qr/^\d{3}$/ => sub {

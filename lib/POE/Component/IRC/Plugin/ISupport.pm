@@ -1,10 +1,14 @@
 package POE::Component::IRC::Plugin::ISupport;
+BEGIN {
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use POE::Component::IRC::Plugin qw(:ALL);
-
-our $VERSION = '6.32';
 
 sub new {
     return bless { }, shift;

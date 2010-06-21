@@ -1,9 +1,13 @@
 package POE::Component::IRC::Constants;
+BEGIN {
+  $POE::Component::IRC::Constants::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Constants::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
-
-our $VERSION = '6.32';
 
 require Exporter;
 use base qw(Exporter);

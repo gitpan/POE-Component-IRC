@@ -1,4 +1,10 @@
 package POE::Component::IRC::Plugin::DCC;
+BEGIN {
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
@@ -8,8 +14,6 @@ use POE qw(Driver::SysRW Filter::Line Filter::Stream
            Wheel::ReadWrite Wheel::SocketFactory);
 use POE::Component::IRC::Plugin qw(:ALL);
 use Socket;
-
-our $VERSION = '6.32';
 
 use constant {
     OUT_BLOCKSIZE  => 1024,   # Send DCC data in 1k chunks

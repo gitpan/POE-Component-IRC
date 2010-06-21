@@ -1,12 +1,16 @@
 package POE::Component::IRC::Plugin::Console;
+BEGIN {
+  $POE::Component::IRC::Plugin::Console::VERSION = '6.33';
+}
+BEGIN {
+  $POE::Component::IRC::Plugin::Console::AUTHORITY = 'cpan:HINRIK';
+}
 
 use strict;
 use warnings;
 use Carp;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw( :ALL );
-
-our $VERSION = '6.32';
 
 sub new {
     my $package = shift;
