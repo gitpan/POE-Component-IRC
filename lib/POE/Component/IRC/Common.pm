@@ -1,9 +1,9 @@
 package POE::Component::IRC::Common;
 BEGIN {
-  $POE::Component::IRC::Common::VERSION = '6.33';
+  $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
+  $POE::Component::IRC::Common::VERSION = '6.34';
 }
 
 use strict;

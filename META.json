@@ -16,9 +16,9 @@
    "name" : "POE-Component-IRC",
    "no_index" : {
       "directory" : [
-         "examples",
          "t",
-         "xt"
+         "xt",
+         "examples"
       ]
    },
    "prereqs" : {
@@ -51,7 +51,7 @@
          "mailto" : "bug-POE-Component-IRC@rt.cpan.org",
          "web" : "https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC"
       },
-      "homepage" : "http://search.cpan.org/dist/POE-Component-IRC",
+      "homepage" : "http://search.cpan.org/dist/POE-Component-IRC/",
       "license" : [
          "http://dev.perl.org/licenses/"
       ],
@@ -59,10 +59,9 @@
          "type" : "git",
          "url" : "git://github.com/bingos/poe-component-irc.git",
          "web" : "http://github.com/bingos/poe-component-irc"
-      },
-      "x_Ratings" : "http://cpanratings.perl.org/d/POE-Component-IRC"
+      }
    },
-   "version" : "6.33",
+   "version" : "6.34",
    "x_authority" : "cpan:HINRIK"
 }
 

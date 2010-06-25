@@ -15,9 +15,9 @@ meta-spec:
 name: POE-Component-IRC
 no_index:
   directory:
-    - examples
     - t
     - xt
+    - examples
 requires:
   POE: 1.287
   POE::Component::Client::DNS: 0.99
@@ -34,9 +34,8 @@ requires:
   perl: 5.008
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC
-  homepage: http://search.cpan.org/dist/POE-Component-IRC
+  homepage: http://search.cpan.org/dist/POE-Component-IRC/
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-  x_Ratings: http://cpanratings.perl.org/d/POE-Component-IRC
-version: 6.33
+version: 6.34
 x_authority: cpan:HINRIK

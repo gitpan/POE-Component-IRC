@@ -1,9 +1,9 @@
 package POE::Component::IRC::Plugin::Whois;
 BEGIN {
-  $POE::Component::IRC::Plugin::Whois::VERSION = '6.33';
+  $POE::Component::IRC::Plugin::Whois::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Whois::AUTHORITY = 'cpan:HINRIK';
+  $POE::Component::IRC::Plugin::Whois::VERSION = '6.34';
 }
 
 use strict;

@@ -1,9 +1,9 @@
 package POE::Filter::IRC::Compat;
 BEGIN {
-  $POE::Filter::IRC::Compat::VERSION = '6.33';
+  $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
+  $POE::Filter::IRC::Compat::VERSION = '6.34';
 }
 
 use strict;
