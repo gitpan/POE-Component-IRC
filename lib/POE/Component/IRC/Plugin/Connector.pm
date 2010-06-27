@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Connector::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Connector::VERSION = '6.34';
+  $POE::Component::IRC::Plugin::Connector::VERSION = '6.35';
 }
 
 use strict;
@@ -141,6 +141,7 @@ sub _shutdown {
     my ($kernel,$self) = @_[KERNEL, OBJECT];
 
     $kernel->yield( '_stop_ping' );
+    $kernel->delay('_reconnect');
     return;
 }
 

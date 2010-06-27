@@ -21,7 +21,7 @@ no_index:
 requires:
   POE: 1.287
   POE::Component::Client::DNS: 0.99
-  POE::Component::Pluggable: 1.24
+  POE::Component::Pluggable: 1.26
   POE::Driver::SysRW: 0
   POE::Filter::IRCD: 2.42
   POE::Filter::Line: 0
@@ -37,5 +37,5 @@ resources:
   homepage: http://search.cpan.org/dist/POE-Component-IRC/
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.34
+version: 6.35
 x_authority: cpan:HINRIK
