@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Proxy::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.35';
+  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.36';
 }
 
 use strict;
@@ -399,7 +399,7 @@ multiple IRC clients to connect.
 Neat, huh? >;o)
 
 This plugin will activate L<POE::Component::IRC>'s raw
-events (L<C<irc_raw>|POE::Component::IRC/"irc_raw">) by calling
+events (L<C<irc_raw>|POE::Component::IRC/irc_raw>) by calling
 C<< $irc->raw_events(1) >>.
 
 This plugin requires the IRC component to be

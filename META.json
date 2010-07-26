@@ -22,6 +22,11 @@
       ]
    },
    "prereqs" : {
+      "build" : {
+         "requires" : {
+            "Test::More" : "0.47"
+         }
+      },
       "configure" : {
          "requires" : {
             "ExtUtils::MakeMaker" : "6.31"
@@ -40,7 +45,6 @@
             "POE::Session" : 0,
             "POE::Wheel::ReadWrite" : 0,
             "POE::Wheel::SocketFactory" : 0,
-            "Test::More" : "0.47",
             "perl" : "5.008"
          }
       }
@@ -61,7 +65,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.35",
+   "version" : "6.36",
    "x_authority" : "cpan:HINRIK"
 }
 

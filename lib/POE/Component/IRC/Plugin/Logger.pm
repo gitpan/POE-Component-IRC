@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Logger::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Logger::VERSION = '6.35';
+  $POE::Component::IRC::Plugin::Logger::VERSION = '6.36';
 }
 
 use strict;
@@ -12,6 +12,7 @@ use Carp;
 use Encode::Guess;
 use Fcntl qw(O_WRONLY O_APPEND O_CREAT);
 use File::Spec::Functions qw(catdir catfile);
+use IO::Handle;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Plugin::BotTraffic;
 use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting irc_to_utf8);

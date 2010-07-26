@@ -382,9 +382,13 @@ METHODS
     arguments and returns a scalar representing the number of messages that
     are queued up waiting for dispatch to the irc server.
 
+  "logged_in"
+    Takes no arguments. Returns true or false depending on whether the IRC
+    component is logged into an IRC network.
+
   "connected"
     Takes no arguments. Returns true or false depending on whether the
-    component is currently connected to an IRC network or not.
+    component's socket is currently connected.
 
   "disconnect"
     Takes no arguments. Terminates the socket connection disgracefully >;o]

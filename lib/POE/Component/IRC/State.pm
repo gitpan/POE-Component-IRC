@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.35';
+  $POE::Component::IRC::State::VERSION = '6.36';
 }
 
 use strict;
@@ -20,7 +20,9 @@ use base qw(POE::Component::IRC);
 # Make sure we have a clean STATE when we first join the network and if we
 # inadvertently get disconnected.
 sub S_001 {
-    my ($self) = @_;
+    my ($self) = shift;
+    $self->SUPER::S_001(@_);
+
     delete $self->{STATE};
     delete $self->{NETSPLIT};
     $self->{STATE}{usermode} = '';
@@ -29,7 +31,9 @@ sub S_001 {
 }
 
 sub S_disconnected {
-    my ($self) = @_;
+    my ($self) = shift;
+    $self->SUPER::S_disconnected(@_);
+
     my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
@@ -37,7 +41,9 @@ sub S_disconnected {
 }
 
 sub S_error {
-    my ($self) = @_;
+    my ($self) = shift;
+    $self->SUPER::S_error(@_);
+
     my $nickinfo = $self->nick_info($self->nick_name());
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
@@ -229,6 +235,8 @@ sub S_kick {
 
 sub S_nick {
     my ($self, $irc) = splice @_, 0, 2;
+    $self->SUPER::S_nick($irc, @_);
+
     my $nick  = (split /!/, ${ $_[0] })[0];
     my $new   = ${ $_[1] };
     my $map   = $irc->isupport('CASEMAPPING');
@@ -236,9 +244,6 @@ sub S_nick {
     my $unew  = u_irc($new, $map);
 
     push @{ $_[-1] }, [ $self->nick_channels( $nick ) ];
-
-    # what the baseclass would have done
-    $self->{RealNick} = $new if $nick eq $self->{RealNick};
 
     if ($unick eq $unew) {
         # Case Change
@@ -1187,17 +1192,17 @@ well as two additional ones:
 
 B<'AwayPoll'>, the interval (in seconds) in which to poll (i.e. C<WHO #channel>)
 the away status of channel members. Defaults to 0 (disabled). If enabled, you
-will receive C<irc_away_sync_*> / L<C<irc_user_away>|/"irc_user_away"> /
-L<C<irc_user_back>|/"irc_user_back"> events, and will be able to use the
-L<C<is_away>|/"is_away"> method for users other than yourself. This can cause
+will receive C<irc_away_sync_*> / L<C<irc_user_away>|/irc_user_away> /
+L<C<irc_user_back>|/irc_user_back> events, and will be able to use the
+L<C<is_away>|/is_away> method for users other than yourself. This can cause
 a lot of increase in traffic, especially if you are on big channels, so if you
 do use this, you probably don't want to set it too low. For reference, X-Chat
 uses 300 seconds (5 minutes).
 
 B<'WhoJoiners'>, a boolean indicating whether the component should send a
 C<WHO nick> for every person which joins a channel. Defaults to on
-(the C<WHO> is sent). If you turn this off, L<C<is_operator>|/"is_operator">
-will not work and L<C<nick_info>|/"nick_info"> will only return the keys
+(the C<WHO> is sent). If you turn this off, L<C<is_operator>|/is_operator>
+will not work and L<C<nick_info>|/nick_info> will only return the keys
 B<'Nick'>, B<'User'>, B<'Host'> and B<'Userhost'>.
 
 =head1 METHODS
@@ -1293,7 +1298,7 @@ not have voice on the channel or if the nick/channel does not exist in the state
 Expects a nick as parameter. Returns a true value if the specified nick is away.
 Returns a false value if the nick is not away or not in the state. This will
 only work for your IRC user unless you specified a value for B<'AwayPoll'> in
-L<C<spawn>|POE::Component::IRC/"spawn">.
+L<C<spawn>|POE::Component::IRC/spawn>.
 
 =head2 C<is_channel_admin>
 
@@ -1392,7 +1397,7 @@ L<POE::Component::IRC|POE::Component::IRC> events.
 
 =head3 C<irc_quit>
 
-See also L<C<irc_quit>|POE::Component::IRC/"irc_quit"> in
+See also L<C<irc_quit>|POE::Component::IRC/irc_quit> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional paramater C<ARG2> contains an arrayref of channel names that are
@@ -1400,7 +1405,7 @@ common to the quitting client and the component.
 
 =head3 C<irc_nick>
 
-See also L<C<irc_nick>|POE::Component::IRC/"irc_nick"> in
+See also L<C<irc_nick>|POE::Component::IRC/irc_nick> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional parameter C<ARG2> contains an arrayref of channel names that are
@@ -1408,7 +1413,7 @@ common to the nick hanging client and the component.
 
 =head3 C<irc_kick>
 
-See also L<C<irc_kick>|POE::Component::IRC/"irc_kick"> in
+See also L<C<irc_kick>|POE::Component::IRC/irc_kick> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional parameter C<ARG4> contains the full nick!user@host of the kicked
@@ -1421,9 +1426,9 @@ individual.
 =head3 C<irc_socketerr>
 
 These three all have two additional parameters. C<ARG1> is a hash of
-information about your IRC user (see L<C<nick_info>|/"nick_info">), while
+information about your IRC user (see L<C<nick_info>|/nick_info>), while
 C<ARG2> is a hash of the channels you were on (see 
-L<C<channels>|/"channels">).
+L<C<channels>|/channels>).
 
 =head2 New events
 
@@ -1434,17 +1439,17 @@ events, there are the following events you can register for:
 
 Sent whenever the component starts to synchronise the away statuses of channel
 members. C<ARG0> is the channel name. You will only receive this event if you
-specified a value for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/"spawn">.
+specified a value for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/spawn>.
 
 =head3 C<irc_away_sync_end>
 
 Sent whenever the component has completed synchronising the away statuses of
 channel members. C<ARG0> is the channel name. You will only receive this event if
-you specified a value for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/"spawn">.
+you specified a value for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/spawn>.
 
 =head3 C<irc_chan_mode>
 
-This is almost identical to L<C<irc_mode>|POE::Component::IRC/"irc_mode">,
+This is almost identical to L<C<irc_mode>|POE::Component::IRC/irc_mode>,
 except that it's sent once for each individual mode with it's respective
 argument if it has one (ie. the banmask if it's +b or -b). However, this
 event is only sent for channel modes.
@@ -1478,7 +1483,7 @@ channel they have joined.
 Sent when an IRC user sets his/her status to away. C<ARG0> is the nickname,
 C<ARG1> is an arrayref of channel names that are common to the nickname
 and the component. You will only receive this event if you specified a value
-for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/"spawn">.
+for B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/spawn>.
 
 B<Note:> This above is only for users I<other than yourself>. To know when you
 change your own away status, register for the C<irc_305> and C<irc_306> events.
@@ -1488,14 +1493,14 @@ change your own away status, register for the C<irc_305> and C<irc_306> events.
 Sent when an IRC user unsets his/her away status. C<ARG0> is the nickname,
 C<ARG1> is an arrayref of channel names that are common to the nickname and
 the component. You will only receive this event if you specified a value for
-B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/"spawn">.
+B<'AwayPoll'> in L<C<spawn>|POE::Component::IRC/spawn>.
 
 B<Note:> This above is only for users I<other than yourself>. To know when you
 change your own away status, register for the C<irc_305> and C<irc_306> events.
 
 =head3 C<irc_user_mode>
 
-This is almost identical to L<C<irc_mode>|POE::Component::IRC/"irc_mode">,
+This is almost identical to L<C<irc_mode>|POE::Component::IRC/irc_mode>,
 except it is sent for each individual umode that is being set.
 
 =head1 CAVEATS

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Qnet::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::VERSION = '6.35';
+  $POE::Component::IRC::Qnet::VERSION = '6.36';
 }
 
 use strict;
@@ -220,7 +220,7 @@ the event.
 =head1 OUTPUT
 
 All output from the Quakenet service bots is sent as NOTICEs.
-Use L<C<irc_notice>|POE::Component::IRC/"irc_notice"> to trap these.
+Use L<C<irc_notice>|POE::Component::IRC/irc_notice> to trap these.
 
 =head2 C<irc_whois>
 

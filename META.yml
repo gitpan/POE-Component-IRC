@@ -3,7 +3,8 @@ abstract: 'A fully event-driven IRC client module'
 author:
   - 'Chris Williams <chris@bingosnet.co.uk>'
   - 'Hinrik Örn Sigurðsson <hinrik.sig@gmail.com>'
-build_requires: {}
+build_requires:
+  Test::More: 0.47
 configure_requires:
   ExtUtils::MakeMaker: 6.31
 dynamic_config: 0
@@ -30,12 +31,11 @@ requires:
   POE::Session: 0
   POE::Wheel::ReadWrite: 0
   POE::Wheel::SocketFactory: 0
-  Test::More: 0.47
   perl: 5.008
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC
   homepage: http://search.cpan.org/dist/POE-Component-IRC/
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.35
+version: 6.36
 x_authority: cpan:HINRIK

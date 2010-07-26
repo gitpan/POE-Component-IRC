@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.35';
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.36';
 }
 
 use strict;
@@ -346,7 +346,7 @@ B<'Method'>, how you want help messages to be delivered. Valid options are
 'notice' (the default) and 'privmsg'.
 
 B<'Eat'>, set to true to make the plugin hide
-L<C<irc_public>|POE::Component::IRC/"irc_public"> events from other plugins
+L<C<irc_public>|POE::Component::IRC/irc_public> events from other plugins
 when they look like commands. Probably only useful when a B<'Prefix'> is
 defined. Default is false.
 
