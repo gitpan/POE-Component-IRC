@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::Logger::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Logger::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::Logger::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use Encode::Guess;
 use Fcntl qw(O_WRONLY O_APPEND O_CREAT);
@@ -478,7 +478,6 @@ sub default_format {
 }
 
 1;
-__END__
 
 =encoding utf8
 

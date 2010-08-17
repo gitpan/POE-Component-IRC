@@ -18,6 +18,7 @@
       "directory" : [
          "t",
          "xt",
+         "utils",
          "examples"
       ]
    },
@@ -65,7 +66,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.36",
+   "version" : "6.37",
    "x_authority" : "cpan:HINRIK"
 }
 

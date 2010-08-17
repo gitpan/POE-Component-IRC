@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.36';
+  $POE::Component::IRC::State::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use POE;
 use POE::Component::IRC::Common qw(u_irc parse_mode_line parse_ban_mask);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
@@ -1077,7 +1077,8 @@ sub nick_channel_modes {
 }
 
 1;
-__END__
+
+=encoding utf8
 
 =head1 NAME
 

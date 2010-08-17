@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::Whois::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Whois::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::Whois::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use POE;
 use POE::Component::IRC::Plugin qw( PCI_EAT_NONE );
 use POE::Component::IRC::Common qw(:ALL);
@@ -178,7 +178,6 @@ sub S_369 {
 }
 
 1;
-__END__
 
 =encoding utf8
 

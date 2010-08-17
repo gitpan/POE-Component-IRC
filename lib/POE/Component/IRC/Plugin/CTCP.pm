@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::CTCP::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::CTCP::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::CTCP::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC;
 use POE::Component::IRC::Plugin qw( :ALL );
@@ -115,7 +115,6 @@ sub eat {
 }
 
 1;
-__END__
 
 =encoding utf8
 

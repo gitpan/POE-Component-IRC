@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::PlugMan::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::PlugMan::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::PlugMan::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( matches_mask parse_user );
@@ -221,7 +221,6 @@ sub _authed {
 }
 
 1;
-__END__
 
 =encoding utf8
 

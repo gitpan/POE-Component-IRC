@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::NickReclaim::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::NickReclaim::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::NickReclaim::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC::Common qw(parse_user);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
@@ -149,7 +149,6 @@ sub S_nick {
 }
 
 1;
-__END__
 
 =encoding utf8
 

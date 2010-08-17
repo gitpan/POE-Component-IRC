@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::Proxy::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use Socket;
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD 
@@ -347,7 +347,6 @@ sub wheel_info {
 }
 
 1;
-__END__
 
 =encoding utf8
 

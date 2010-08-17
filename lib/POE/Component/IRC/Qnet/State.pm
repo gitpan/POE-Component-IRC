@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::State::VERSION = '6.36';
+  $POE::Component::IRC::Qnet::State::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE;
 use POE::Component::IRC::Common qw(:ALL);
@@ -430,7 +430,6 @@ sub ban_mask {
 }
 
 1;
-__END__
 
 =encoding utf8
 

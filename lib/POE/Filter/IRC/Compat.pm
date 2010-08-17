@@ -3,11 +3,11 @@ BEGIN {
   $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::Compat::VERSION = '6.36';
+  $POE::Filter::IRC::Compat::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Filter::IRCD;
 use File::Basename qw(fileparse);
@@ -416,7 +416,6 @@ sub _low_dequote {
 }
 
 1;
-__END__
 
 =encoding utf8
 

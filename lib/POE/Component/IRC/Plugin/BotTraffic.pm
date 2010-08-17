@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotTraffic::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
@@ -66,7 +66,6 @@ sub U_privmsg {
 }
 
 1;
-__END__
 
 =encoding utf8
 

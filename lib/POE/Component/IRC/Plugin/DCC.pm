@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::DCC::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use File::Basename qw(fileparse);
 use POE qw(Driver::SysRW Filter::Line Filter::Stream
@@ -615,7 +615,6 @@ sub _dcc_up {
 }
 
 1;
-__END__
 
 =encoding utf8
 

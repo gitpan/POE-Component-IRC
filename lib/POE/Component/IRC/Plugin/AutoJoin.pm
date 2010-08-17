@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC::Plugin qw(:ALL);
 use POE::Component::IRC::Common qw(parse_user l_irc);
@@ -163,7 +163,6 @@ sub U_join {
 }
 
 1;
-__END__
 
 =encoding utf8
 

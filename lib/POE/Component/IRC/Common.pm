@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Common::VERSION = '6.36';
+  $POE::Component::IRC::Common::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 
 use Encode qw(decode);
 use Encode::Guess;
@@ -384,7 +384,6 @@ sub irc_ip_is_ipv6 {
 }
 
 1;
-__END__
 
 =encoding utf8
 

@@ -3,11 +3,11 @@ BEGIN {
   $POE::Filter::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::VERSION = '6.36';
+  $POE::Filter::IRC::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use POE::Filter::Stackable;
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
@@ -24,7 +24,6 @@ sub new {
 }
 
 1;
-__END__
 
 =encoding utf8
 

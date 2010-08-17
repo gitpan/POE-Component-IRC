@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( u_irc );
@@ -67,7 +67,6 @@ sub _identify {
 }
 
 1;
-__END__
 
 =encoding utf8
 

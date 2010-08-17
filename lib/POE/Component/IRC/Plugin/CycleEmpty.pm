@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::CycleEmpty::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Common qw( parse_user u_irc );
@@ -94,7 +94,6 @@ sub is_cycling {
 }
 
 1;
-__END__
 
 =encoding utf8
 

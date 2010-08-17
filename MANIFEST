@@ -6,6 +6,7 @@ META.json
 META.yml
 Makefile.PL
 README
+README.pod
 dist.ini
 docs/ctcpspec.html
 docs/dccspec.html
@@ -121,9 +122,9 @@ t/04_plugins/13_botcommand/04_help.t
 t/04_plugins/13_botcommand/05_auth_sub.t
 t/04_plugins/14_logger/01_load.t
 t/04_plugins/14_logger/02_public.t
-t/04_plugins/14_logger/03_log_sub.t
 t/04_plugins/14_logger/03_private.t
 t/04_plugins/14_logger/04_dcc_chat.t
+t/04_plugins/14_logger/05_log_sub.t
 t/04_plugins/15_nickservid/01_load.t
 t/04_plugins/16_whois/01_load.t
 t/04_plugins/16_whois/02_whois.t
@@ -146,10 +147,3 @@ t/inc/POE/Component/Server/IRC/Common.pm
 t/inc/POE/Component/Server/IRC/OperServ.pm
 t/inc/POE/Component/Server/IRC/Pipeline.pm
 t/inc/POE/Component/Server/IRC/Plugin.pm
-t/release-pod-syntax.t
-xt/perl_critic.t
-xt/perl_critic_t.t
-xt/perlcriticrc
-xt/perlcriticrc_t
-xt/pod.t
-xt/pod_coverage.t

@@ -3,11 +3,11 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.36';
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.37';
 }
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 use Carp;
 use POE::Component::IRC::Common qw( parse_user strip_color strip_formatting );
 use POE::Component::IRC::Plugin qw( :ALL );
@@ -182,7 +182,6 @@ sub list {
 }
 
 1;
-__END__
 
 =encoding utf8
 
