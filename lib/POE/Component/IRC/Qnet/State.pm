@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::State::VERSION = '6.37';
+  $POE::Component::IRC::Qnet::State::VERSION = '6.38';
 }
 
 use strict;
