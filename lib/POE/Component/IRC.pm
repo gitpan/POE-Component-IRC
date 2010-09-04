@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.38';
+  $POE::Component::IRC::VERSION = '6.39';
 }
 
 use strict;
@@ -93,7 +93,6 @@ sub _create {
         stats     => [ PRI_HIGH,     'spacesep',      ],
         links     => [ PRI_HIGH,     'spacesep',      ],
         mode      => [ PRI_HIGH,     'spacesep',      ],
-        nickserv  => [ PRI_HIGH,     'spacesep',      ],
         servlist  => [ PRI_HIGH,     'spacesep',      ],
         part      => [ PRI_HIGH,     'commasep',      ],
         names     => [ PRI_HIGH,     'commasep',      ],
@@ -136,6 +135,7 @@ sub _create {
         kick
         register
         remove
+        nickserv
         shutdown
         sl
         sl_login
@@ -231,15 +231,13 @@ sub _parseline {
     my ($session, $self, $ev) = @_[SESSION, OBJECT, ARG0];
 
     return if !$ev->{name};
-
     $self->_send_event(irc_raw => $ev->{raw_line} ) if $self->{raw};
 
-    # If its 001 event grab the server name and stuff it into {INFO}
+    # record our nickname
     if ( $ev->{name} eq '001' ) {
-        $self->{INFO}->{ServerName} = $ev->{args}->[0];
-        $self->{RealNick} = ( split / /, $ev->{raw_line} )[2];
+        $self->{INFO}{RealNick} = ( split / /, $ev->{raw_line} )[2];
     }
-    
+
     $ev->{name} = 'irc_' . $ev->{name};
     $self->_send_event( $ev->{name}, @{$ev->{args}} );
 
@@ -703,7 +701,7 @@ sub connect {
         $kernel->yield('_do_connect');
     }
 
-    $self->{RealNick} = $self->{nick};
+    $self->{INFO}{RealNick} = $self->{nick};
     return;
 }
 
@@ -877,6 +875,20 @@ sub remove {
 
     $nick .= " :$message" if defined $message;
     $kernel->yield(sl_high => "REMOVE $chan $nick");
+    return;
+}
+
+# Interact with NickServ
+sub nickserv {
+    my ($kernel, $self, $state) = @_[KERNEL, OBJECT, STATE];
+    my $args = join ' ', @_[ARG0 .. $#_];
+
+    my $command = 'NICKSERV';
+    my $version = $self->server_version();
+    $command = 'NS' if defined $version && $version =~ /ratbox/i;
+    $command .= " $args" if defined $args;
+
+    $kernel->yield(sl_high => $command);
     return;
 }
 
@@ -1374,7 +1386,12 @@ sub userhost {
 
 sub server_name {
     my ($self) = @_;
-    return $self->{INFO}->{ServerName};
+    return $self->{INFO}{ServerName};
+}
+
+sub server_version {
+    my ($self) = @_;
+    return $self->{INFO}{ServerVersion};
 }
 
 sub localaddr {
@@ -1384,7 +1401,7 @@ sub localaddr {
 
 sub nick_name {
     my ($self) = @_;
-    return $self->{RealNick};
+    return $self->{INFO}{RealNick};
 }
 
 sub send_queue {
@@ -1474,7 +1491,7 @@ sub connected {
 
 sub logged_in {
     my ($self) = @_;
-    return 1 if $self->{logged_in};
+    return 1 if $self->{INFO}{LoggedIn};
     return;
 }
 
@@ -1516,25 +1533,33 @@ sub _compress_downlink {
 
 sub S_001 {
     my ($self, $irc) = splice @_, 0, 2;
-    $self->{logged_in} = 1;
+    $self->{INFO}{ServerName} = ${ $_[0] };
+    $self->{INFO}{LoggedIn}   = 1;
+    return PCI_EAT_NONE;
+}
+
+sub S_004 {
+    my ($self, $irc) = splice @_, 0, 2;
+    my $args = ${ $_[2] };
+    $self->{INFO}{ServerVersion} = $args->[1];
     return PCI_EAT_NONE;
 }
 
 sub S_error {
     my ($self, $irc) = splice @_, 0, 2;
-    $self->{logged_in} = 0;
+    $self->{INFO}{LoggedIn} = 0;
     return PCI_EAT_NONE;
 }
 
 sub S_disconnected {
     my ($self, $irc) = splice @_, 0, 2;
-    $self->{logged_in} = 0;
+    $self->{INFO}{LoggedIn} = 0;
     return PCI_EAT_NONE;
 }
 
 sub S_shutdown {
     my ($self, $irc) = splice @_, 0, 2;
-    $self->{logged_in} = 0;
+    $self->{INFO}{LoggedIn} = 0;
     return PCI_EAT_NONE;
 }
 
@@ -1553,7 +1578,7 @@ sub S_nick {
     my ($self, $irc) = splice @_, 0, 2;
     my $nick = ( split /!/, ${ $_[0] } )[0];
     my $new = ${ $_[1] };
-    $self->{RealNick} = $new if ( $nick eq $self->{RealNick} );
+    $self->{INFO}{RealNick} = $new if ( $nick eq $self->{INFO}{RealNick} );
     return PCI_EAT_NONE;
 }
 
@@ -1979,6 +2004,10 @@ See its documentation for details.
 Takes no arguments. Returns the name of the IRC server that the component
 is currently connected to.
 
+=head2 C<server_version>
+
+Takes no arguments. Returns the IRC server version.
+
 =head2 C<nick_name>
 
 Takes no arguments. Returns a scalar containing the current nickname that the
@@ -1999,10 +2028,6 @@ events to the component.
 
 Takes no arguments. Returns the session alias that has been set through
 L<C<spawn>|/spawn>'s alias argument.
-
-=head2 C<version>
-
-Takes no arguments. Returns the version number of the module.
 
 =head2 C<send_queue>
 
@@ -2201,9 +2226,9 @@ the details anyhow.
 Allows you to change your nickname. Takes exactly one argument: the
 new username that you'd like to be known as.
 
-=head3 C<nickserv> (FreeNode only)
+=head3 C<nickserv> (FreeNode, ratbox, et al)
 
-Talks to FreeNode's NickServ. Takes any number of arguments.
+Talks to NickServ. Takes any number of arguments.
 
 =head3 C<notice>
 

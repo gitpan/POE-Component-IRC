@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.38';
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.39';
 }
 
 use strict;
@@ -39,7 +39,7 @@ sub PCI_register {
     }
     elsif (ref $self->{Channels} eq 'ARRAY') {
         my %channels;
-        $channels{l_irc($_, $irc->isupport('MAPPING'))} = '' for @{ $self->{Channels} };
+        $channels{l_irc($_, $irc->isupport('MAPPING'))} = undef for @{ $self->{Channels} };
         $self->{Channels} = \%channels;
     }
 
@@ -79,7 +79,7 @@ sub S_isupport {
     my ($self, $irc) = splice @_, 0, 2;
     
     while (my ($chan, $key) = each %{ $self->{Channels} }) {
-        $irc->yield(join => $chan => $key);
+        $irc->yield(join => $chan => (defined $key ? $key : ()));
     }
     return PCI_EAT_NONE;
 }
@@ -93,7 +93,7 @@ sub S_474 {
 
     my $key = $self->{Channels}{$lchan};
     $key = $self->{tried_keys}{$lchan} if defined $self->{tried_keys}{$lchan};
-    $irc->delay([join => $chan => $key], $self->{Retry_when_banned});
+    $irc->delay([join => $chan => (defined $key ? $key : ())], $self->{Retry_when_banned});
     return PCI_EAT_NONE;
 }
 
@@ -136,7 +136,11 @@ sub S_kick {
 
     if ($victim eq $irc->nick_name()) {
         if ($self->{RejoinOnKick}) {
-            $irc->delay([join => $chan => $self->{Channels}->{$lchan}], $self->{Rejoin_delay});
+            $irc->delay([
+                'join',
+                $chan,
+                (defined $self->{Channels}->{$lchan} ? $self->{Channels}->{$lchan} : ())
+            ], $self->{Rejoin_delay});
         }
         delete $self->{Channels}->{$lchan};
     }

@@ -357,6 +357,9 @@ METHODS
     Takes no arguments. Returns the name of the IRC server that the
     component is currently connected to.
 
+  "server_version"
+    Takes no arguments. Returns the IRC server version.
+
   "nick_name"
     Takes no arguments. Returns a scalar containing the current nickname
     that the bot is using.
@@ -373,9 +376,6 @@ METHODS
   "session_alias"
     Takes no arguments. Returns the session alias that has been set through
     "spawn"'s alias argument.
-
-  "version"
-    Takes no arguments. Returns the version number of the module.
 
   "send_queue"
     The component provides anti-flood throttling. This method takes no
@@ -552,8 +552,8 @@ INPUT
     Allows you to change your nickname. Takes exactly one argument: the new
     username that you'd like to be known as.
 
-   "nickserv" (FreeNode only)
-    Talks to FreeNode's NickServ. Takes any number of arguments.
+   "nickserv" (FreeNode, ratbox, et al)
+    Talks to NickServ. Takes any number of arguments.
 
    "notice"
     Sends a NOTICE message to the nick(s) or channel(s) which you specify.
