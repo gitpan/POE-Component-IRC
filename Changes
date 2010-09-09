@@ -1,5 +1,9 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.40  Thu Sep 9 06:55:27 UTC 2010
+    - AutoJoin.pm: Wait for a reply from NickServ before joining channels
+      on connect
+
 6.39  Sat Sep 4 02:16:28 UTC 2010
     - AutoJoin.pm: Allow channel keys to be undefined
     - Make the 'nickserv' command do the right thing on ratbox ircds
