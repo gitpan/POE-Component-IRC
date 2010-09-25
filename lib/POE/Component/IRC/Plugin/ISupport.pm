@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.41';
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.42';
 }
 
 use strict;
@@ -93,10 +93,11 @@ sub PCI_unregister {
     return 1;
 }
 
-sub S_001 {
+sub S_connected {
     my ($self, $irc) = splice @_, 0, 2;
 
-    $self->{server} = { };
+    $self->{server}   = { };
+    $self->{got_005}  = 0;
     $self->{done_005} = 0;
     return PCI_EAT_NONE;
 }
@@ -135,7 +136,8 @@ sub S_005 {
             }
         }
     }
-    
+
+    $self->{got_005}++;
     return PCI_EAT_NONE;
 }
 
@@ -143,7 +145,8 @@ sub _default {
     my ($self, $irc, $event) = @_;
 
     return PCI_EAT_NONE if $self->{done_005};
-    
+    return PCI_EAT_NONE if !$self->{got_005};
+
     if ($event =~ /^S_(\d+)/ and $1 > 5) {
         $irc->send_event(irc_isupport => $self);
         $self->{done_005} = 1;
