@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Common::VERSION = '6.43';
+  $POE::Component::IRC::Common::VERSION = '6.44';
 }
 
 use strict;
@@ -109,7 +109,7 @@ sub parse_mode_line {
            $statmodes = join '', keys %{ $arg };
            next;
         }
-        elsif ( $arg =~ /^(\+|-)/ or $count == 0 ) {
+        elsif ( $arg =~ /^[-+]/ or $count == 0 ) {
             my $action = '+';
             for my $char ( split (//,$arg) ) {
                 if ($char eq '+' or $char eq '-') {
@@ -119,11 +119,12 @@ sub parse_mode_line {
                    push @{ $hashref->{modes} }, $action . $char;
                 }
                 
-                if ($char =~ /[$statmodes$chanmodes->[0]$chanmodes->[1]]/) {
+                if (length $chanmodes->[0] && length $chanmodes->[1] && length $statmodes
+                    && $char =~ /[$statmodes$chanmodes->[0]$chanmodes->[1]]/) {
                     push @{ $hashref->{args} }, shift @args;
                 }
                 
-                if ($action eq '+' && $char =~ /[$chanmodes->[2]]/) {
+                if (length $chanmodes->[2] && $action eq '+' && $char =~ /[$chanmodes->[2]]/) {
                     push @{ $hashref->{args} }, shift @args;
                 }
             }
