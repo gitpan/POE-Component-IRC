@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.44';
+  $POE::Component::IRC::VERSION = '6.45';
 }
 
 use strict;
@@ -173,12 +173,6 @@ sub _configure {
     
     if ($self->{usessl} && !$GOT_SSL) {
         warn "'usessl' option specified, but POE::Component::SSLify was not found\n";
-    }
-
-    if (!$self->{nodns} && $GOT_CLIENT_DNS && !$self->{resolver} ) {
-        $self->{resolver} = POE::Component::Client::DNS->spawn(
-            Alias => 'resolver' . $self->session_id(),
-        );
     }
 
     $self->{dcc}->nataddr($self->{nataddr}) if exists $self->{nataddr};
@@ -940,16 +934,17 @@ sub spawn {
         args => [ $alias ],
         heap => $self,
     );
-    
-    if (!$params{nodns} && $GOT_CLIENT_DNS) {
+
+    $params{spawned} = 1;
+    $self->_configure(\%params);
+
+    if (!$params{nodns} && $GOT_CLIENT_DNS && !$self->{resolver}) {
         $self->{resolver} = POE::Component::Client::DNS->spawn(
             Alias => 'resolver' . $self->session_id()
         );
         $self->{mydns} = 1;
     }
-    
-    $params{spawned} = 1;
-    $self->_configure(\%params);
+
     return $self;
 }
 
@@ -1173,7 +1168,7 @@ sub shutdown {
     # Delete all plugins that are loaded.
     $self->_pluggable_destroy();
     
-    $self->{resolver}->shutdown() if $self->{resolver};
+    $self->{resolver}->shutdown() if $self->{resolver} && $self->{mydns};
     $kernel->call($session => sl_high => $cmd) if $self->{socket};
     
     return;

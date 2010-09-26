@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::FollowTail::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.44';
+  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.45';
 }
 
 use strict;
