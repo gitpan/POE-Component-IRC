@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
- BEGIN { require 5.008; } 
+BEGIN { require 5.008; }
 
 use ExtUtils::MakeMaker 6.31;
 
@@ -22,9 +22,9 @@ my %WriteMakefileArgs = (
   'LICENSE' => 'perl',
   'NAME' => 'POE::Component::IRC',
   'PREREQ_PM' => {
+    'Object::Pluggable' => '0',
     'POE' => '1.287',
     'POE::Component::Client::DNS' => '0.99',
-    'POE::Component::Pluggable' => '1.26',
     'POE::Driver::SysRW' => '0',
     'POE::Filter::IRCD' => '2.42',
     'POE::Filter::Line' => '0',
@@ -34,7 +34,7 @@ my %WriteMakefileArgs = (
     'POE::Wheel::ReadWrite' => '0',
     'POE::Wheel::SocketFactory' => '0'
   },
-  'VERSION' => '6.45',
+  'VERSION' => '6.46',
   'test' => {
     'TESTS' => 't/01_base/*.t t/02_behavior/*.t t/03_subclasses/*.t t/04_plugins/01_ctcp/*.t t/04_plugins/02_connector/*.t t/04_plugins/03_botaddressed/*.t t/04_plugins/04_bottraffic/*.t t/04_plugins/05_isupport/*.t t/04_plugins/06_plugman/*.t t/04_plugins/07_console/*.t t/04_plugins/08_proxy/*.t t/04_plugins/09_nickreclaim/*.t t/04_plugins/10_followtail/*.t t/04_plugins/11_cycleempty/*.t t/04_plugins/12_autojoin/*.t t/04_plugins/13_botcommand/*.t t/04_plugins/14_logger/*.t t/04_plugins/15_nickservid/*.t t/04_plugins/16_whois/*.t t/04_plugins/17_dcc/*.t t/05_regression/*.t'
   }

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::DCC::VERSION = '6.45';
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.46';
 }
 
 use strict;
@@ -149,6 +149,7 @@ sub _default {
     my ($self, $irc, $event) = splice @_, 0, 3;
     return PCI_EAT_NONE if $event !~ /^U_dcc(_accept|_chat|_close|_resume)?$/;
     $event =~ s/^U_/_U_/;
+    pop @_;
     my @args = map { $$_ } @_;
     $poe_kernel->call($self->{session_id}, $event, @args);
     return PCI_EAT_NONE;

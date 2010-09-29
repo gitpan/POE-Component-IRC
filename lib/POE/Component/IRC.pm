@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.45';
+  $POE::Component::IRC::VERSION = '6.46';
 }
 
 use strict;
@@ -20,7 +20,7 @@ use POE::Component::IRC::Plugin::DCC;
 use POE::Component::IRC::Plugin::ISupport;
 use POE::Component::IRC::Plugin::Whois;
 use Socket;
-use base qw(POE::Component::Pluggable);
+use base qw(Object::Pluggable);
 
 our ($GOT_SSL, $GOT_CLIENT_DNS, $GOT_SOCKET6, $GOT_ZLIB);
 
@@ -282,16 +282,12 @@ sub _send_event {
     # any other bugger
     $kernel->call($session => $event => @args) if delete $sessions{$session};
 
-    my @extra_args;
     # Let the plugin system process this
     return 1 if $self->_pluggable_process(
         'SERVER',
         $event,
-        \( @args ),
-        \@extra_args,
+        \@args,
     ) == PCI_EAT_ALL;
-
-    push @args, @extra_args if @extra_args;
 
     # BINGOS:
     # We have a hack here, because the component used to send 'irc_connected'
@@ -812,7 +808,7 @@ sub ctcp {
 # allow plugins to respond to user commands which are not defined here
 sub __default {
     return if $_[ARG0] =~ /^_/;
-    $_[OBJECT]->_pluggable_process(USER => $_[ARG0] => \(@{ $_[ARG1] }));
+    $_[OBJECT]->_pluggable_process(USER => $_[ARG0] => [@{ $_[ARG1] }]);
     return;
 }
 
@@ -1208,21 +1204,22 @@ sub sl {
 # flood yourself off.  Thanks to Raistlin for explaining how ircd
 # throttles messages.
 sub sl_prioritized {
-    my ($kernel, $self, $priority, $msg) = @_[KERNEL, OBJECT, ARG0, ARG1];
+    my ($kernel, $self, $priority, @args) = @_[KERNEL, OBJECT, ARG0, ARG1];
 
     # Get the first word for the plugin system
-    if (my ($event) = $msg =~ /^(\w+)/ ) {
+    if (my ($event) = $args[0] =~ /^(\w+)/ ) {
         # Let the plugin system process this
         return 1 if $self->_pluggable_process(
             'USER',
             $event,
-            \$msg,
+            \@args,
         ) == PCI_EAT_ALL;
     }
     else {
-        warn "Unable to extract the event name from '$msg'\n";
+        warn "Unable to extract the event name from '$args[0]'\n";
     }
 
+    my $msg = $args[0];
     my $now = time();
     $self->{send_time} = $now if $self->{send_time} < $now;
 
@@ -1851,7 +1848,8 @@ L<C<register>|/register> and L<C<irc_registered>|/irc_registered>.
 
 Takes a number of arguments, all of which are optional. All the options
 below may be supplied to the L<C<connect>|/connect> input event as well,
-except for B<'alias'>, B<'options'>, B<'NoDNS'>, and B<'plugin_debug'>.
+except for B<'alias'>, B<'options'>, B<'NoDNS'>, B<'debug'>, and
+B<'plugin_debug'>.
 
 B<'alias'>, a name (kernel alias) that this instance will be known by;
 
@@ -1908,7 +1906,13 @@ send as long a message as possible. Be careful though, increase it too much
 and the IRC server might disconnect you with a "Request too long" message when
 you try to send a message that's too long.
 
+B<'debug'>, if set to a true value causes the IRC component to print every
+message sent to and from the server, as well as print some warnings when it
+receives malformed messages.
+
 B<'plugin_debug'>, set to some true value to print plugin debug info, default 0.
+Plugins are processed inside an eval. When you enable this option, you will be
+notified when (and why) a plugin raises an exception.
 
 B<'socks_proxy'>, specify a SOCKS4/SOCKS4a proxy to use.
 
@@ -1964,9 +1968,6 @@ completely. Setting it with L<C<connect>|/connect> on the other hand
 allows the PoCo-Client-DNS session to be spawned, but will disable
 any dns lookups using it.
 
-B<'plugin_debug'>, setting to true enables plugin debug info. Plugins are processed
-inside an eval, so debugging them can be hard. This should help with that.
-
 SOCKS4 proxy support is provided by B<'socks_proxy'>, B<'socks_port'> and
 B<'socks_id'> parameters. If something goes wrong with the SOCKS connection
 you should get a warning on STDERR. This is fairly experimental currently.
@@ -1991,7 +1992,7 @@ plans to make it die() >;]
 =head1 METHODS
 
 These are methods supported by the POE::Component::IRC object. It also
-inherits a few from L<POE::Component::Pluggable|POE::Component::Pluggable>.
+inherits a few from L<Object::Pluggable|Object::Pluggable>.
 See its documentation for details.
 
 =head2 C<server_name>

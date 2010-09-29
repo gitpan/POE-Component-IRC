@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::VERSION = '6.45';
+  $POE::Component::IRC::Plugin::VERSION = '6.46';
 }
 
 use strict;
@@ -82,9 +82,9 @@ L<POE::Component::IRC|POE::Component::IRC>
 =head1 DESCRIPTION
 
 POE::Component::IRC's plugin system has been released separately as
-L<POE::Component::Pluggable|POE::Component::Pluggable>. Gleaning at its
-documentation is advised. The rest of this document mostly describes aspects
-that are specific to POE::Component::IRC's use of POE::Component::Pluggable.
+L<Object::Pluggable|Object::Pluggable>. Gleaning at its documentation is
+advised. The rest of this document mostly describes aspects that are
+specific to POE::Component::IRC's use of Object::Pluggable.
 
 =head1 HISTORY
 
@@ -403,9 +403,9 @@ Also, the ':ALL' tag can be used to get all of them.
 
 L<POE::Component::IRC|POE::Component::IRC>
 
-L<POE::Component::Pluggable|POE::Component::Pluggable>
+L<Object::Pluggable|Object::Pluggable>
 
-L<POE::Component::Pluggable::Pipeline|POE::Component::Pluggable::Pipeline>
+L<Object::Pluggable::Pipeline|Object::Pluggable::Pipeline>
 
 L<POE::Session|POE::Session>
 

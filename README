@@ -207,7 +207,7 @@ CONSTRUCTORS
   "spawn"
     Takes a number of arguments, all of which are optional. All the options
     below may be supplied to the "connect" input event as well, except for
-    'alias', 'options', 'NoDNS', and 'plugin_debug'.
+    'alias', 'options', 'NoDNS', 'debug', and 'plugin_debug'.
 
     'alias', a name (kernel alias) that this instance will be known by;
 
@@ -267,8 +267,14 @@ CONSTRUCTORS
     too much and the IRC server might disconnect you with a "Request too
     long" message when you try to send a message that's too long.
 
+    'debug', if set to a true value causes the IRC component to print every
+    message sent to and from the server, as well as print some warnings when
+    it receives malformed messages.
+
     'plugin_debug', set to some true value to print plugin debug info,
-    default 0.
+    default 0. Plugins are processed inside an eval. When you enable this
+    option, you will be notified when (and why) a plugin raises an
+    exception.
 
     'socks_proxy', specify a SOCKS4/SOCKS4a proxy to use.
 
@@ -323,10 +329,6 @@ CONSTRUCTORS
     the other hand allows the PoCo-Client-DNS session to be spawned, but
     will disable any dns lookups using it.
 
-    'plugin_debug', setting to true enables plugin debug info. Plugins are
-    processed inside an eval, so debugging them can be hard. This should
-    help with that.
-
     SOCKS4 proxy support is provided by 'socks_proxy', 'socks_port' and
     'socks_id' parameters. If something goes wrong with the SOCKS connection
     you should get a warning on STDERR. This is fairly experimental
@@ -350,7 +352,7 @@ CONSTRUCTORS
 
 METHODS
     These are methods supported by the POE::Component::IRC object. It also
-    inherits a few from POE::Component::Pluggable. See its documentation for
+    inherits a few from Object::Pluggable. See its documentation for
     details.
 
   "server_name"

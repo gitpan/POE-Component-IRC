@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Logger::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Logger::VERSION = '6.45';
+  $POE::Component::IRC::Plugin::Logger::VERSION = '6.46';
 }
 
 use strict;
@@ -226,7 +226,7 @@ sub S_nick {
     my ($self, $irc) = splice @_, 0, 2;
     my $old_nick = parse_user(${ $_[0] });
     my $new_nick = ${ $_[1] };
-    my $channels = @{ $_[2] }[0];
+    my $channels = ${ $_[2] };
 
     for my $chan (@{ $channels }) {
         $chan = irc_to_utf8($chan);
@@ -263,7 +263,7 @@ sub S_quit {
     my ($self, $irc) = splice @_, 0, 2;
     my ($quitter, $user, $host) = parse_user(${ $_[0] });
     my $msg      = $self->_normalize(${ $_[1] });
-    my $channels = @{ $_[2] }[0];
+    my $channels = ${ $_[2] };
 
     for my $chan (@{ $channels }) {
         $chan = irc_to_utf8($chan);
@@ -310,6 +310,7 @@ sub S_dcc_chat {
 
 sub U_dcc_chat {
     my ($self, $irc) = splice @_, 0, 2;
+    pop @_;
     my ($id, @lines) = @_;
     $_ = $$_ for @lines;
     my $me = $irc->nick_name();
