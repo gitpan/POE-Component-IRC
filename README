@@ -636,6 +636,10 @@ INPUT
     communicate with you. When sent without arguments, it tells the server
     that you're back and paying attention.
 
+   "cap"
+    Used to query/enable/disable IRC protocol capabilities. Takes any number
+    of arguments.
+
    "dcc*"
     See the DCC plugin (loaded by default) documentation for DCC-related
     commands.
@@ -848,7 +852,7 @@ OUTPUT
     generates an "irc_ctcp_action" event, blah blah, so on and so forth.
     "ARG0" is the nick!hostmask of the sender. "ARG1" is the
     channel/recipient name(s). "ARG2" is the text of the CTCP message. On
-    servers supporting the CAPAB IDENTIFY-MSG feature (e.g. FreeNode), CTCP
+    servers supporting the IDENTIFY-MSG feature (e.g. FreeNode), CTCP
     ACTIONs will have "ARG3", which will be 1 if the sender has identified
     with NickServ, 0 otherwise.
 
@@ -897,9 +901,9 @@ OUTPUT
     Sent whenever you receive a PRIVMSG command that was addressed to you
     privately. "ARG0" is the nick!hostmask of the sender. "ARG1" is an array
     reference containing the nick(s) of the recipients. "ARG2" is the text
-    of the message. On servers supporting the CAPAB IDENTIFY-MSG feature
-    (e.g. FreeNode), CTCP ACTIONs will have "ARG3", which will be 1 if the
-    sender has identified with NickServ, 0 otherwise.
+    of the message. On servers supporting the IDENTIFY-MSG feature (e.g.
+    FreeNode), there will be an additional argument, "ARG3", will be 1 if
+    the sender has identified with NickServ, 0 otherwise.
 
    "irc_nick"
     Sent whenever you, or someone around you, changes nicks. "ARG0" is the
@@ -921,9 +925,9 @@ OUTPUT
     Sent whenever you receive a PRIVMSG command that was sent to a channel.
     "ARG0" is the nick!hostmask of the sender. "ARG1" is an array reference
     containing the channel name(s) of the recipients. "ARG2" is the text of
-    the message. On servers supporting the CAPAB IDENTIFY-MSG feature (e.g.
-    FreeNode), CTCP ACTIONs will have "ARG3", which will be 1 if the sender
-    has identified with NickServ, 0 otherwise.
+    the message. On servers supporting the IDENTIFY-MSG feature (e.g.
+    FreeNode), there will be an additional argument, "ARG3", will be 1 if
+    the sender has identified with NickServ, 0 otherwise.
 
    "irc_quit"
     Sent whenever someone on a channel with you quits IRC (or gets KILLed).
@@ -1025,6 +1029,12 @@ OUTPUT
     SOCKS port and "ARG3" the SOCKS user id (if defined).
 
   Somewhat Less Important Events
+   "irc_cap"
+    A reply from the server regarding protocol capabilities. "ARG0" is the
+    CAP subcommand (e.g. 'LS'). "ARG1" is the result of the subcommand,
+    unless this is a multi-part reply, in which case "ARG1" is '*' and
+    "ARG2" contains the result.
+
    "irc_dcc_*"
     See the DCC plugin (loaded by default) documentation for DCC-related
     events.

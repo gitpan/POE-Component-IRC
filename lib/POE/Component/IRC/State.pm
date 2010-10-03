@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.46';
+  $POE::Component::IRC::State::VERSION = '6.47';
 }
 
 use strict;
@@ -37,6 +37,7 @@ sub S_disconnected {
     shift @_;
 
     my $nickinfo = $self->nick_info($self->nick_name());
+    $nickinfo = {} if !defined $nickinfo;
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
     return PCI_EAT_NONE;
@@ -48,6 +49,7 @@ sub S_error {
     shift @_;
 
     my $nickinfo = $self->nick_info($self->nick_name());
+    $nickinfo = {} if !defined $nickinfo;
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
     return PCI_EAT_NONE;
@@ -56,6 +58,7 @@ sub S_error {
 sub S_socketerr {
     my ($self, undef) = splice @_, 0, 2;
     my $nickinfo = $self->nick_info($self->nick_name());
+    $nickinfo = {} if !defined $nickinfo;
     my $channels = $self->channels();
     push @{ $_[-1] }, $nickinfo, $channels;
     return PCI_EAT_NONE;
@@ -173,11 +176,7 @@ sub S_quit {
     # Check if it is a netsplit
     $netsplit = 1 if _is_netsplit( $msg );
 
-    if ($unick eq u_irc($self->nick_name(), $map)) {
-        delete $self->{STATE};
-        delete $self->{NETSPLIT};
-    }
-    else {
+    if ($unick ne u_irc($self->nick_name(), $map)) {
         for my $uchan ( keys %{ $self->{STATE}{Nicks}{ $unick }{CHANS} } ) {
             delete $self->{STATE}{Chans}{ $uchan }{Nicks}{ $unick };
             # No don't stash the channel state.

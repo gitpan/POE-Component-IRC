@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Console::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Console::VERSION = '6.46';
+  $POE::Component::IRC::Plugin::Console::VERSION = '6.47';
 }
 
 use strict;
@@ -58,6 +58,9 @@ sub _default {
         if ( ref($arg) eq 'ARRAY' ) {
             push( @output, '[' . join(', ', @$arg ) . ']' );
         }
+        elsif (ref $arg eq 'HASH') {
+            push @output, '{'. join(', ', map { "$_ => \"$arg->{$_}\"" } keys %$arg) .'}';
+        }
         else {
             push ( @output, "'$arg'" );
         }
@@ -65,6 +68,7 @@ sub _default {
 
     for my $wheel_id ( keys %{ $self->{wheels} } ) {
         next if ( $self->{exit}->{ $wheel_id } or ( not defined ( $self->{wheels}->{ $wheel_id } ) ) );
+        next if !$self->{authed}{ $wheel_id };
         $self->{wheels}->{ $wheel_id }->put( join(' ', @output ) );
     }
     

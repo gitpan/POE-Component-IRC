@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.46';
+  $POE::Component::IRC::VERSION = '6.47';
 }
 
 use strict;
@@ -94,6 +94,7 @@ sub _create {
         links     => [ PRI_HIGH,     'spacesep',      ],
         mode      => [ PRI_HIGH,     'spacesep',      ],
         servlist  => [ PRI_HIGH,     'spacesep',      ],
+        cap       => [ PRI_HIGH,     'spacesep',      ],
         part      => [ PRI_HIGH,     'commasep',      ],
         names     => [ PRI_HIGH,     'commasep',      ],
         list      => [ PRI_HIGH,     'commasep',      ],
@@ -527,6 +528,12 @@ sub _send_login {
     my ($kernel, $self, $session) = @_[KERNEL, OBJECT, SESSION];
 
     # Now that we're connected, attempt to log into the server.
+
+    # for servers which support CAP, it's customary to start with that
+    $kernel->call($session, 'sl_login', 'CAP REQ identify-msg');
+    $kernel->call($session, 'sl_login', 'CAP LS');
+    $kernel->call($session, 'sl_login', 'CAP END');
+
     if ($self->{password}) {
         $kernel->call($session => sl_login => 'PASS ' . $self->{password});
     }
@@ -1174,7 +1181,7 @@ sub shutdown {
 # must go first.
 sub sl_login {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    my $arg = join '', @_[ARG0 .. $#_];
+    my $arg = join ' ', @_[ARG0 .. $#_];
     $kernel->yield(sl_prioritized => PRI_LOGIN, $arg );
     return;
 }
@@ -1183,7 +1190,7 @@ sub sl_login {
 # modes, kick messages, and whatever.
 sub sl_high {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    my $arg = join '', @_[ARG0 .. $#_];
+    my $arg = join ' ', @_[ARG0 .. $#_];
     $kernel->yield(sl_prioritized => PRI_HIGH, $arg );
     return;
 }
@@ -1193,7 +1200,7 @@ sub sl_high {
 # code.
 sub sl {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    my $arg = join '', @_[ARG0 .. $#_];
+    my $arg = join ' ', @_[ARG0 .. $#_];
     $kernel->yield(sl_prioritized => PRI_NORMAL, $arg );
     return;
 }
@@ -1579,6 +1586,24 @@ sub S_290 {
     my ($self, $irc) = splice @_, 0, 2;
     my $text = ${ $_[1] };
     $self->{ircd_compat}->identifymsg(1) if $text eq 'IDENTIFY-MSG';
+    return PCI_EAT_NONE;
+}
+
+sub S_cap {
+    my ($self, $irc) = splice @_, 0, 2;
+    my $cmd = ${ $_[0] };
+
+    if ($cmd eq 'ACK') {
+        my $list = ${ $_[1] } eq '*' ? ${ $_[2] } : ${ $_[1] };
+        my @enabled = split / /, $list;
+
+        if (grep { $_ =~ /^=?identify-msg$/ } @enabled) {
+            $self->{ircd_compat}->identifymsg(1);
+        }
+        if (grep { $_ =~ /^-identify-msg$/ } @enabled) {
+            $self->{ircd_compat}->identifymsg(0);
+        }
+    }
     return PCI_EAT_NONE;
 }
 
@@ -2317,6 +2342,11 @@ preoccupied, and pass your message along to anyone who tries to
 communicate with you. When sent without arguments, it tells the server
 that you're back and paying attention.
 
+=head3 C<cap>
+
+Used to query/enable/disable IRC protocol capabilities. Takes any number of
+arguments.
+
 =head3 C<dcc*>
 
 See the L<DCC plugin|POE::Component::IRC::Plugin/COMMANDS> (loaded by default)
@@ -2569,8 +2599,8 @@ event, CTCP ACTION (produced by typing "/me" in most IRC clients)
 generates an C<irc_ctcp_action> event, blah blah, so on and so forth. C<ARG0>
 is the nick!hostmask of the sender. C<ARG1> is the channel/recipient
 name(s). C<ARG2> is the text of the CTCP message. On servers supporting the
-CAPAB IDENTIFY-MSG feature (e.g. FreeNode), CTCP ACTIONs will have C<ARG3>,
-which will be 1 if the sender has identified with NickServ, 0 otherwise.
+IDENTIFY-MSG feature (e.g. FreeNode), CTCP ACTIONs will have C<ARG3>, which
+will be C<1> if the sender has identified with NickServ, C<0> otherwise.
 
 Note that DCCs are handled separately -- see the
 L<DCC plugin|POE::Component::IRC::Plugin::DCC>.
@@ -2626,9 +2656,9 @@ hostmasks, channel keys, whatever).
 Sent whenever you receive a PRIVMSG command that was addressed to you
 privately. C<ARG0> is the nick!hostmask of the sender. C<ARG1> is an array
 reference containing the nick(s) of the recipients. C<ARG2> is the text
-of the message. On servers supporting the CAPAB IDENTIFY-MSG feature
-(e.g. FreeNode), CTCP ACTIONs will have C<ARG3>, which will be 1 if the
-sender has identified with NickServ, 0 otherwise.
+of the message. On servers supporting the IDENTIFY-MSG feature (e.g.
+FreeNode), there will be an additional argument, C<ARG3>, will be C<1> if the
+sender has identified with NickServ, C<0> otherwise.
 
 =head3 C<irc_nick>
 
@@ -2654,9 +2684,9 @@ message.
 Sent whenever you receive a PRIVMSG command that was sent to a channel.
 C<ARG0> is the nick!hostmask of the sender. C<ARG1> is an array
 reference containing the channel name(s) of the recipients. C<ARG2> is the
-text of the message. On servers supporting the CAPAB IDENTIFY-MSG feature
-(e.g. FreeNode), CTCP ACTIONs will have C<ARG3>, which will be 1 if the
-sender has identified with NickServ, 0 otherwise.
+text of the message. On servers supporting the IDENTIFY-MSG feature (e.g.
+FreeNode), there will be an additional argument, C<ARG3>, will be C<1> if the
+sender has identified with NickServ, C<0> otherwise.
 
 =head3 C<irc_quit>
 
@@ -2770,6 +2800,13 @@ the SOCKS code, C<ARG1> the SOCKS server address, C<ARG2> the SOCKS port and
 C<ARG3> the SOCKS user id (if defined).
 
 =head2 Somewhat Less Important Events
+
+=head3 C<irc_cap>
+
+A reply from the server regarding protocol capabilities. C<ARG0> is the
+CAP subcommand (e.g. 'LS'). C<ARG1> is the result of the subcommand, unless
+this is a multi-part reply, in which case C<ARG1> is '*' and C<ARG2> contains
+the result.
 
 =head3 C<irc_dcc_*>
 

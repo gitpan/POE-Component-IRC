@@ -1,5 +1,15 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.47  Sun Oct 3 15:28:50 GMT 2010
+    - Join arguments to the 'quote' command with spaces. This allows us to
+      send commands with multiple arguments through the Console plugin.
+    - Add support for CAP command/replies. We use it to enable the server's
+      identify-msg feature when we connect.
+    - State.pm: In disconnected/error/socketerr events when no info is
+      available, make ARG1 an empty hash reference instead of undef.
+    - Console.pm: Don't send events to client before they're authed
+    - Console.pm: Pretty-print hash references
+
 6.46  Wed Sep 29 04:57:42 UTC 2010
     - Document the 'debug' parameter.
     - Use Object::Pluggable instead of POE::Component::Pluggable. This smooths
