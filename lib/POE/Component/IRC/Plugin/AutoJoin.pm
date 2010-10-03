@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.47';
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.48';
 }
 
 use strict;
@@ -124,9 +124,10 @@ sub S_474 {
 
 sub S_chan_mode {
     my ($self, $irc) = splice @_, 0, 2;
+    pop @_;
     my $chan  = ${ $_[1] };
     my $mode  = ${ $_[2] };
-    my $arg   = ${ $_[3] };
+    my $arg   = defined $_[3] ? ${ $_[3] } : '';
     my $lchan = l_irc($chan, $irc->isupport('MAPPING'));
 
     $self->{Channels}->{$lchan} = $arg if $mode eq '+k';

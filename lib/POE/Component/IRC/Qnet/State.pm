@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::State::VERSION = '6.47';
+  $POE::Component::IRC::Qnet::State::VERSION = '6.48';
 }
 
 use strict;
@@ -246,10 +246,11 @@ sub S_join {
 sub S_chan_mode {
     my ($self, $irc) = splice @_, 0, 2;
     my $mapping = $irc->isupport('CASEMAPPING');
+    pop @_;
     my $who = ${ $_[0] };
     my $source = u_irc ( ( split /!/, $who )[0], $mapping );
     my $mode = ${ $_[2] };
-    my $arg = ${ $_[3] };
+    my $arg = defined $_[3] ? ${ $_[3] } : '';
     my $uarg = u_irc $arg, $mapping;
     
     return PCI_EAT_NONE if $source !~ /^[Q]$/ || $mode !~ /[ov]/;
