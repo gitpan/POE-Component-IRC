@@ -9,7 +9,8 @@ README
 dist.ini
 docs/ctcpspec.html
 docs/dccspec.html
-docs/isupport-draft.txt
+docs/draft-brocklesby-irc-isupport-03.txt
+docs/draft-mitchell-irc-capabilities-02.html
 docs/rfc1459.html
 docs/rfc2810.html
 docs/rfc2811.html

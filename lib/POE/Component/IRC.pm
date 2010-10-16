@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.48';
+  $POE::Component::IRC::VERSION = '6.49';
 }
 
 use strict;
@@ -420,6 +420,7 @@ sub _sock_up {
         };
 
         if ($@) {
+            chomp $@;
             warn "Couldn't use an SSL socket: $@\n";
             $self->{usessl} = 0;
         }
@@ -534,7 +535,7 @@ sub _send_login {
     $kernel->call($session, 'sl_login', 'CAP LS');
     $kernel->call($session, 'sl_login', 'CAP END');
 
-    if ($self->{password}) {
+    if (defined $self->{password}) {
         $kernel->call($session => sl_login => 'PASS ' . $self->{password});
     }
     $kernel->call($session => sl_login => 'NICK ' . $self->{nick});
@@ -2741,13 +2742,13 @@ undef if they aren't.
 
 B<'actually'>, some ircds report the users actual ip address, that'll be here;
 
-On ircu servers, if the user has registered with services, there will be
-another key:
+On ircu/seven IRCDs (e.g. FreeNode), if the user has registered with
+services, there will be another key:
 
 B<'account'>.
 
-On Freenode if the user has identified with NICKSERV there will be an
-additional key:
+On Hyperion IRCDs, if the user has identified with NICKSERV there will be
+an additional key:
 
 B<'identified'>.
 

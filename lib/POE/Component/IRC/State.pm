@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.48';
+  $POE::Component::IRC::State::VERSION = '6.49';
 }
 
 use strict;
@@ -1534,7 +1534,7 @@ should use them with this in mind (for now, at least).
 
 Chris Williams <chris@bingosnet.co.uk>
 
-With contributions from the Kinky Black Goat.
+With contributions from Lyndon Miller.
 
 =head1 LICENCE
 
