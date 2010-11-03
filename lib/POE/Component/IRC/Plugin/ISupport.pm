@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.49';
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.50';
 }
 
 use strict;
@@ -107,9 +107,7 @@ sub S_005 {
     my @vals = @{ ${ $args[2] } };
     pop @vals;
     my $support = $self->{server};
-    #(my $spec = ${ $args[1] }) =~ s/:are (?:available|supported).*//;
 
-    #for (split ' ', $spec) {
     for my $val (@vals) {
         if ($val =~ /=/) {
             my $key;

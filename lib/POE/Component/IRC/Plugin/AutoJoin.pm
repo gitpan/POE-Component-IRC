@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.49';
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.50';
 }
 
 use strict;
@@ -21,20 +21,21 @@ sub new {
 
 sub PCI_register {
     my ($self, $irc) = @_;
-    
-    if (!$irc->isa('POE::Component::IRC::State')) {
-        die  __PACKAGE__ . ' requires PoCo::IRC::State or a subclass thereof';
-    }
-    
-    if (!$self->{Channels}) {
-        for my $chan (keys %{ $irc->channels() }) {
-            my $lchan = l_irc($chan, $irc->isupport('MAPPING'));
-            my $key = $irc->is_channel_mode_set($chan, 'k')
-                ? $irc->channel_key($chan)
-                : ''
-            ;
 
-            $self->{Channels}->{$lchan} = $key;
+    if (!$self->{Channels}) {
+        if ($irc->isa('POE::Component::IRC::State')) {
+            for my $chan (keys %{ $irc->channels() }) {
+                my $lchan = l_irc($chan, $irc->isupport('MAPPING'));
+                my $key = $irc->is_channel_mode_set($chan, 'k')
+                    ? $irc->channel_key($chan)
+                    : ''
+                ;
+
+                $self->{Channels}->{$lchan} = $key;
+            }
+        }
+        else {
+            $self->{Channels} = {};
         }
     }
     elsif (ref $self->{Channels} eq 'ARRAY') {
@@ -263,7 +264,8 @@ Takes the following optional arguments:
 
 B<'Channels'>, either an array reference of channel names, or a hash reference
 keyed on channel name, containing the password for each channel. By default it
-uses the channels the component is already on, if any.
+uses the channels the component is already on if you are using
+L<POE::Component::IRC::State|POE::Component::IRC::State>.
 
 B<'RejoinOnKick'>, set this to 1 if you want the plugin to try to rejoin a
 channel (once) if you get kicked from it. Default is 0.

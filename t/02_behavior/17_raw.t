@@ -3,23 +3,22 @@ use warnings FATAL => 'all';
 use lib 't/inc';
 use POE qw(Wheel::SocketFactory);
 use POE::Component::IRC;
-use POE::Component::IRC::Plugin::AutoJoin;
 use POE::Component::Server::IRC;
 use Socket;
-use Test::More tests => 4;
+use Test::More tests => 6;
 
-my $bot = POE::Component::IRC->spawn(
-    Flood        => 1,
-    plugin_debug => 1,
-);
 my $ircd = POE::Component::Server::IRC->spawn(
-    Alias     => 'ircd',
     Auth      => 0,
     AntiFlood => 0,
 );
-$bot->plugin_add(AutoJoin => POE::Component::IRC::Plugin::AutoJoin->new(
-    Channels => ['#chan1', '#chan2'],
-));
+
+my $bot = POE::Component::IRC->spawn(
+    Flood => 1,
+    Raw   => 1,
+);
+
+isa_ok($ircd, 'POE::Component::Server::IRC');
+isa_ok($bot, 'POE::Component::IRC');
 
 POE::Session->create(
     package_states => [
@@ -27,8 +26,9 @@ POE::Session->create(
             _start
             _config_ircd 
             _shutdown 
+            irc_connected 
+            irc_raw_out
             irc_001 
-            irc_join
             irc_disconnected
         )],
     ],
@@ -58,40 +58,37 @@ sub get_port {
 }
 
 sub _config_ircd {
-    my ($kernel, $port) = @_[KERNEL, ARG0];
-    
-    $kernel->post( 'ircd' => 'add_listener' => Port => $port);
-    
+    my ($kernel, $heap, $port) = @_[KERNEL, HEAP, ARG0];
+    $ircd->yield(add_listener => Port => $port);
+
     $bot->yield(register => 'all');
-    $bot->yield(connect => {
-        nick    => 'TestBot1',
+    $bot->yield( connect => {
+        nick    => 'TestBot',
         server  => '127.0.0.1',
         port    => $port,
     });
 }
 
-sub irc_001 {
-    my $irc = $_[SENDER]->get_heap();
-    pass('Logged in');
+sub irc_connected {
+    pass('Connected');
 }
 
-sub irc_join {
-    my ($sender, $heap, $where) = @_[SENDER, HEAP, ARG1];
-    my $irc = $sender->get_heap();
-    $heap->{joined}++;
+sub irc_raw_out {
+    my ($raw) = $_[ARG0];
+    pass('Got raw nick string') if $raw =~ /^NICK /;
+}
 
-    $where =~ /^#chan[12]$/
-        ? pass("Joined channel $where")
-        : fail("Joined wrong channel $where");
-    ;
-    
-    $irc->yield('quit') if $heap->{joined} == 2;
+sub irc_001 {
+    my ($sender) = $_[SENDER];
+    my $irc = $sender->get_heap();
+
+    ok($irc->logged_in(), 'Logged in');
+    $irc->yield('quit');
 }
 
 sub irc_disconnected {
-    my ($kernel) = $_[KERNEL];
-    pass('irc_disconnected');
-    $kernel->yield('_shutdown');
+    pass('Got irc_disconnected');
+    $poe_kernel->yield('_shutdown');
 }
 
 sub _shutdown {
@@ -99,7 +96,6 @@ sub _shutdown {
     fail($error) if defined $error;
     
     $kernel->alarm_remove_all();
-    $kernel->post(ircd => 'shutdown');
+    $ircd->yield('shutdown');
     $bot->yield('shutdown');
 }
-

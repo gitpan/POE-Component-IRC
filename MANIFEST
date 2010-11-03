@@ -82,6 +82,7 @@ t/02_behavior/13_activity.t
 t/02_behavior/14_newline.t
 t/02_behavior/15_no_stacked_ctcp.t
 t/02_behavior/16_nonclosing_ctcp.t
+t/02_behavior/17_raw.t
 t/03_subclasses/01_state.t
 t/03_subclasses/02_qnet.t
 t/03_subclasses/03_qnet_state.t

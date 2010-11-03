@@ -228,7 +228,7 @@ CONSTRUCTORS
     'UseSSL', set to some true value if you want to connect using SSL.
 
     'Raw', set to some true value to enable the component to send "irc_raw"
-    events.
+    and "irc_raw_out" events.
 
     'LocalAddr', which local IP address on a multihomed box to connect as;
 
@@ -269,12 +269,14 @@ CONSTRUCTORS
 
     'debug', if set to a true value causes the IRC component to print every
     message sent to and from the server, as well as print some warnings when
-    it receives malformed messages.
+    it receives malformed messages. This option will be enabled if the
+    "POCOIRC_DEBUG" environment variable is set to a true value.
 
     'plugin_debug', set to some true value to print plugin debug info,
     default 0. Plugins are processed inside an eval. When you enable this
     option, you will be notified when (and why) a plugin raises an
-    exception.
+    exception. This option will be enabled if the "POCOIRC_DEBUG"
+    environment variable is set to a true value.
 
     'socks_proxy', specify a SOCKS4/SOCKS4a proxy to use.
 
@@ -315,9 +317,6 @@ CONSTRUCTORS
     that supports SSL connections. If you're missing POE::Component::SSLify,
     specifying 'UseSSL' will do nothing. The default is to not try to use
     SSL.
-
-    Setting 'Raw' to true, will enable the component to send "irc_raw"
-    events to interested plugins and sessions.
 
     'Resolver', requires a POE::Component::Client::DNS object. Useful when
     spawning multiple poco-irc sessions, saves the overhead of multiple dns
@@ -397,8 +396,8 @@ METHODS
 
   "raw_events"
     With no arguments, returns true or false depending on whether "irc_raw"
-    events are being generated or not. Provide a true or false argument to
-    enable or disable this feature accordingly.
+    and "irc_raw_out" events are being generated or not. Provide a true or
+    false argument to enable or disable this feature accordingly.
 
   "isupport"
     Takes one argument, a server capability to query. Returns "undef" on
@@ -593,12 +592,14 @@ INPUT
     backwards compatibility at this point.) You can send the IRC session a
     "shutdown" event manually to make it delete itself.
 
-    If you are connected, "shutdown" will send a quit message to ircd and
-    disconnect. If you provide an argument that will be used as the QUIT
-    message.
+    If you are logged into an IRC server, "shutdown" first will send a quit
+    message and wait to be disconnected. It will wait for up to 5 seconds
+    before forcibly disconnecting from the IRC server. If you provide an
+    argument, that will be used as the QUIT message. If you provide two
+    arguments, the second one will be used as the timeout (in seconds).
 
     Terminating multiple components can be tricky. Check the SIGNALS section
-    for an alternative method of shutting down multiple poco-ircs.
+    for a method of shutting down multiple poco-ircs.
 
    "topic"
     Retrieves or sets the topic for particular channel. If called with just
@@ -993,6 +994,11 @@ OUTPUT
     "raw_events" with a true argument. "ARG0" is the raw IRC string received
     by the component from the IRC server, before it has been mangled by
     filters and such like.
+
+   "irc_raw_out"
+    Enabled by passing "Raw => 1" to "spawn" or "connect", or by calling
+    "raw_events" with a true argument. "ARG0" is the raw IRC string sent by
+    the component to the the IRC server.
 
    "irc_registered"
     Sent once to the requesting session on registration (see "register").
