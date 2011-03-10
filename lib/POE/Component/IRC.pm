@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.53'; # TRIAL
+  $POE::Component::IRC::VERSION = '6.54';
 }
 
 use strict;
@@ -1695,8 +1695,8 @@ POE::Component::IRC - A fully event-driven IRC client module
  use POE qw(Component::IRC);
 
  my $nickname = 'Flibble' . $$;
- my $ircname = 'Flibble the Sailor Bot';
- my $server = 'irc.blahblahblah.irc';
+ my $ircname  = 'Flibble the Sailor Bot';
+ my $server   = 'irc.perl.org';
 
  my @channels = ('#Blah', '#Foo', '#Bar');
 
@@ -1704,7 +1704,7 @@ POE::Component::IRC - A fully event-driven IRC client module
  my $irc = POE::Component::IRC->spawn(
     nick => $nickname,
     ircname => $ircname,
-    server => $server,
+    server  => $server,
  ) or die "Oh noooo! $!";
 
  POE::Session->create(
@@ -1768,7 +1768,7 @@ POE::Component::IRC - A fully event-driven IRC client module
          }
      }
      print join ' ', @output, "\n";
-     return 0;
+     return;
  }
 
 =head1 DESCRIPTION

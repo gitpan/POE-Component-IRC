@@ -1,9 +1,8 @@
 Revision history for Perl extension POE::Component::IRC.
 
-6.53  Thu Mar 10 15:36:45 GMT 2011
-
+6.54  Thu Mar 10 18:20:47 GMT 2011
     - Fixed all the trailing space 'errors'
-    - Resolve an issue with irc_nick_sync in poco-irc-state
+    - Resolve an issue with irc_nick_sync in poco-irc-state, added test
 
 6.52  Fri Nov 5 18:27:16 CET 2010
     - Fixed typo in shutdown code and added a test to confirm

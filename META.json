@@ -5,7 +5,7 @@
       "Hinrik \u00c3\u0096rn Sigur\u00c3\u00b0sson <hinrik.sig@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Zilla version 4.200004, CPAN::Meta::Converter version 2.110580",
+   "generated_by" : "Dist::Zilla version 4.102342, CPAN::Meta::Converter version 2.102400",
    "license" : [
       "perl_5"
    ],
@@ -52,7 +52,7 @@
          }
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
          "mailto" : "bug-POE-Component-IRC@rt.cpan.org",
@@ -68,7 +68,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.53",
+   "version" : "6.54",
    "x_authority" : "cpan:HINRIK"
 }
 
