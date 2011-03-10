@@ -3,7 +3,7 @@ BEGIN {
   $POE::Filter::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::VERSION = '6.52';
+  $POE::Filter::IRC::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -16,7 +16,7 @@ sub new {
     my ($package, %opts) = @_;
     $opts{lc $_} = delete $opts{$_} for keys %opts;
     return POE::Filter::Stackable->new(
-        Filters => [ 
+        Filters => [
             POE::Filter::IRCD->new( DEBUG => $opts{debug} ),
             POE::Filter::IRC::Compat->new( DEBUG => $opts{debug} ),
         ],

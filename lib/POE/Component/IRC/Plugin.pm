@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -27,7 +27,7 @@ use constant {
 
 =head1 NAME
 
-POE::Component::IRC::Plugin - Provides plugin constants and documentation for 
+POE::Component::IRC::Plugin - Provides plugin constants and documentation for
 L<POE::Component::IRC|POE::Component::IRC>
 
 =head1 SYNOPSIS

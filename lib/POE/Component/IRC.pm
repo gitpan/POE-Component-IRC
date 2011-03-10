@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.52';
+  $POE::Component::IRC::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -107,7 +107,7 @@ sub _create {
 
     my %event_map = map {($_ => $self->{IRC_CMDS}->{$_}->[CMD_SUB])}
         keys %{ $self->{IRC_CMDS} };
-    
+
     $self->{OBJECT_STATES_HASHREF} = {
         %event_map,
         quote => 'sl',
@@ -159,7 +159,7 @@ sub _create {
 sub _configure {
     my ($self, $args) = @_;
     my $spawned = 0;
-    
+
     if (ref $args eq 'HASH' && keys %{ $args }) {
         $spawned = delete $args->{spawned};
         @{ $self }{ keys %{ $args } } = values %{ $args };
@@ -169,30 +169,30 @@ sub _configure {
         $self->{debug} = 1;
         $self->{plugin_debug} = 1;
     }
-    
+
     if ($self->{debug}) {
         $self->{ircd_filter}->debug(1);
         $self->{ircd_compat}->debug(1);
     }
-    
+
     if ($self->{useipv6} && !$GOT_SOCKET6) {
         warn "'useipv6' option specified, but Socket6 was not found\n";
     }
-    
+
     if ($self->{usessl} && !$GOT_SSL) {
         warn "'usessl' option specified, but POE::Component::SSLify was not found\n";
     }
 
     $self->{dcc}->nataddr($self->{nataddr}) if exists $self->{nataddr};
     $self->{dcc}->dccports($self->{dccports}) if exists $self->{dccports};
-    
+
     $self->{port} = 6667 if !$self->{port};
     $self->{msg_length} = 450 if !defined $self->{msg_length};
-  
+
     if ($self->{localaddr} && $self->{localport}) {
         $self->{localaddr} .= ':' . $self->{localport};
     }
-  
+
     # Make sure that we have reasonable defaults for all the attributes.
     # The "IRC*" variables are ircII environment variables.
     if (!defined $self->{nick}) {
@@ -209,12 +209,12 @@ sub _configure {
         $self->{ircname} = $ENV{IRCNAME} || eval { (getpwuid $>)[6] }
             || 'Just Another Perl Hacker';
     }
-    
+
     if (!defined $self->{server} && !$spawned) {
         die "No IRC server specified\n" if !$ENV{IRCSERVER};
         $self->{server} = $ENV{IRCSERVER};
     }
-  
+
     return;
 }
 
@@ -246,7 +246,7 @@ sub _parseline {
     if ($ev->{name} =~ /^irc_ctcp_(.+)$/) {
         $self->_send_event(irc_ctcp => $1 => @{$ev->{args}});
     }
-  
+
     return;
 }
 
@@ -277,9 +277,9 @@ sub _send_event {
     my %sessions;
 
     # BINGOS:
-    # I've moved these above the plugin system call to ensure that pesky plugins 
+    # I've moved these above the plugin system call to ensure that pesky plugins
     # don't eat the events before *our* session can process them. *sigh*
-    
+
     for my $value (values %{ $self->{events}->{irc_all} },
         values %{ $self->{events}->{$event} })
     {
@@ -311,11 +311,11 @@ sub _send_event {
         }
         return 1;
     }
-    
+
     for my $session (values %sessions) {
         $kernel->post($session => $event => @args);
     }
-    
+
     return;
 }
 
@@ -367,7 +367,7 @@ sub _sock_up {
     # Remember what IP address we're connected through, for multihomed boxes.
     my $localaddr;
     if ($GOT_SOCKET6) {
-        eval { 
+        eval {
                 $localaddr = (unpack_sockaddr_in6( getsockname $socket ))[1];
                 $localaddr = inet_ntop( AF_INET6, $localaddr );
         };
@@ -388,13 +388,13 @@ sub _sock_up {
             InputEvent   => '_socks_proxy_response',
             ErrorEvent   => '_sock_down',
         );
-    
+
         if ( !$self->{socket} ) {
             $self->_send_event(irc_socketerr =>
                 "Couldn't create ReadWrite wheel for SOCKS socket" );
             return;
         }
-    
+
         my $packet;
         if ( irc_ip_is_ipv4( $self->{server} ) ) {
             # SOCKS 4
@@ -407,7 +407,7 @@ sub _sock_up {
             inet_aton('0.0.0.1') . ($self->{socks_id} || '') . (pack 'x') .
             $self->{server} . (pack 'x');
         }
-        
+
         $self->{socket}->put( $packet );
         return;
     }
@@ -429,7 +429,7 @@ sub _sock_up {
         $self->_compress_uplink(1);
         $self->_compress_downlink(1);
     }
-    
+
     # Create a new ReadWrite wheel for the connected socket.
     $self->{socket} = POE::Wheel::ReadWrite->new(
         Handle       => $socket,
@@ -466,14 +466,14 @@ sub _sock_up {
         # the queueing so that the sent text is delayed...
         $self->{send_time} = time() + 10;
     }
-    
+
     $kernel->yield('_send_login');
     return;
 }
 
 sub _socks_proxy_response {
     my ($kernel, $self, $session, $input) = @_[KERNEL, OBJECT, SESSION, ARG0];
-  
+
     if (length $input != 8) {
         $self->_send_event(
             'irc_socks_failed',
@@ -483,7 +483,7 @@ sub _socks_proxy_response {
         $self->disconnect();
         return;
     }
-    
+
     my @resp = unpack 'CCnN', $input;
     if (@resp != 4 || $resp[0] ne '0' || $resp[1] !~ /^(90|91|92|93)$/) {
         $self->_send_event(
@@ -494,7 +494,7 @@ sub _socks_proxy_response {
         $self->disconnect();
         return;
     }
-  
+
     if ( $resp[1] eq '90' ) {
         $kernel->call($session => '_socks_proxy_connect');
         $self->{connected} = 1;
@@ -511,7 +511,7 @@ sub _socks_proxy_response {
         );
         $self->disconnect();
     }
-    
+
     return;
 }
 
@@ -551,7 +551,7 @@ sub _send_login {
     # If we have queued data waiting, its flush loop has stopped
     # while we were disconnected.  Start that up again.
     $kernel->delay(sl_delayed => 0);
-    
+
     return;
 }
 
@@ -583,7 +583,7 @@ sub _start {
 
     $self->{ircd_filter} = POE::Filter::IRCD->new(debug => $self->{debug});
     $self->{ircd_compat} = POE::Filter::IRC::Compat->new(debug => $self->{debug});
-    
+
     my $srv_filters = [
         POE::Filter::Line->new(
             InputRegexp => '\015?\012',
@@ -592,7 +592,7 @@ sub _start {
         $self->{ircd_filter},
         $self->{ircd_compat},
     ];
-   
+
     $self->{srv_filter} = POE::Filter::Stackable->new(Filters => $srv_filters);
     $self->{out_filter} = POE::Filter::Stackable->new(Filters => [
         POE::Filter::Line->new( OutputLiteral => "\015\012" ),
@@ -631,7 +631,7 @@ sub _stop {
         $kernel->call($session => quit => $quitmsg);
         $kernel->call($session => shutdown => $quitmsg);
     }
-    
+
     return;
 }
 
@@ -661,7 +661,7 @@ sub commasep {
     $state = uc $state;
     $state .= " $args" if defined $args;
     $kernel->yield(sl_prioritized => $pri, $state );
-    
+
     return;
 }
 
@@ -692,7 +692,7 @@ sub connect {
              $self->{server},
              ( $self->{useipv6} && $GOT_SOCKET6 ? 'AAAA' : 'A' ),
         );
-    } 
+    }
     else {
         $kernel->yield('_do_connect');
     }
@@ -703,14 +703,14 @@ sub connect {
 
 sub _resolve_addresses {
     my ($kernel, $self, $hostname, $type) = @_[KERNEL, OBJECT, ARG0 .. ARG1];
-    
-    my $response = $self->{resolver}->resolve( 
-        event => '_got_dns_response', 
+
+    my $response = $self->{resolver}->resolve(
+        event => '_got_dns_response',
         host => $hostname,
-        type => $type, 
-        context => { }, 
+        type => $type,
+        context => { },
     );
-    
+
     $kernel->yield(_got_dns_response => $response) if $response;
     return;
 }
@@ -736,7 +736,7 @@ sub _do_connect {
         $domain = AF_INET6;
     }
 
-    $self->{socketfactory} = POE::Wheel::SocketFactory->new( 
+    $self->{socketfactory} = POE::Wheel::SocketFactory->new(
         SocketDomain   => $domain,
         SocketType     => SOCK_STREAM,
         SocketProtocol => 'tcp',
@@ -746,14 +746,14 @@ sub _do_connect {
         FailureEvent   => '_sock_failed',
         ($self->{localaddr} ? (BindAddress => $self->{localaddr}) : ()),
     );
-    
+
     return;
 }
 
 # got response from POE::Component::Client::DNS
 sub _got_dns_response {
     my ($kernel, $self, $response) = @_[KERNEL, OBJECT, ARG0];
-    
+
     my $type = uc $response->{type};
     my $net_dns_packet = $response->{response};
     my $net_dns_errorstring = $response->{error};
@@ -839,7 +839,7 @@ sub ison {
         }
         $tmp .= " $nick";
     }
-    
+
     $kernel->yield(sl_high => $tmp);
     return;
 }
@@ -897,9 +897,9 @@ sub new {
     if (!defined $alias) {
         croak 'Not enough arguments to POE::Component::IRC::new()';
     }
-    
+
     carp "Use of ${package}->new() is deprecated, please use spawn()";
-    
+
     my $self = $package->spawn ( alias => $alias, options => \%options );
     return $self;
 }
@@ -915,7 +915,7 @@ sub spawn {
 
     my $self = bless { }, $package;
     $self->_create();
-    
+
     if ($ENV{POCOIRC_DEBUG}) {
         $params{debug} = 1;
         $params{plugin_debug} = 1;
@@ -982,7 +982,7 @@ sub oneandtwoopt {
         $arg = ':' . $arg if $arg =~ /\x20/;
         $state .= " $arg";
     }
-    
+
     $kernel->yield(sl_prioritized => $pri, $state);
     return;
 }
@@ -1008,7 +1008,7 @@ sub oneortwo {
     my ($kernel, $state, $one) = @_[KERNEL, STATE, ARG0];
     my $two = join '', @_[ARG1 .. $#_];
     my $pri = $_[OBJECT]->{IRC_CMDS}->{$state}->[CMD_PRI];
-    
+
     if (!defined $one) {
         warn "The '$state' event requires at least one argument\n";
         return;
@@ -1087,7 +1087,7 @@ sub _poco_irc_sig_shutdown {
 sub _poco_irc_sig_register {
     my ($kernel, $self, $session, $signal, $sender, @events)
         = @_[KERNEL, OBJECT, SESSION, ARG0 .. $#_];
-  
+
     return if !defined $sender;
     my $session_id = $session->ID();
     my $sender_id;
@@ -1098,7 +1098,7 @@ sub _poco_irc_sig_register {
         warn "Can't resolve $sender\n";
         return;
     }
-  
+
     if (!@events) {
         warn "Signal POCOIRC: Not enough arguments\n";
         return;
@@ -1140,13 +1140,13 @@ sub register {
         if (!$self->{sessions}->{$sender_id}->{refcnt} && $session != $sender) {
             $kernel->refcount_increment($sender_id, PCI_REFCOUNT_TAG);
         }
-        
+
         $self->{sessions}->{$sender_id}->{refcnt}++;
     }
 
     # BINGOS:
-    # Apocalypse is gonna hate me for this as 'irc_registered' events will bypass 
-    # the Plugins system, but I can't see how this event will be relevant without 
+    # Apocalypse is gonna hate me for this as 'irc_registered' events will bypass
+    # the Plugins system, but I can't see how this event will be relevant without
     # some sort of reference, like what session has registered. I'm not going to
     # start hurling session references around at this point :)
     $kernel->post($sender => irc_registered => $self);
@@ -1196,12 +1196,12 @@ sub _cleanup {
     $kernel->alarm_remove_all();
     $kernel->alias_remove($_) for $kernel->alias_list($session);
     delete $self->{$_} for qw(socketfactory dcc wheelmap);
-    
+
     # Delete all plugins that are loaded.
     $self->_pluggable_destroy();
-    
+
     $self->{resolver}->shutdown() if $self->{resolver} && $self->{mydns};
-    
+
     return;
 }
 
@@ -1260,7 +1260,7 @@ sub sl_prioritized {
 
     # if we find a newline in the message, take that to be the end of it
     $msg =~ s/[\015\012].*//s;
-    
+
     if (bytes::length($msg) > $self->{msg_length} - bytes::length($self->nick_name())) {
         $msg = bytes::substr($msg, 0, $self->{msg_length} - bytes::length($self->nick_name()));
     }
@@ -1281,7 +1281,7 @@ sub sl_prioritized {
         $self->{send_time} += 2 + length($msg) / 120;
         $self->{socket}->put($msg);
     }
-    
+
     return;
 }
 
@@ -1308,7 +1308,7 @@ sub sl_delayed {
     if (@{ $self->{send_queue} }) {
         $kernel->delay( sl_delayed => $self->{send_time} - $now - 10 );
     }
-    
+
     return;
 }
 
@@ -1334,7 +1334,7 @@ sub topic {
         $chan .= " :";
         $chan .= $topic if length $topic;
     }
-    
+
     $kernel->yield(sl_prioritized => PRI_NORMAL, "TOPIC $chan");
     return;
 }
@@ -1364,7 +1364,7 @@ sub _unregister {
             carp "Sender $sender_id hasn't registered for '$event' events";
             next;
         }
-    
+
         if (--$self->{sessions}->{$sender_id}->{refcnt} <= 0) {
             delete $self->{sessions}->{$sender_id};
             if ($session != $sender) {
@@ -1372,13 +1372,13 @@ sub _unregister {
             }
         }
     }
-    
+
     return;
 }
 
 sub _unregister_sessions {
     my ($self) = @_;
-    
+
     for my $session_id ( keys %{ $self->{sessions} } ) {
         my $refcnt = $self->{sessions}->{$session_id}->{refcnt};
         while ( $refcnt --> 0 ) {
@@ -1386,7 +1386,7 @@ sub _unregister_sessions {
         }
         delete $self->{sessions}->{$session_id};
     }
-    
+
     return;
 }
 
@@ -1407,7 +1407,7 @@ sub userhost {
             'USERHOST ' . join(' ', splice(@nicks, 0, 5)),
         );
     }
-    
+
     return;
 }
 
@@ -1435,7 +1435,7 @@ sub nick_name {
 
 sub send_queue {
     my ($self) = @_;
-    
+
     if (defined $self->{send_queue} && ref $self->{send_queue} eq 'ARRAY' ) {
         return scalar @{ $self->{send_queue} };
     }
@@ -1484,7 +1484,7 @@ sub delay {
 
 sub _delay {
     my ($kernel, $self, $arrayref, $time) = @_[KERNEL, OBJECT, ARG0, ARG1];
-    
+
     return if !scalar @{ $arrayref };
     return if !defined $time;
     my $event = shift @{ $arrayref };
@@ -1501,7 +1501,7 @@ sub delay_remove {
 
 sub _delay_remove {
     my ($kernel, $self, $alarm_id) = @_[KERNEL, OBJECT, ARG0];
-    
+
     return if !defined $alarm_id;
     my @old_alarm_list = $kernel->alarm_remove( $alarm_id );
     if (@old_alarm_list) {
@@ -1509,7 +1509,7 @@ sub _delay_remove {
         $self->_send_event(irc_delay_removed => $alarm_id, @old_alarm_list );
         return \@old_alarm_list;
     }
-    
+
     return;
 }
 
@@ -1526,10 +1526,10 @@ sub logged_in {
 
 sub _compress_uplink {
     my ($self, $value) = @_;
-    
+
     return if !$GOT_ZLIB;
     return $self->{uplink} if !defined $value;
-    
+
     if ($value) {
         $self->{out_filter}->unshift( POE::Filter::Zlib::Stream->new() ) if !$self->{uplink};
         $self->{uplink} = 1;
@@ -1538,16 +1538,16 @@ sub _compress_uplink {
         $self->{out_filter}->shift() if $self->{uplink};
         $self->{uplink} = 0;
     }
-    
+
     return $self->{uplink};
 }
 
 sub _compress_downlink {
     my ($self, $value) = @_;
-    
+
     return if !$GOT_ZLIB;
     return $self->{downlink} if !defined $value;
-    
+
     if ($value) {
         $self->{srv_filter}->unshift( POE::Filter::Zlib::Stream->new() ) if !$self->{downlink};
         $self->{downlink} = 1;
@@ -1701,7 +1701,7 @@ POE::Component::IRC - A fully event-driven IRC client module
  my @channels = ('#Blah', '#Foo', '#Bar');
 
  # We create a new PoCo-IRC object
- my $irc = POE::Component::IRC->spawn( 
+ my $irc = POE::Component::IRC->spawn(
     nick => $nickname,
     ircname => $ircname,
     server => $server,
@@ -1791,7 +1791,7 @@ The POE::Component::IRC distribution has a F<docs/> folder with a collection of
 salient documentation including the pertinent RFCs.
 
 POE::Component::IRC consists of a POE::Session that manages the IRC connection
-and dispatches C<irc_> prefixed events to interested sessions and 
+and dispatches C<irc_> prefixed events to interested sessions and
 an object that can be used to access additional information using methods.
 
 Sessions register their interest in receiving C<irc_> events by sending
@@ -1826,7 +1826,7 @@ network.
 =item L<POE::Component::IRC::Qnet::State|POE::Component::IRC::Qnet::State>
 
 POE::Component::IRC::Qnet::State is a tweaked version of POE::Component::IRC::State
-for use on the Quakenet IRC network. 
+for use on the Quakenet IRC network.
 
 =back
 
@@ -1838,7 +1838,7 @@ That is not a subclass, just a placeholder for documentation!
 
 A number of useful plugins have made their way into the core distribution:
 
-=over 
+=over
 
 =item L<POE::Component::IRC::Plugin::DCC|POE::Component::IRC::Plugin::DCC>
 
@@ -1970,7 +1970,7 @@ the 'user' part and some even replace the whole string (think FreeNode cloaks).
 If you have an unusually long user@host mask you might want to decrease this
 value if you're prone to sending long messages. Conversely, if you have an
 unusually short one, you can increase this value if you want to be able to
-send as long a message as possible. Be careful though, increase it too much 
+send as long a message as possible. Be careful though, increase it too much
 and the IRC server might disconnect you with a "Request too long" message when
 you try to send a message that's too long.
 
@@ -2252,7 +2252,7 @@ specify. Takes 2 arguments: the nick or channel to send a message to
 plain text of the message to send (the CTCP quoting will be handled
 for you). The "/me" command in popular IRC clients is actually a CTCP action.
 
- # Doing a /me 
+ # Doing a /me
  $irc->yield(ctcp => $channel => 'ACTION dances.');
 
 =head3 C<join>
@@ -2278,7 +2278,7 @@ out the door. Similar to KICK but does an enforced PART instead.
 =head3 C<mode>
 
 Request a mode change on a particular channel or user. Takes at least
-one argument: the mode changes to effect, as a single string (e.g. 
+one argument: the mode changes to effect, as a single string (e.g.
 "#mychan +sm-p+o"), and any number of optional operands to the mode changes
 (nicks, hostmasks, channel keys, whatever.) Or just pass them all as one
 big string and it'll still work, whatever. I regret that I haven't the
@@ -2360,7 +2360,7 @@ for a particular event which you no longer care about, this event will
 tell the IRC connection to stop sending them to you. (If you haven't, it just
 ignores you. No big deal.)
 
-If you have registered with 'all', attempting to unregister individual 
+If you have registered with 'all', attempting to unregister individual
 events such as 'mode', etc. will not work. This is a 'feature'.
 
 =head3 C<debug>
@@ -2522,7 +2522,7 @@ pings automatically. Don't worry about it.
 =head3 C<die>
 
 Tells the IRC server you're connect to, to terminate. Only useful for
-IRCops, thank goodness. Takes no arguments. 
+IRCops, thank goodness. Takes no arguments.
 
 =head3 C<locops>
 
@@ -2601,14 +2601,14 @@ receive are prefixed by C<irc_>, to inhibit event namespace pollution.
 If you wish, you can ask the client to send you every event it
 generates. Simply register for the event name "all". This is a lot
 easier than writing a huge list of things you specifically want to
-listen for. 
+listen for.
 
 FIXME: I'd really like to classify these somewhat ("basic", "oper", "ctcp",
 "dcc", "raw" or some such), and I'd welcome suggestions for ways to make
 this easier on the user, if you can think of some.
 
 In your event handlers, C<$_[SENDER]> is the particular component session that
-sent you the event. C<< $_[SENDER]->get_heap() >> will retrieve the component's 
+sent you the event. C<< $_[SENDER]->get_heap() >> will retrieve the component's
 object. Useful if you want on-the-fly access to the object and its methods.
 
 =head2 Important Events
@@ -2755,11 +2755,11 @@ unset. Note: replies to queries about what a channel topic *is*
 =head3 C<irc_whois>
 
 Sent in response to a WHOIS query. C<ARG0> is a hashref, with the following
-keys: 
+keys:
 
-B<'nick'>, the users nickname; 
+B<'nick'>, the users nickname;
 
-B<'user'>, the users username; 
+B<'user'>, the users username;
 
 B<'host'>, their hostname;
 
@@ -2775,7 +2775,7 @@ prefixed with '@','+','%' depending on whether they have +o +v or +h;
 
 B<'server'>, their server ( might not be useful on some networks );
 
-B<'oper'>, whether they are an IRCop, contains the IRC operator string if they are, 
+B<'oper'>, whether they are an IRCop, contains the IRC operator string if they are,
 undef if they aren't.
 
 B<'actually'>, some ircds report the users actual ip address, that'll be here;
@@ -2895,7 +2895,7 @@ is no need to parse C<ARG1> yourself.
 
 =head1 SIGNALS
 
-The component will handle a number of custom signals that you may send using 
+The component will handle a number of custom signals that you may send using
 L<POE::Kernel|POE::Kernel>'s C<signal> method.
 
 =head2 C<POCOIRC_REGISTER>
@@ -2909,7 +2909,7 @@ event. From that event one can get all the information necessary such as the
 poco-irc object and the SENDER session to do whatever one needs to build a
 poco-irc dispatch table.
 
-The way the signal handler in PoCo-IRC is written also supports sending the 
+The way the signal handler in PoCo-IRC is written also supports sending the
 C<POCOIRC_REGISTER> to multiple sessions simultaneously, by sending the signal
 to the POE Kernel itself.
 
@@ -2934,7 +2934,7 @@ L<C<irc_registered>|/irc_registered> event:
  sub irc_registered {
      my ($kernel, $sender, $heap, $irc_object) = @_[KERNEL, SENDER, HEAP, ARG0];
 
-     # Get the poco-irc session ID 
+     # Get the poco-irc session ID
      my $sender_id = $sender->ID();
 
      # Or it's alias
@@ -2943,7 +2943,7 @@ L<C<irc_registered>|/irc_registered> event:
      # Store it in our heap maybe
      $heap->{irc_objects}->{ $sender_id } = $irc_object;
 
-     # Make the poco connect 
+     # Make the poco connect
      $irc_object->yield(connect => { });
 
      return;
@@ -3091,7 +3091,7 @@ Check out the Changes file for further contributors.
 
 =head1 SEE ALSO
 
-RFC 1459 L<http://www.faqs.org/rfcs/rfc1459.html> 
+RFC 1459 L<http://www.faqs.org/rfcs/rfc1459.html>
 
 L<http://www.irchelp.org/>,
 

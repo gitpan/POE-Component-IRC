@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::CycleEmpty::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -21,11 +21,11 @@ sub new {
 
 sub PCI_register {
     my ($self, $irc) = @_;
-    
+
     if (!$irc->isa('POE::Component::IRC::State')) {
         die __PACKAGE__ . " requires PoCo::IRC::State or a subclass thereof";
     }
-    
+
     $self->{cycling} = { };
     $self->{irc} = $irc;
     $irc->plugin_register($self, 'SERVER', qw(join kick part quit));

@@ -15,7 +15,7 @@ SYNOPSIS
      my @channels = ('#Blah', '#Foo', '#Bar');
 
      # We create a new PoCo-IRC object
-     my $irc = POE::Component::IRC->spawn( 
+     my $irc = POE::Component::IRC->spawn(
         nick => $nickname,
         ircname => $ircname,
         server => $server,
@@ -520,7 +520,7 @@ INPUT
     you). The "/me" command in popular IRC clients is actually a CTCP
     action.
 
-     # Doing a /me 
+     # Doing a /me
      $irc->yield(ctcp => $channel => 'ACTION dances.');
 
    "join"
@@ -1108,7 +1108,7 @@ SIGNALS
      sub irc_registered {
          my ($kernel, $sender, $heap, $irc_object) = @_[KERNEL, SENDER, HEAP, ARG0];
 
-         # Get the poco-irc session ID 
+         # Get the poco-irc session ID
          my $sender_id = $sender->ID();
 
          # Or it's alias
@@ -1117,7 +1117,7 @@ SIGNALS
          # Store it in our heap maybe
          $heap->{irc_objects}->{ $sender_id } = $irc_object;
 
-         # Make the poco connect 
+         # Make the poco connect
          $irc_object->yield(connect => { });
 
          return;

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::FollowTail::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -17,11 +17,11 @@ sub new {
     croak "$package requires an even number of arguments" if @_ & 1;
     my %args = @_;
     $args{lc $_} = delete $args{$_} for keys %args;
-    
+
     if (!$args{filename} || ! -e $args{filename}) {
         die "$package requires a valid 'filename' attribute";
     }
-    
+
     return bless \%args, $package;
 }
 
@@ -47,10 +47,10 @@ sub PCI_unregister {
 
 sub _start {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
-    
+
     $self->{session_id} = $_[SESSION]->ID();
     $kernel->refcount_increment( $self->{session_id}, __PACKAGE__ );
-    
+
     $self->{wheel} = POE::Wheel::FollowTail->new(
         Filename     => $self->{filename},
         InputEvent   => '_input',
@@ -110,7 +110,7 @@ of an ever-growing file
  my $filename = '/some/such/file/here';
  my @channels = ( '#Blah', '#Foo', '#Bar' );
 
- my $irc = POE::Component::IRC->spawn( 
+ my $irc = POE::Component::IRC->spawn(
      nick => $nickname,
      server => $ircserver,
      port => $port,
@@ -126,7 +126,7 @@ of an ever-growing file
   $poe_kernel->run();
 
  sub _start {
-     $irc->plugin_add( 'FollowTail' => POE::Component::IRC::Plugin::FollowTail->new( 
+     $irc->plugin_add( 'FollowTail' => POE::Component::IRC::Plugin::FollowTail->new(
          filename => $filename,
      ));
      $irc->yield( register => 'all' );

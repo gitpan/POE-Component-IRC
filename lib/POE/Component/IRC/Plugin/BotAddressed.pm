@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotAddressed::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotAddressed::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::BotAddressed::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -40,14 +40,14 @@ sub S_ctcp_action {
 
     my $eat = PCI_EAT_NONE;
     return $eat if $what !~ /$me/i;
-    
+
     for my $recipient (@{ $recipients }) {
         if ($recipient =~ /^[$chantypes]/) {
             $eat = PCI_EAT_ALL if $self->{eat};
             $irc->send_event(irc_bot_mentioned_action => $who => [$recipient] => $what);
         }
     }
-    
+
     return $eat;
 }
 
@@ -58,9 +58,9 @@ sub S_public {
     my $what = ${ $_[2] };
     my $me = $irc->nick_name();
     my ($cmd) = $what =~ m/^\s*\Q$me\E[:,;.!?~]?\s*(.*)$/i;
-    
+
     return PCI_EAT_NONE if !defined $cmd && $what !~ /$me/i;
-    
+
     for my $channel (@{ $channels }) {
         if (defined $cmd) {
             $irc->send_event(irc_bot_addressed => $who => [$channel] => $cmd );
@@ -69,7 +69,7 @@ sub S_public {
             $irc->send_event(irc_bot_mentioned => $who => [$channel] => $what);
         }
     }
-  
+
     return $self->{eat} ? PCI_EAT_ALL : PCI_EAT_NONE;
 }
 
@@ -119,7 +119,7 @@ event if its name comes up in channel discussion.
 
 One optional argument:
 
-B<'eat'>, set to true to make the plugin eat the C<irc_public> / 
+B<'eat'>, set to true to make the plugin eat the C<irc_public> /
 C<irc_ctcp_action>
 event and only generate an appropriate event, default is false.
 

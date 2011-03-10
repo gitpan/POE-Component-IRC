@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -16,7 +16,7 @@ sub new {
     my ($package) = shift;
     croak "$package requires an even number of arguments" if @_ & 1;
     my %self = @_;
-    
+
     die "$package requires a Password" if !defined $self{Password};
     return bless \%self, $package;
 }

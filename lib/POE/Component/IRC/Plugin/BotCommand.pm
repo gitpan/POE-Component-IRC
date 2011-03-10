@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -27,13 +27,13 @@ sub new {
 
 sub PCI_register {
     my ($self, $irc) = splice @_, 0, 2;
-    
+
     $self->{Addressed}   = 1   if !defined $self->{Addressed};
     $self->{Prefix}      = '!' if !defined $self->{Prefix};
     $self->{In_channels} = 1   if !defined $self->{In_channels};
     $self->{In_private}  = 1   if !defined $self->{In_private};
     $self->{irc} = $irc;
-    
+
     $irc->plugin_register( $self, 'SERVER', qw(msg public) );
     return 1;
 }
@@ -47,15 +47,15 @@ sub S_msg {
     my $who   = ${ $_[0] };
     my $where = parse_user($who);
     my $what  = ${ $_[2] };
-    
+
     return PCI_EAT_NONE if !$self->{In_private};
     $what = $self->_normalize($what);
-    
+
     my ($cmd, $args);
     if (!(($cmd, $args) = $what =~ /^$self->{Prefix}(\w+)(?:\s+(.+))?$/)) {
         return PCI_EAT_NONE;
     }
-    
+
     $self->_handle_cmd($who, $where, $cmd, $args);
     return $self->{Eat} ? PCI_EAT_PLUGIN : PCI_EAT_NONE;
 }
@@ -135,7 +135,7 @@ sub _get_help {
     my $p = $self->{Addressed} && $public
         ? $irc->nick_name().': '
         : $self->{Prefix};
-    
+
     my @help;
     if (defined $args) {
         my $cmd = (split /\s+/, $args, 2)[0];
@@ -242,7 +242,7 @@ commands issued to your bot
      my $nick = (split /!/, $_[ARG0])[0];
      my ($where, $arg) = @_[ARG1, ARG2];
      my ($type, $host) = $arg =~ /^(?:(\w+) )?(\S+)/;
-     
+
      my $res = $dns->resolve(
          event => 'dns_response',
          host => $host,
@@ -259,7 +259,7 @@ commands issued to your bot
  sub dns_response {
      my $res = $_[ARG0];
      my @answers = map { $_->rdatastr } $res->{response}->answer() if $res->{response};
-     
+
      $irc->yield(
          'notice',
          $res->{context}->{where},

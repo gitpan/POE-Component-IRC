@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -78,7 +78,7 @@ sub S_004 {
 # CAPAB IDENTIFY-MSG, so pocoirc can turn it on before we join channels
 sub S_isupport {
     my ($self, $irc) = splice @_, 0, 2;
-    
+
     if (!grep { $_->isa('POE::Component::IRC::Plugin::NickServID') } values %{ $irc->plugin_list() }) {
         # we don't have to wait for NickServ, so let's join
         while (my ($chan, $key) = each %{ $self->{Channels} }) {
@@ -215,7 +215,7 @@ keeps you on your favorite channels
      '#Secret' => 'secret_password',
      '#Foo'    => '',
  );
- 
+
  POE::Session->create(
      package_states => [
          main => [ qw(_start irc_join) ],
@@ -225,7 +225,7 @@ keeps you on your favorite channels
  $poe_kernel->run();
 
  sub _start {
-     my $irc = POE::Component::IRC::State->spawn( 
+     my $irc = POE::Component::IRC::State->spawn(
          Nick => $nickname,
          Server => $server,
      ) or die "Oh noooo! $!";
@@ -234,7 +234,7 @@ keeps you on your favorite channels
      $irc->yield(register => qw(join);
      $irc->yield(connect => { } );
  }
- 
+
  sub irc_join {
      my $chan = @_[ARG1];
      $irc->yield(privmsg => $chan => "hi $channel!");

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Whois::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Whois::VERSION = '6.52';
+  $POE::Component::IRC::Plugin::Whois::VERSION = '6.53'; # TRIAL
 }
 
 use strict;
@@ -120,9 +120,9 @@ sub S_338 {
     my $mapping = $irc->isupport('CASEMAPPING');
     my $nick = u_irc ${ $_[2] }->[0], $mapping;
     my $ip = ${ $_[2] }->[1];
-    
+
     $self->{WHOIS}->{ $nick }->{actually} = $ip;
-    
+
     return PCI_EAT_NONE;
 }
 
