@@ -1055,7 +1055,9 @@ OUTPUT
 
    "irc_snotice"
     A weird, non-RFC-compliant message from an IRC server. Don't worry about
-    it. "ARG0" is the text of the server's message.
+    it. "ARG0" is the text of the server's message. Servers vary as to
+    whether these notices include a server name as the sender, or no sender
+    at all. "ARG1" is the sender, if any.
 
   All numeric events
     Most messages from IRC servers are identified only by three-digit

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.55';
+  $POE::Component::IRC::VERSION = '6.56';
 }
 
 use strict;
@@ -2877,7 +2877,9 @@ informational purposes.
 =head3 C<irc_snotice>
 
 A weird, non-RFC-compliant message from an IRC server. Don't worry
-about it. C<ARG0> is the text of the server's message.
+about it. C<ARG0> is the text of the server's message. Servers vary as to
+whether these notices include a server name as the sender, or no sender at
+all. C<ARG1> is the sender, if any.
 
 =head2 All numeric events
 
