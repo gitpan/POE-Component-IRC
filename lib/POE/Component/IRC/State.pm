@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.54';
+  $POE::Component::IRC::State::VERSION = '6.55';
 }
 
 use strict;
@@ -450,6 +450,7 @@ sub S_353 {
        $existing .= $whatever if !$existing || $existing !~ /$whatever/;
        $self->{STATE}{Nicks}{ $unick }{CHANS}{ $uchan } = $existing;
        $self->{STATE}{Chans}{ $uchan }{Nicks}{ $unick } = $existing;
+       $self->{STATE}{Nicks}{ $unick }{Nick} = $user;
     }
     return PCI_EAT_NONE;
 }
@@ -711,6 +712,11 @@ sub umode {
 sub is_user_mode_set {
     my ($self, $mode) = @_;
 
+    if (!defined $mode) {
+        warn 'User mode is undefined';
+        return;
+    }
+
     $mode = (split //, $mode)[0] || return;
     $mode =~ s/[^A-Za-z]//g;
     return if !$mode;
@@ -800,6 +806,12 @@ sub nicks {
 
 sub nick_info {
     my ($self, $nick) = @_;
+
+    if (!defined $nick) {
+        warn 'Nickname is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $unick = u_irc($nick, $map);
 
@@ -815,6 +827,12 @@ sub nick_info {
 
 sub nick_long_form {
     my ($self, $nick) = @_;
+
+    if (!defined $nick) {
+        warn 'Nickname is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $unick = u_irc($nick, $map);
 
@@ -826,6 +844,11 @@ sub nick_long_form {
 
 sub nick_channels {
     my ($self, $nick) = @_;
+
+    if (!defined $nick) {
+        warn 'Nickname is undefined';
+        return;
+    }
     my $map   = $self->isupport('CASEMAPPING');
     my $unick = u_irc($nick, $map);
 
@@ -835,6 +858,12 @@ sub nick_channels {
 
 sub channel_list {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
 
@@ -844,6 +873,12 @@ sub channel_list {
 
 sub is_away {
     my ($self, $nick) = @_;
+
+    if (!defined $nick) {
+        warn 'Nickname is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $unick = u_irc($nick, $map);
 
@@ -860,6 +895,12 @@ sub is_away {
 
 sub is_operator {
     my ($self, $nick) = @_;
+
+    if (!defined $nick) {
+        warn 'Nickname is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $unick = u_irc($nick, $map);
 
@@ -871,6 +912,12 @@ sub is_operator {
 
 sub is_channel_mode_set {
     my ($self, $chan, $mode) = @_;
+
+    if (!defined $chan || !defined $mode) {
+        warn 'Channel or mode is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     $mode = (split //, $mode)[0];
@@ -888,11 +935,23 @@ sub is_channel_mode_set {
 
 sub is_channel_synced {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     return $self->_channel_sync($chan);
 }
 
 sub channel_creation_time {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
 
@@ -904,6 +963,12 @@ sub channel_creation_time {
 
 sub channel_limit {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
 
@@ -919,6 +984,12 @@ sub channel_limit {
 
 sub channel_key {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     return if !$self->_channel_exists($chan);
@@ -933,6 +1004,12 @@ sub channel_key {
 
 sub channel_modes {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     return if !$self->_channel_exists($chan);
@@ -951,6 +1028,12 @@ sub channel_modes {
 
 sub is_channel_member {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nickname is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     my $unick = u_irc($nick, $map);
@@ -962,36 +1045,72 @@ sub is_channel_member {
 
 sub is_channel_operator {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nickname is undefined';
+        return;
+    }
+
     return 1 if $self->_nick_has_channel_mode($chan, $nick, 'o');
     return;
 }
 
 sub has_channel_voice {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nickname is undefined';
+        return;
+    }
+
     return 1 if $self->_nick_has_channel_mode($chan, $nick, 'v');
     return;
 }
 
 sub is_channel_halfop {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nickname is undefined';
+        return;
+    }
+
     return 1 if $self->_nick_has_channel_mode($chan, $nick, 'h');
     return;
 }
 
 sub is_channel_owner {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nickname is undefined';
+        return;
+    }
+
     return 1 if $self->_nick_has_channel_mode($chan, $nick, 'q');
     return;
 }
 
 sub is_channel_admin {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nickname is undefined';
+        return;
+    }
+
     return 1 if $self->_nick_has_channel_mode($chan, $nick, 'a');
     return;
 }
 
 sub ban_mask {
     my ($self, $chan, $mask) = @_;
+
+    if (!defined $chan || !defined $mask) {
+        warn 'Channel or mask is undefined';
+        return;
+    }
+
     my $map = $self->isupport('CASEMAPPING');
     $mask = parse_ban_mask($mask);
     my @result;
@@ -1014,6 +1133,12 @@ sub ban_mask {
 
 sub channel_ban_list {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     my %result;
@@ -1029,6 +1154,12 @@ sub channel_ban_list {
 
 sub channel_except_list {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map     = $self->isupport('CASEMAPPING');
     my $uchan   = u_irc($chan, $map);
     my $excepts = $self->isupport('EXCEPTS');
@@ -1045,6 +1176,12 @@ sub channel_except_list {
 
 sub channel_invex_list {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     my $invex = $self->isupport('INVEX');
@@ -1061,6 +1198,12 @@ sub channel_invex_list {
 
 sub channel_topic {
     my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     my %result;
@@ -1076,6 +1219,12 @@ sub channel_topic {
 
 sub nick_channel_modes {
     my ($self, $chan, $nick) = @_;
+
+    if (!defined $chan || !defined $nick) {
+        warn 'Channel or nick is undefined';
+        return;
+    }
+
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = u_irc($chan, $map);
     my $unick = u_irc($nick, $map);
