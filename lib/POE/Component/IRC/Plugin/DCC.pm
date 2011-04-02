@@ -3,13 +3,15 @@ BEGIN {
   $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::DCC::VERSION = '6.56';
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.57';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
+use Cwd qw(abs_path);
 use File::Basename qw(fileparse);
+use File::Glob ':glob';
 use POE qw(Driver::SysRW Filter::Line Filter::Stream
            Wheel::ReadWrite Wheel::SocketFactory);
 use POE::Component::IRC::Plugin qw(:ALL);
@@ -177,6 +179,7 @@ sub _U_dcc {
             warn "The 'dcc' command requires three arguments for a SEND\n";
             return;
         }
+        $file = abs_path(bsd_glob($file));
         $size = (stat $file)[7];
         if (!defined $size) {
             $irc->send_event(
