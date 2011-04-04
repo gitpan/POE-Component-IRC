@@ -3,14 +3,14 @@ BEGIN {
   $POE::Component::IRC::Plugin::FollowTail::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.58';
+  $POE::Component::IRC::Plugin::FollowTail::VERSION = '6.59';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
-use Cwd qw(abs_path);
 use File::Glob ':glob';
+use File::Spec::Functions 'rel2abs';
 use POE qw(Wheel::FollowTail);
 use POE::Component::IRC::Plugin qw( :ALL );
 
@@ -23,7 +23,7 @@ sub new {
     die "$package requires a 'filename' attribute" if !defined $args{filename};
     $args{filename} = bsd_glob($args{filename});
     die "File '$args{filename}' does not exist" if !-e $args{filename};
-    $args{filename} = abs_path($args{filename});
+    $args{filename} = rel2abs($args{filename});
 
     return bless \%args, $package;
 }

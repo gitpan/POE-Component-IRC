@@ -3,7 +3,7 @@ BEGIN {
   $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::Compat::VERSION = '6.58';
+  $POE::Filter::IRC::Compat::VERSION = '6.59';
 }
 
 use strict;
