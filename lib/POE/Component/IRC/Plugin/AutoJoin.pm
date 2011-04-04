@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.57';
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.58';
 }
 
 use strict;

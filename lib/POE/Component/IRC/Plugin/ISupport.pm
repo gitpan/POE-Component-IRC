@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.57';
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.58';
 }
 
 use strict;
@@ -116,9 +116,9 @@ sub S_005 {
                 $self->{parser}->{$key}->($support, $key, $val);
             }
             else {
-                # AWAYLEN CHANNELLEN CHIDLEN EXCEPTS INVEX KICKLEN MAXBANS
-                # MAXCHANNELS MAXTARGETS MODES NETWORK NICKLEN STD TOPICLEN
-                # WATCH
+                # AWAYLEN CHANNELLEN CHIDLEN CHARSET EXCEPTS INVEX KICKLEN
+                # MAXBANS MAXCHANNELS MAXTARGETS MODES NETWORK NICKLEN STD
+                # TOPICLEN WATCH
                 $support->{$key} = $val;
             }
         }
