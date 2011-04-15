@@ -3,7 +3,7 @@ BEGIN {
   $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::Compat::VERSION = '6.59';
+  $POE::Filter::IRC::Compat::VERSION = '6.60';
 }
 
 use strict;
@@ -37,7 +37,7 @@ my %irc_cmds = (
     qr/^notice$/ => sub {
         my ($self, $event, $line) = @_;
 
-        if (length $line->{prefix} && $line->{prefix} =~ /!/) {
+        if (defined $line->{prefix} && $line->{prefix} =~ /!/) {
             $event->{args} = [
                 _decolon( $line->{prefix} ),
                 [split /,/, $line->{params}->[0]],
@@ -51,7 +51,7 @@ my %irc_cmds = (
             $event->{name} = 'snotice';
             $event->{args} = [
                 $line->{params}->[1],
-                (length $line->{prefix} ? _decolon($line->{prefix}) : ()),
+                (defined $line->{prefix} ? _decolon($line->{prefix}) : ()),
             ];
         }
     },
