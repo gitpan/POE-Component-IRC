@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotTraffic::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.60';
+  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.61';
 }
 
 use strict;
@@ -37,7 +37,7 @@ sub U_notice {
     my $text    = $line->{params}->[1];
     my $targets = [ split(/,/, $line->{params}->[0]) ];
 
-    $irc->send_event(irc_bot_notice => $targets => $text);
+    $irc->send_event_next(irc_bot_notice => $targets => $text);
 
     return PCI_EAT_NONE;
 }
@@ -51,14 +51,14 @@ sub U_privmsg {
     if ($text =~ /^\001/) {
         my $ctcp_event = $self->{compat}->get([$line])->[0];
         return PCI_EAT_NONE if $ctcp_event->{name} ne 'ctcp_action';
-        $irc->send_event(irc_bot_action => @{ $ctcp_event->{args} }[1..2]);
+        $irc->send_event_next(irc_bot_action => @{ $ctcp_event->{args} }[1..2]);
     }
     else {
         my $chantypes = join('', @{ $irc->isupport('CHANTYPES') || ['#', '&']});
         for my $recipient ( split(/,/, $line->{params}->[0]) ) {
             my $event = 'irc_bot_msg';
             $event = 'irc_bot_public' if $recipient =~ /^[$chantypes]/;
-            $irc->send_event($event => [ $recipient ] => $text);
+            $irc->send_event_next($event => [ $recipient ] => $text);
         }
     }
 

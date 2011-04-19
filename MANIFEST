@@ -64,7 +64,6 @@ lib/POE/Filter/IRC.pm
 lib/POE/Filter/IRC/Compat.pm
 t/01_base/01_compile.t
 t/01_base/02_filters.t
-t/01_base/03_common.t
 t/01_base/04_pocosi.t
 t/02_behavior/01_public_methods.t
 t/02_behavior/02_connect.t

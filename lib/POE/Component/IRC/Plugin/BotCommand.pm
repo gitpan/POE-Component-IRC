@@ -3,13 +3,13 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.60';
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.61';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
-use POE::Component::IRC::Common qw( parse_user strip_color strip_formatting );
+use IRC::Utils qw( parse_user strip_color strip_formatting );
 use POE::Component::IRC::Plugin qw( :ALL );
 
 sub new {
@@ -115,7 +115,7 @@ sub _handle_cmd {
     }
 
     if (defined $self->{Commands}->{$cmd}) {
-        $irc->send_event("irc_botcmd_$cmd" => $who, $where, $args);
+        $irc->send_event_next("irc_botcmd_$cmd" => $who, $where, $args);
     }
     elsif ($cmd =~ /^help$/i) {
         my @help = $self->_get_help($args, $public);

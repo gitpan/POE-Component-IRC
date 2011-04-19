@@ -33,8 +33,9 @@
             "POE::Component::Client::DNS" : "0.99"
          },
          "requires" : {
+            "IRC::Utils" : "0.06",
             "Object::Pluggable" : 0,
-            "POE" : "1.287",
+            "POE" : "1.310",
             "POE::Driver::SysRW" : 0,
             "POE::Filter::IRCD" : "2.42",
             "POE::Filter::Line" : 0,
@@ -68,7 +69,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.60",
+   "version" : "6.61",
    "x_authority" : "cpan:HINRIK"
 }
 

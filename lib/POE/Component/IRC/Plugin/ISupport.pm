@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.60';
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.61';
 }
 
 use strict;
@@ -146,8 +146,8 @@ sub _default {
     return PCI_EAT_NONE if !$self->{got_005};
 
     if ($event =~ /^S_(\d+)/ and $1 > 5) {
-        $irc->send_event(irc_isupport => $self);
         $self->{done_005} = 1;
+        $irc->send_event_now(irc_isupport => $self);
     }
 
     return PCI_EAT_NONE;

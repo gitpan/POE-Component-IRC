@@ -3,14 +3,14 @@ BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.60';
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.61';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
+use IRC::Utils qw( uc_irc parse_user );
 use POE::Component::IRC::Plugin qw( :ALL );
-use POE::Component::IRC::Common qw( u_irc parse_user );
 
 sub new {
     my ($package) = shift;
@@ -45,9 +45,9 @@ sub S_isupport {
 sub S_nick {
     my ($self, $irc) = splice @_, 0, 2;
     my $mapping = $irc->isupport('CASEMAPPING');
-    my $new_nick = u_irc( ${ $_[1] }, $mapping );
+    my $new_nick = uc_irc( ${ $_[1] }, $mapping );
 
-    if ( $new_nick eq u_irc($self->{nick}, $mapping) ) {
+    if ( $new_nick eq uc_irc($self->{nick}, $mapping) ) {
         $irc->yield(nickserv => "IDENTIFY $self->{Password}");
     }
     return PCI_EAT_NONE;
@@ -62,7 +62,7 @@ sub S_notice {
     return PCI_EAT_NONE if $recipient ne $irc->nick_name();
     return PCI_EAT_NONE if $sender !~ /^nickserv$/i;
     return PCI_EAT_NONE if $msg !~ /now (?:identified|recognized)/;
-    $irc->send_event('irc_identified');
+    $irc->send_event_next('irc_identified');
     return PCI_EAT_NONE;
 }
 

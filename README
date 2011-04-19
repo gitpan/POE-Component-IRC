@@ -179,7 +179,7 @@ DESCRIPTION
         Log public and private messages to disk.
 
     POE::Component::IRC::Plugin::NickServID
-        Identify with FreeNode's NickServ when needed.
+        Identify with NickServ when needed.
 
     POE::Component::IRC::Plugin::Proxy
         A lightweight IRC proxy/bouncer.
@@ -354,6 +354,14 @@ METHODS
     inherits a few from Object::Pluggable. See its documentation for
     details.
 
+  "server"
+    Takes no arguments. Returns the server host we are currently connected
+    to (or trying to connect to).
+
+  "port"
+    Takes no arguments. Returns the server port we are currently connected
+    to (or trying to connect to).
+
   "server_name"
     Takes no arguments. Returns the name of the IRC server that the
     component is currently connected to.
@@ -447,9 +455,24 @@ METHODS
     internally created by the component.
 
   "send_event"
-    Sends an event through the components event handling system. These will
+    Sends an event through the component's event handling system. These will
     get processed by plugins then by registered sessions. First argument is
     the event name, followed by any parameters for that event.
+
+  "send_event_next"
+    This sends an event right after the one that's currently being
+    processed. Useful if you want to generate some event which is directly
+    related to another event so you want them to appear together. This
+    method can only be called when POE::Component::IRC is processing an
+    event, e.g. from one of your event handlers. Takes the same arguments as
+    "send_event" in "send_event".
+
+  "send_event_now"
+    This will send an event to be processed immediately. This means that if
+    an event is currently being processed and there are plugins or sessions
+    which will receive it after you do, then an event sent with
+    "send_event_now" will be received by those plugins/sessions *before* the
+    current event. Takes the same arguments as "send_event" in "send_event".
 
 INPUT
     How to talk to your new IRC component... here's the events we'll accept.
@@ -575,8 +598,8 @@ INPUT
     (use an array reference here to specify multiple recipients), and the
     text of the message to send.
 
-    Have a look at the constants in POE::Component::IRC::Common if you would
-    like to use formatting and color codes in your messages.
+    Have a look at the constants in IRC::Utils if you would like to use
+    formatting and color codes in your messages.
 
    "quit"
     Tells the IRC server to disconnect you. Takes one optional argument:
@@ -903,8 +926,8 @@ OUTPUT
     privately. "ARG0" is the nick!hostmask of the sender. "ARG1" is an array
     reference containing the nick(s) of the recipients. "ARG2" is the text
     of the message. On servers supporting the IDENTIFY-MSG feature (e.g.
-    FreeNode), there will be an additional argument, "ARG3", will be 1 if
-    the sender has identified with NickServ, 0 otherwise.
+    FreeNode), there will be an additional argument, "ARG3", which will be 1
+    if the sender has identified with NickServ, 0 otherwise.
 
    "irc_nick"
     Sent whenever you, or someone around you, changes nicks. "ARG0" is the
@@ -927,8 +950,8 @@ OUTPUT
     "ARG0" is the nick!hostmask of the sender. "ARG1" is an array reference
     containing the channel name(s) of the recipients. "ARG2" is the text of
     the message. On servers supporting the IDENTIFY-MSG feature (e.g.
-    FreeNode), there will be an additional argument, "ARG3", will be 1 if
-    the sender has identified with NickServ, 0 otherwise.
+    FreeNode), there will be an additional argument, "ARG3", which will be 1
+    if the sender has identified with NickServ, 0 otherwise.
 
    "irc_quit"
     Sent whenever someone on a channel with you quits IRC (or gets KILLed).
@@ -1137,76 +1160,8 @@ SIGNALS
     Any additional parameters passed to the signal will become your quit
     messages on each IRC network.
 
-ENCODING AND CHARACTER SETS
-  Messages
-    The only requirement the IRC protocol places on its messages is that
-    they be 8-bits, and in ASCII. This has resulted in most of the Western
-    world settling on ASCII-compatible Latin-1 (usually Microsoft's CP1252,
-    a Latin-1 variant) as a convention. Recently, popular IRC clients (mIRC,
-    xchat, certain irssi configurations) have begun sending a mixture of
-    CP1252 and UTF-8 over the wire to allow more characters without breaking
-    backward compatibility (too much). They send CP1252 encoded messages if
-    the characters fit within that encoding, otherwise falling back to
-    UTF-8. Writing text with mixed encoding to a file, terminal, or database
-    is rarely a good idea. To decode such messages reliably, see
-    "irc_to_utf8" from POE::Component::IRC::Common.
-
-  Channel names
-    This matter is complicated further by the fact that some servers allow
-    non-ASCII characters in channel names. The IRC component doesn't
-    explicitly convert between encodings before sending your message along,
-    but it has to concatenate the channel name and the message before
-    sending them over the wire. So when you do "$irc->yield(privmsg =>
-    $chan, 'æði')", where $chan is the unmodified channel name you got from
-    the IRC component (i.e. it's a byte string), the channel name will end
-    up getting double-encoded when concatenated with the message (which is a
-    text string). If the channel name is all-ASCII, then nothing bad will
-    happen, but if there are non-ASCII chars in it, you're in trouble.
-
-    To prevent this, you can't simply call "irc_to_utf8" on the channel name
-    and then use it, because IRC servers don't care about encodings. '#æði'
-    in CP1252 is not the same channel as '#æði' in UTF-8. The channel name
-    and your message must therefore both be byte stirngs, or both be text
-    strings. If they're text strings, the UTF-8 flag must be off for both,
-    or on for both.
-
-    A simple rule to follow is to call "encode_utf8" on the channel name
-    and/or message if they are text strings. Here are some examples:
-
-     use Encode qw(encode_utf8);
-
-     sub irc_public {
-         my ($who, $where, $what) = @_[ARG0..ARG2];
-         my $irc = $_[SENDER]->get_heap();
-
-         # bad: if $where has any non-ASCII chars, they will get double-encoded
-         $irc->yield(privmsg => $where, 'æði');
-
-         # bad: if $what has any non-ASCII chars, they will get double-encoded
-         $irc->yield(privmsg => '#æði', $what);
-
-         # good: both are byte strings already, so this does what we expect
-         $irc->yield(privmsg => $where, $what);
-
-         # good: both are text strings (Latin1 as per Perl's default), so
-         # they'll be concatenated correctly
-         $irc->yield(privmsg => '#æði', 'æði');
-
-         # good: same as the last one, except now they're both in UTF-8,
-         # which means we'll be sending the message to a different channel
-         use utf8;
-         $irc->yield(privmsg => '#æði', 'æði');
-
-         # good: $where and $msg_bytes are both byte strings
-         my $msg_bytes = encode_utf8('æði');
-         $irc->yield(privmsg => $where, $msg_bytes);
-
-         # good: $chan_bytes and $what are both byte strings
-         my $chan_bytes = encode_utf8('#æði');
-         $irc->yield(privmsg => $chan_bytes, $what);
-     }
-
-    See also Encode, perluniintro, perlunitut, perlunicode, and perlunifaq.
+ENCODING
+    This can be an issue. Take a look at IRC::Utils' section on it.
 
 BUGS
     A few have turned up in the past and they are sure to again. Please use
@@ -1218,7 +1173,7 @@ DEVELOPMENT
     <http://github.com/bingos/poe-component-irc>
 
     The project's developers usually hang out in the "#poe" IRC channel on
-    irc.freenode.org. Do drop us a line.
+    irc.perl.org.org. Do drop us a line.
 
 MAINTAINERS
     Chris "BinGOs" Williams <chris@bingosnet.co.uk>
@@ -1251,6 +1206,8 @@ MAD PROPS
     Thanks to the merry band of POE pixies from #PoE @ irc.perl.org,
     including ( but not limited to ), ketas, ct, dec, integral, webfox,
     immute, perigrin, paulv, alias.
+
+    IP functions are shamelessly 'borrowed' from Net::IP by Manuel Valente
 
     Check out the Changes file for further contributors.
 

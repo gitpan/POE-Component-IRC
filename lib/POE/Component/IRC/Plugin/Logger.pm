@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Logger::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Logger::VERSION = '6.60';
+  $POE::Component::IRC::Plugin::Logger::VERSION = '6.61';
 }
 
 use strict;
@@ -14,9 +14,9 @@ use Fcntl qw(O_WRONLY O_APPEND O_CREAT);
 use File::Glob ':glob';
 use File::Spec::Functions qw(catdir catfile rel2abs);
 use IO::Handle;
+use IRC::Utils qw(lc_irc parse_user strip_color strip_formatting decode_irc);
 use POE::Component::IRC::Plugin qw( :ALL );
 use POE::Component::IRC::Plugin::BotTraffic;
-use POE::Component::IRC::Common qw( l_irc parse_user strip_color strip_formatting irc_to_utf8);
 use POSIX qw(strftime);
 
 sub new {
@@ -84,7 +84,7 @@ sub S_001 {
 
 sub S_332 {
     my ($self, $irc) = splice @_, 0, 2;
-    my $chan  = irc_to_utf8(${ $_[2] }->[0]);
+    my $chan  = decode_irc(${ $_[2] }->[0]);
     my $topic = $self->_normalize(${ $_[2] }->[1]);
 
     # only log this if we were just joining the channel
@@ -95,7 +95,7 @@ sub S_332 {
 sub S_333 {
     my ($self, $irc) = splice @_, 0, 2;
     my ($chan, $user, $time) = @{ ${ $_[2] } };
-    $chan = irc_to_utf8($chan);
+    $chan = decode_irc($chan);
 
     # only log this if we were just joining the channel
     $self->_log_entry($chan, topic_set_by => $chan, $user, $time) if !$irc->channel_list($chan);
@@ -106,7 +106,7 @@ sub S_chan_mode {
     my ($self, $irc) = splice @_, 0, 2;
     pop @_;
     my $nick = parse_user(${ $_[0] });
-    my $chan = irc_to_utf8(${ $_[1] });
+    my $chan = decode_irc(${ $_[1] });
     my $mode = ${ $_[2] };
     my $arg  = defined $_[3] ? ${ $_[3] } : '';
 
@@ -125,7 +125,7 @@ sub S_ctcp_action {
             $self->_log_entry($sender, action => $sender, $msg);
         }
         else {
-            $recipient = irc_to_utf8($recipient);
+            $recipient = decode_irc($recipient);
             $self->_log_entry($recipient, action => $sender, $msg);
         }
     }
@@ -143,7 +143,7 @@ sub S_notice {
             $self->_log_entry($sender, notice => $sender, $msg);
         }
         else {
-            $target = irc_to_utf8($target);
+            $target = decode_irc($target);
             $self->_log_entry($target, notice => $sender, $msg);
         }
     }
@@ -157,7 +157,7 @@ sub S_bot_action {
     my $msg        = $self->_normalize(${ $_[1] });
 
     for my $recipient (@{ $recipients }) {
-        $recipient = irc_to_utf8($recipient);
+        $recipient = decode_irc($recipient);
         $self->_log_entry($recipient, action => $irc->nick_name(), $msg);
     }
     return PCI_EAT_NONE;
@@ -180,7 +180,7 @@ sub S_bot_public {
     my $msg      = $self->_normalize(${ $_[1] });
 
     for my $chan (@{ $channels }) {
-        $chan = irc_to_utf8($chan);
+        $chan = decode_irc($chan);
         $self->_log_entry($chan, privmsg => $irc->nick_name(), $msg);
     }
     return PCI_EAT_NONE;
@@ -192,7 +192,7 @@ sub S_bot_notice {
     my $msg     = $self->_normalize(${ $_[1] });
 
     for my $target (@{ $targets }) {
-        $target = irc_to_utf8($target);
+        $target = decode_irc($target);
         $self->_log_entry($target, notice => $irc->nick_name(), $msg);
     }
     return PCI_EAT_NONE;
@@ -201,7 +201,7 @@ sub S_bot_notice {
 sub S_join {
     my ($self, $irc) = splice @_, 0, 2;
     my ($joiner, $user, $host) = parse_user(${ $_[0] });
-    my $chan = irc_to_utf8(${ $_[1] });
+    my $chan = decode_irc(${ $_[1] });
 
     $self->_log_entry($chan, join => $joiner, "$user\@$host", $chan);
     return PCI_EAT_NONE;
@@ -210,7 +210,7 @@ sub S_join {
 sub S_kick {
     my ($self, $irc) = splice @_, 0, 2;
     my $kicker = parse_user(${ $_[0] });
-    my $chan   = irc_to_utf8(${ $_[1] });
+    my $chan   = decode_irc(${ $_[1] });
     my $victim = ${ $_[2] };
     my $msg    = $self->_normalize(${ $_[3] });
 
@@ -234,7 +234,7 @@ sub S_nick {
     my $channels = ${ $_[2] };
 
     for my $chan (@{ $channels }) {
-        $chan = irc_to_utf8($chan);
+        $chan = decode_irc($chan);
         $self->_log_entry($chan, nick_change => $old_nick, $new_nick);
     }
     return PCI_EAT_NONE;
@@ -243,7 +243,7 @@ sub S_nick {
 sub S_part {
     my ($self, $irc) = splice @_, 0, 2;
     my ($parter, $user, $host) = parse_user(${ $_[0] });
-    my $chan = irc_to_utf8(${ $_[1] });
+    my $chan = decode_irc(${ $_[1] });
     my $msg  = ref $_[2] eq 'SCALAR' ? ${ $_[2] } : '';
     $msg = $self->_normalize($msg);
 
@@ -258,7 +258,7 @@ sub S_public {
     my $msg      = $self->_normalize(${ $_[2] });
 
     for my $chan (@{ $channels }) {
-        $chan = irc_to_utf8($chan);
+        $chan = decode_irc($chan);
         $self->_log_entry($chan, privmsg => $sender, $msg);
     }
     return PCI_EAT_NONE;
@@ -271,7 +271,7 @@ sub S_quit {
     my $channels = ${ $_[2] };
 
     for my $chan (@{ $channels }) {
-        $chan = irc_to_utf8($chan);
+        $chan = decode_irc($chan);
         $self->_log_entry($chan, quit => $quitter, "$user\@$host", $msg);
     }
     return PCI_EAT_NONE;
@@ -280,7 +280,7 @@ sub S_quit {
 sub S_topic {
     my ($self, $irc) = splice @_, 0, 2;
     my $changer   = parse_user(${ $_[0] });
-    my $chan      = irc_to_utf8(${ $_[1] });
+    my $chan      = decode_irc(${ $_[1] });
     my $new_topic = $self->_normalize(${ $_[2] });
 
     $self->_log_entry($chan, topic_change => $changer, $new_topic);
@@ -351,7 +351,7 @@ sub S_dcc_done {
 sub _log_entry {
     my ($self, $context, $type, @args) = @_;
     my ($date, $time) = split / /, (strftime '%Y-%m-%d %H:%M:%S ', localtime);
-    $context = l_irc $context, $self->{irc}->isupport('CASEMAPPING');
+    $context = lc_irc $context, $self->{irc}->isupport('CASEMAPPING');
     my $chantypes = join('', @{ $self->{irc}->isupport('CHANTYPES') || ['#', '&']});
 
     if ($context =~ /^[$chantypes]/) {
@@ -412,7 +412,7 @@ sub _open_log {
 
 sub _normalize {
     my ($self, $line) = @_;
-    $line = irc_to_utf8($line);
+    $line = decode_irc($line);
     $line = strip_color($line) if $self->{Strip_color};
     $line = strip_formatting($line) if $self->{Strip_formatting};
     return $line;

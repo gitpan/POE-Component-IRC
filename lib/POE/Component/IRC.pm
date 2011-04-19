@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.60';
+  $POE::Component::IRC::VERSION = '6.61';
 }
 
 use strict;
@@ -13,7 +13,6 @@ use POE qw(Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
            Filter::Line Filter::Stream Filter::Stackable);
 use POE::Filter::IRCD;
 use POE::Filter::IRC::Compat;
-use POE::Component::IRC::Common qw(:ALL);
 use POE::Component::IRC::Constants qw(:ALL);
 use POE::Component::IRC::Plugin qw(:ALL);
 use POE::Component::IRC::Plugin::DCC;
@@ -118,7 +117,7 @@ sub _create {
         _delay
         _delay_remove
         _parseline
-        __send_event
+        _send_pending_events
         _sock_down
         _sock_failed
         _sock_up
@@ -130,7 +129,6 @@ sub _create {
         connect
         _resolve_addresses
         _do_connect
-        _cleanup
         _quit_timeout
         _send_login
         _got_dns_response
@@ -233,7 +231,7 @@ sub _parseline {
     my ($session, $self, $ev) = @_[SESSION, OBJECT, ARG0];
 
     return if !$ev->{name};
-    $self->_send_event(irc_raw => $ev->{raw_line} ) if $self->{raw};
+    $self->send_event(irc_raw => $ev->{raw_line} ) if $self->{raw};
 
     # record our nickname
     if ( $ev->{name} eq '001' ) {
@@ -241,10 +239,10 @@ sub _parseline {
     }
 
     $ev->{name} = 'irc_' . $ev->{name};
-    $self->_send_event( $ev->{name}, @{$ev->{args}} );
+    $self->send_event( $ev->{name}, @{$ev->{args}} );
 
     if ($ev->{name} =~ /^irc_ctcp_(.+)$/) {
-        $self->_send_event(irc_ctcp => $1 => @{$ev->{args}});
+        $self->send_event(irc_ctcp => $1 => @{$ev->{args}});
     }
 
     return;
@@ -252,70 +250,83 @@ sub _parseline {
 
 sub send_event {
     my ($self, @args) = @_;
-    $poe_kernel->call($self->{SESSION_ID} => __send_event => @args);
+    $poe_kernel->post($self->{SESSION_ID}, '_send_pending_events', @args);
     return 1;
 }
 
-# Hack to make plugin_add/del send events from OUR session
-sub __send_event {
-    my ($self, $event, @args) = @_[OBJECT, ARG0..$#_];
-    # Actually send the event...
-    $self->_send_event($event, @args);
+sub send_event_now {
+    my ($self, @args) = @_;
+    $poe_kernel->call($self->{SESSION_ID}, '_send_pending_events', @args);
     return 1;
 }
 
-# Sends an event to all interested sessions. This is a separate sub
-# because I do it so much, but it's not an actual POE event because it
-# doesn't need to be one and I don't need the overhead.
-# Changed to a method by BinGOs, 21st January 2005.
-# Amended by BinGOs (2nd February 2005) use call to send events to
-# *our* session first.
-sub _send_event {
+sub send_event_next {
     my ($self, $event, @args) = @_;
-    my $kernel = $poe_kernel;
-    my $session = $kernel->get_active_session()->ID();
+
+    if (!$self->{pending_events} || !@{ $self->{pending_events} }) {
+        croak('send_event_next() can only be called from an event handler');
+    }
+    else {
+        push @{ $self->{pending_events}[-1] }, [$event, \@args];
+    }
+    return 1;
+}
+
+sub _send_pending_events {
+    my ($kernel, $session, $self, $event, @args)
+        = @_[KERNEL, SESSION, OBJECT, ARG0, ARG1..$#_];
+    my $session_id = $session->ID();
     my %sessions;
 
-    # BINGOS:
-    # I've moved these above the plugin system call to ensure that pesky plugins
-    # don't eat the events before *our* session can process them. *sigh*
-
-    for my $value (values %{ $self->{events}->{irc_all} },
-        values %{ $self->{events}->{$event} })
-    {
-        $sessions{$value} = $value;
+    # create new context if we were passed an event directly
+    if (defined $event) {
+        my @our_events = [$event, \@args];
+        push @{ $self->{pending_events} }, \@our_events;
     }
 
-    # Make sure our session gets notified of any requested events before
-    # any other bugger
-    $kernel->call($session => $event => @args) if delete $sessions{$session};
+    while (my ($ev) = shift @{ $self->{pending_events}[-1] }) {
+        last if !defined $ev;
+        my ($event, $args) = @$ev;
 
-    # Let the plugin system process this
-    return 1 if $self->_pluggable_process(
-        'SERVER',
-        $event,
-        \@args,
-    ) == PCI_EAT_ALL;
+        # BINGOS:
+        # I've moved these above the plugin system call to ensure that pesky plugins
+        # don't eat the events before *our* session can process them. *sigh*
 
-    # BINGOS:
-    # We have a hack here, because the component used to send 'irc_connected'
-    # and 'irc_disconnected' events to every registered session regardless of
-    # whether that session had registered from them or not.
-    if ( $event =~ /connected$/ || $event eq 'irc_shutdown' ) {
-        for my $session (keys %{ $self->{sessions} }) {
-            $kernel->post(
-                $self->{sessions}->{$session}->{ref},
-                $event,
-                @args,
-            );
+        for my $value (values %{ $self->{events}->{irc_all} },
+            values %{ $self->{events}->{$event} })
+        {
+            $sessions{$value} = $value;
         }
-        return 1;
+
+        # Make sure our session gets notified of any requested events before
+        # any other bugger
+        $kernel->call($session_id => $event => @$args) if delete $sessions{$session_id};
+
+        # Let the plugin system process this
+        if ($self->_pluggable_process('SERVER', $event, $args) != PCI_EAT_ALL) {
+            # BINGOS:
+            # We have a hack here, because the component used to send 'irc_connected'
+            # and 'irc_disconnected' events to every registered session regardless of
+            # whether that session had registered from them or not.
+            if ( $event =~ /connected$/ || $event eq 'irc_shutdown' ) {
+                for my $session (keys %{ $self->{sessions} }) {
+                    $kernel->call(
+                        $self->{sessions}->{$session}->{ref},
+                        $event,
+                        @$args,
+                    );
+                }
+            }
+            else {
+                for my $session (values %sessions) {
+                    $kernel->call($session => $event => @$args);
+                }
+            }
+        }
+        $self->_cleanup() if $event eq 'irc_shutdown';
     }
 
-    for my $session (values %sessions) {
-        $kernel->post($session => $event => @args);
-    }
-
+    pop @{ $self->{pending_events} };
     return;
 }
 
@@ -339,7 +350,7 @@ sub _sock_down {
     $self->{ircd_compat}->identifymsg(0);
 
     # post a 'irc_disconnected' to each session that cares
-    $self->_send_event(irc_disconnected => $self->{server} );
+    $self->send_event(irc_disconnected => $self->{server} );
     return;
 }
 
@@ -353,7 +364,7 @@ sub _sock_failed {
     my ($self, $op, $errno, $errstr) = @_[OBJECT, ARG0..ARG2];
 
     delete $self->{socketfactory};
-    $self->_send_event(irc_socketerr => "$op error $errno: $errstr" );
+    $self->send_event(irc_socketerr => "$op error $errno: $errstr" );
     return;
 }
 
@@ -390,13 +401,13 @@ sub _sock_up {
         );
 
         if ( !$self->{socket} ) {
-            $self->_send_event(irc_socketerr =>
+            $self->send_event(irc_socketerr =>
                 "Couldn't create ReadWrite wheel for SOCKS socket" );
             return;
         }
 
         my $packet;
-        if ( irc_ip_is_ipv4( $self->{server} ) ) {
+        if ( _ip_is_ipv4( $self->{server} ) ) {
             # SOCKS 4
             $packet = pack ('CCn', 4, 1, $self->{port}) .
             inet_aton($self->{server}) . ($self->{socks_id} || '') . (pack 'x');
@@ -444,12 +455,12 @@ sub _sock_up {
         $self->{connected} = 1;
     }
     else {
-        $self->_send_event(irc_socketerr => "Couldn't create ReadWrite wheel for IRC socket");
+        $self->send_event(irc_socketerr => "Couldn't create ReadWrite wheel for IRC socket");
         return;
     }
 
     # Post a 'irc_connected' event to each session that cares
-    $self->_send_event(irc_connected => $self->{server} );
+    $self->send_event(irc_connected => $self->{server} );
 
     # CONNECT if we're using a proxy
     if ($self->{proxy}) {
@@ -475,7 +486,7 @@ sub _socks_proxy_response {
     my ($kernel, $self, $session, $input) = @_[KERNEL, OBJECT, SESSION, ARG0];
 
     if (length $input != 8) {
-        $self->_send_event(
+        $self->send_event(
             'irc_socks_failed',
             'Mangled response from SOCKS proxy',
             $input,
@@ -486,7 +497,7 @@ sub _socks_proxy_response {
 
     my @resp = unpack 'CCnN', $input;
     if (@resp != 4 || $resp[0] ne '0' || $resp[1] !~ /^(90|91|92|93)$/) {
-        $self->_send_event(
+        $self->send_event(
             'irc_socks_failed',
             'Mangled response from SOCKS proxy',
             $input,
@@ -498,11 +509,11 @@ sub _socks_proxy_response {
     if ( $resp[1] eq '90' ) {
         $kernel->call($session => '_socks_proxy_connect');
         $self->{connected} = 1;
-        $self->_send_event( 'irc_connected', $self->{server} );
+        $self->send_event( 'irc_connected', $self->{server} );
         $kernel->yield('_send_login');
     }
     else {
-        $self->_send_event(
+        $self->send_event(
             'irc_socks_rejected',
             $resp[1],
             $self->{socks_proxy},
@@ -601,14 +612,14 @@ sub _start {
     $self->{SESSION_ID} = $session->ID();
 
     # Plugin 'irc_whois' and 'irc_whowas' support
-    $self->plugin_add('Whois' . $self->{SESSION_ID},
+    $self->plugin_add('Whois_' . $self->{SESSION_ID},
         POE::Component::IRC::Plugin::Whois->new()
     );
 
     $self->{isupport} = POE::Component::IRC::Plugin::ISupport->new();
-    $self->plugin_add('ISupport' . $self->{SESSION_ID}, $self->{isupport});
+    $self->plugin_add('ISupport_' . $self->{SESSION_ID}, $self->{isupport});
     $self->{dcc} = POE::Component::IRC::Plugin::DCC->new();
-    $self->plugin_add('DCC' . $self->{SESSION_ID}, $self->{dcc});
+    $self->plugin_add('DCC_' . $self->{SESSION_ID}, $self->{dcc});
 
     if ($kernel != $sender) {
         my $sender_id = $sender->ID;
@@ -681,11 +692,11 @@ sub connect {
     if ( $self->{resolver} && $self->{res_addresses}
         && @{ $self->{res_addresses} } ) {
         push @{ $self->{res_addresses} }, $self->{server};
-        $self->{server} = shift @{ $self->{res_addresses} };
+        $self->{resolved_server} = shift @{ $self->{res_addresses} };
     }
 
     # try and use non-blocking resolver if needed
-    if ( $self->{resolver} && !irc_ip_get_version( $self->{server} )
+    if ( $self->{resolver} && !_ip_get_version( $self->{server} )
         && !$self->{nodns} ) {
         $kernel->yield(
             '_resolve_addresses',
@@ -727,8 +738,8 @@ sub _do_connect {
         $self->{socks_port} = 1080;
     }
 
-    for my $address (qw(socks_proxy proxy server localaddr)) {
-        next if !$self->{$address} || !irc_ip_is_ipv6( $self->{$address} );
+    for my $address (qw(socks_proxy proxy server resolved_server localaddr)) {
+        next if !$self->{$address} || !_ip_is_ipv6( $self->{$address} );
         if (!$GOT_SOCKET6) {
             warn "IPv6 address specified for '$address' but Socket6 not found\n";
             return;
@@ -740,7 +751,7 @@ sub _do_connect {
         SocketDomain   => $domain,
         SocketType     => SOCK_STREAM,
         SocketProtocol => 'tcp',
-        RemoteAddress  => $self->{socks_proxy} || $self->{proxy} || $self->{server},
+        RemoteAddress  => $self->{socks_proxy} || $self->{proxy} || $self->{resolved_server} || $self->{server},
         RemotePort     => $self->{socks_port} || $self->{proxyport} || $self->{port},
         SuccessEvent   => '_sock_up',
         FailureEvent   => '_sock_failed',
@@ -760,7 +771,7 @@ sub _got_dns_response {
     $self->{res_addresses} = [ ];
 
     if (!defined $net_dns_packet) {
-        $self->_send_event(irc_socketerr => $net_dns_errorstring );
+        $self->send_event(irc_socketerr => $net_dns_errorstring );
         return;
     }
 
@@ -777,17 +788,17 @@ sub _got_dns_response {
     }
 
     if ( !@{ $self->{res_addresses} } ) {
-        $self->_send_event(irc_socketerr => 'Unable to resolve ' . $self->{server});
+        $self->send_event(irc_socketerr => 'Unable to resolve ' . $self->{server});
         return;
       }
 
     if ( my $address = shift @{ $self->{res_addresses} } ) {
-        $self->{server} = $address;
+        $self->{resolved_server} = $address;
         $kernel->yield('_do_connect');
         return;
     }
 
-    $self->_send_event(irc_socketerr => 'Unable to resolve ' . $self->{server});
+    $self->send_event(irc_socketerr => 'Unable to resolve ' . $self->{server});
     return;
 }
 
@@ -813,8 +824,13 @@ sub ctcp {
 
 # allow plugins to respond to user commands which are not defined here
 sub __default {
-    return if $_[ARG0] =~ /^_/;
-    $_[OBJECT]->_pluggable_process(USER => $_[ARG0] => [@{ $_[ARG1] }]);
+    my ($self, $event, $args) = @_[OBJECT, ARG0, ARG1];
+    return if $event =~ /^_/;
+
+    push @{ $self->{pending_events} }, [];
+    $self->_pluggable_process(USER => $event => [@$args]);
+    $self->call('_send_pending_events');
+
     return;
 }
 
@@ -1159,6 +1175,9 @@ sub shutdown {
     return if $self->{_shutdown};
     $self->{_shutdown} = $sender->ID();
 
+    $kernel->sig('POCOIRC_REGISTER');
+    $kernel->sig('POCOIRC_SHUTDOWN');
+
     if ($self->logged_in()) {
         my ($msg, $timeout) = @_[ARG0, ARG1];
         $msg = '' if !defined $msg;
@@ -1173,7 +1192,7 @@ sub shutdown {
         $self->disconnect();
     }
     else {
-        $self->call('_cleanup');
+        $self->_shutdown();
     }
 
     return;
@@ -1185,23 +1204,20 @@ sub _quit_timeout {
     return;
 }
 
-sub _cleanup {
-    my ($kernel, $self, $session) = @_[KERNEL, OBJECT];
-
-    my $sender_id = delete $self->{_shutdown};
-    $kernel->sig('POCOIRC_REGISTER');
-    $kernel->sig('POCOIRC_SHUTDOWN');
-    $self->_send_event(irc_shutdown => $sender_id);
-    $self->_unregister_sessions();
-    $kernel->alarm_remove_all();
-    $kernel->alias_remove($_) for $kernel->alias_list($session);
-    delete $self->{$_} for qw(socketfactory dcc wheelmap);
-
-    # Delete all plugins that are loaded.
+sub _shutdown {
+    my ($self) = @_;
     $self->_pluggable_destroy();
+    $self->send_event('irc_shutdown', $self->{_shutdown});
+    return;
+}
 
+sub _cleanup {
+    my ($self) = @_;
+
+    $self->_unregister_sessions();
+    $poe_kernel->alarm_remove_all();
+    delete $self->{$_} for qw(socketfactory dcc wheelmap);
     $self->{resolver}->shutdown() if $self->{resolver} && $self->{mydns};
-
     return;
 }
 
@@ -1241,14 +1257,13 @@ sub sl {
 sub sl_prioritized {
     my ($kernel, $self, $priority, @args) = @_[KERNEL, OBJECT, ARG0, ARG1];
 
-    # Get the first word for the plugin system
+    my $eat;
     if (my ($event) = $args[0] =~ /^(\w+)/ ) {
         # Let the plugin system process this
-        return 1 if $self->_pluggable_process(
-            'USER',
-            $event,
-            \@args,
-        ) == PCI_EAT_ALL;
+        push @{ $self->{pending_events} }, [];
+        my $eat = $self->_pluggable_process('USER', $event, \@args);
+        $self->call('_send_pending_events');
+        return 1 if $eat == PCI_EAT_ALL;
     }
     else {
         warn "Unable to extract the event name from '$args[0]'\n";
@@ -1277,7 +1292,7 @@ sub sl_prioritized {
     }
     else {
         warn ">>> $msg\n" if $self->{debug};
-        $self->_send_event(irc_raw_out => $msg) if $self->{raw};
+        $self->send_event(irc_raw_out => $msg) if $self->{raw};
         $self->{send_time} += 2 + length($msg) / 120;
         $self->{socket}->put($msg);
     }
@@ -1300,7 +1315,7 @@ sub sl_delayed {
     while (@{ $self->{send_queue} } && ($self->{send_time} - $now < 10)) {
         my $arg = (shift @{$self->{send_queue}})->[MSG_TEXT];
         warn ">>> $arg\n" if $self->{debug};
-        $self->_send_event(irc_raw_out => $arg) if $self->{raw};
+        $self->send_event(irc_raw_out => $arg) if $self->{raw};
         $self->{send_time} += 2 + length($arg) / 120;
         $self->{socket}->put($arg);
     }
@@ -1413,6 +1428,16 @@ sub userhost {
 
 # Non-event methods
 
+sub server {
+    my ($self) = @_;
+    return $self->{server};
+}
+
+sub port {
+    my ($self) = @_;
+    return $self->{port};
+}
+
 sub server_name {
     my ($self) = @_;
     return $self->{INFO}{ServerName};
@@ -1489,7 +1514,7 @@ sub _delay {
     return if !defined $time;
     my $event = shift @{ $arrayref };
     my $alarm_id = $kernel->delay_set( $event => $time => @{ $arrayref } );
-    $self->_send_event(irc_delay_set => $alarm_id, $event, @{ $arrayref } ) if $alarm_id;
+    $self->send_event(irc_delay_set => $alarm_id, $event, @{ $arrayref } ) if $alarm_id;
     return $alarm_id;
 }
 
@@ -1506,7 +1531,7 @@ sub _delay_remove {
     my @old_alarm_list = $kernel->alarm_remove( $alarm_id );
     if (@old_alarm_list) {
         splice @old_alarm_list, 1, 1;
-        $self->_send_event(irc_delay_removed => $alarm_id, @old_alarm_list );
+        $self->send_event(irc_delay_removed => $alarm_id, @old_alarm_list );
         return \@old_alarm_list;
     }
 
@@ -1589,7 +1614,7 @@ sub S_disconnected {
         delete $self->{_waiting};
     }
 
-    $self->yield('_cleanup') if $self->{_shutdown};
+    $self->_shutdown() if $self->{_shutdown};
     return PCI_EAT_NONE;
 }
 
@@ -1668,14 +1693,89 @@ sub resolver {
 
 sub _pluggable_event {
     my ($self, $event, @args) = @_;
-
-    if ($event eq 'irc_plugin_error') {
-        $self->call(__send_event => $event, @args);
-    }
-    else {
-        $self->yield(__send_event => $event, @args);
-    }
+    $self->send_event($event, @args);
     return;
+}
+
+sub _ip_get_version {
+    my ($ip) = @_;
+    return if !defined $ip;
+
+    # If the address does not contain any ':', maybe it's IPv4
+    return 4 if $ip !~ /:/ && _ip_is_ipv4($ip);
+
+    # Is it IPv6 ?
+    return 6 if _ip_is_ipv6($ip);
+
+    return;
+}
+
+sub _ip_is_ipv4 {
+    my ($ip) = @_;
+    return if !defined $ip;
+
+    # Check for invalid chars
+    return if $ip !~ /^[\d\.]+$/;
+    return if $ip =~ /^\./;
+    return if $ip =~ /\.$/;
+
+    # Single Numbers are considered to be IPv4
+    return 1 if $ip =~ /^(\d+)$/ && $1 < 256;
+
+    # Count quads
+    my $n = ($ip =~ tr/\./\./);
+
+    # IPv4 must have from 1 to 4 quads
+    return if $n <= 0 || $n > 4;
+
+    # Check for empty quads
+    return if $ip =~ /\.\./;
+
+    for my $quad (split /\./, $ip) {
+        # Check for invalid quads
+        return if $quad < 0 || $quad >= 256;
+    }
+    return 1;
+}
+
+sub _ip_is_ipv6 {
+    my ($ip) = @_;
+    return if !defined $ip;
+
+    # Count octets
+    my $n = ($ip =~ tr/:/:/);
+    return if ($n <= 0 || $n >= 8);
+
+    # $k is a counter
+    my $k;
+
+    for my $octet (split /:/, $ip) {
+        $k++;
+
+        # Empty octet ?
+        next if $octet eq '';
+
+        # Normal v6 octet ?
+        next if $octet =~ /^[a-f\d]{1,4}$/i;
+
+        # Last octet - is it IPv4 ?
+        if ($k == $n + 1) {
+            next if (ip_is_ipv4($octet));
+        }
+
+        return;
+    }
+
+    # Does the IP address start with : ?
+    return if $ip =~ m/^:[^:]/;
+
+    # Does the IP address finish with : ?
+    return if $ip =~ m/[^:]:$/;
+
+    # Does the IP address have more than one '::' pattern ?
+    return if $ip =~ s/:(?=:)//g > 1;
+
+    return 1;
 }
 
 1;
@@ -1881,7 +1981,7 @@ Log public and private messages to disk.
 
 =item L<POE::Component::IRC::Plugin::NickServID|POE::Component::IRC::Plugin::NickServID>
 
-Identify with FreeNode's NickServ when needed.
+Identify with NickServ when needed.
 
 =item L<POE::Component::IRC::Plugin::Proxy|POE::Component::IRC::Plugin::Proxy>
 
@@ -2062,6 +2162,16 @@ These are methods supported by the POE::Component::IRC object. It also
 inherits a few from L<Object::Pluggable|Object::Pluggable>.
 See its documentation for details.
 
+=head2 C<server>
+
+Takes no arguments. Returns the server host we are currently connected to
+(or trying to connect to).
+
+=head2 C<port>
+
+Takes no arguments. Returns the server port we are currently connected to
+(or trying to connect to).
+
 =head2 C<server_name>
 
 Takes no arguments. Returns the name of the IRC server that the component
@@ -2176,9 +2286,25 @@ object that is internally created by the component.
 
 =head2 C<send_event>
 
-Sends an event through the components event handling system. These will get
+Sends an event through the component's event handling system. These will get
 processed by plugins then by registered sessions. First argument is the event
 name, followed by any parameters for that event.
+
+=head2 C<send_event_next>
+
+This sends an event right after the one that's currently being processed.
+Useful if you want to generate some event which is directly related to
+another event so you want them to appear together. This method can only be
+called when POE::Component::IRC is processing an event, e.g. from one of your
+event handlers. Takes the same arguments as L<C<send_event>/send_event>.
+
+=head2 C<send_event_now>
+
+This will send an event to be processed immediately. This means that if an
+event is currently being processed and there are plugins or sessions which
+will receive it after you do, then an event sent with C<send_event_now> will
+be received by those plugins/sessions I<before> the current event. Takes the
+same arguments as L<C<send_event>/send_event>.
 
 =head1 INPUT
 
@@ -2315,8 +2441,7 @@ you specify. Takes 2 arguments: the nick or channel to send a message
 to (use an array reference here to specify multiple recipients), and
 the text of the message to send.
 
-Have a look at the constants in
-L<POE::Component::IRC::Common|POE::Component::IRC::Common> if you would
+Have a look at the constants in L<IRC::Utils|IRC::Utils> if you would
 like to use formatting and color codes in your messages.
 
 =head3 C<quit>
@@ -2702,8 +2827,8 @@ Sent whenever you receive a PRIVMSG command that was addressed to you
 privately. C<ARG0> is the nick!hostmask of the sender. C<ARG1> is an array
 reference containing the nick(s) of the recipients. C<ARG2> is the text
 of the message. On servers supporting the IDENTIFY-MSG feature (e.g.
-FreeNode), there will be an additional argument, C<ARG3>, will be C<1> if the
-sender has identified with NickServ, C<0> otherwise.
+FreeNode), there will be an additional argument, C<ARG3>, which will be
+C<1> if the sender has identified with NickServ, C<0> otherwise.
 
 =head3 C<irc_nick>
 
@@ -2730,8 +2855,8 @@ Sent whenever you receive a PRIVMSG command that was sent to a channel.
 C<ARG0> is the nick!hostmask of the sender. C<ARG1> is an array
 reference containing the channel name(s) of the recipients. C<ARG2> is the
 text of the message. On servers supporting the IDENTIFY-MSG feature (e.g.
-FreeNode), there will be an additional argument, C<ARG3>, will be C<1> if the
-sender has identified with NickServ, C<0> otherwise.
+FreeNode), there will be an additional argument, C<ARG3>, which will be
+C<1> if the sender has identified with NickServ, C<0> otherwise.
 
 =head3 C<irc_quit>
 
@@ -2964,79 +3089,10 @@ poco-ircs simultaneously.
 Any additional parameters passed to the signal will become your quit messages
 on each IRC network.
 
-=head1 ENCODING AND CHARACTER SETS
+=head1 ENCODING
 
-=head2 Messages
-
-The only requirement the IRC protocol places on its messages is that they be
-8-bits, and in ASCII. This has resulted in most of the Western world settling
-on ASCII-compatible Latin-1 (usually Microsoft's CP1252, a Latin-1 variant) as
-a convention. Recently, popular IRC clients (mIRC, xchat, certain irssi
-configurations) have begun sending a mixture of CP1252 and UTF-8 over the wire
-to allow more characters without breaking backward compatibility (too much).
-They send CP1252 encoded messages if the characters fit within that encoding,
-otherwise falling back to UTF-8. Writing text with mixed encoding to a file,
-terminal, or database is rarely a good idea. To decode such messages reliably,
-see L<C<irc_to_utf8>|POE::Component::IRC::Common/irc_to_utf8> from
-L<POE::Component::IRC::Common|POE::Component::IRC::Common>.
-
-=head2 Channel names
-
-This matter is complicated further by the fact that some servers allow
-non-ASCII characters in channel names. The IRC component doesn't explicitly
-convert between encodings before sending your message along, but it has to
-concatenate the channel name and the message before sending them over the
-wire. So when you do C<< $irc->yield(privmsg => $chan, 'æði') >>, where
-C<$chan> is the unmodified channel name you got from the IRC component
-(i.e. it's a byte string), the channel name will end up getting
-double-encoded when concatenated with the message (which is a text string).
-If the channel name is all-ASCII, then nothing bad will happen, but if there
-are non-ASCII chars in it, you're in trouble.
-
-To prevent this, you can't simply call C<irc_to_utf8> on the channel name and
-then use it, because IRC servers don't care about encodings. C<'#æði'> in
-CP1252 is not the same channel as C<'#æði'> in UTF-8. The channel name and
-your message must therefore both be byte stirngs, or both be text strings.
-If they're text strings, the UTF-8 flag must be off for both, or on for both.
-
-A simple rule to follow is to call L<C<encode_utf8>|Encode> on the channel
-name and/or message if they are text strings. Here are some examples:
-
- use Encode qw(encode_utf8);
-
- sub irc_public {
-     my ($who, $where, $what) = @_[ARG0..ARG2];
-     my $irc = $_[SENDER]->get_heap();
-
-     # bad: if $where has any non-ASCII chars, they will get double-encoded
-     $irc->yield(privmsg => $where, 'æði');
-
-     # bad: if $what has any non-ASCII chars, they will get double-encoded
-     $irc->yield(privmsg => '#æði', $what);
-
-     # good: both are byte strings already, so this does what we expect
-     $irc->yield(privmsg => $where, $what);
-
-     # good: both are text strings (Latin1 as per Perl's default), so
-     # they'll be concatenated correctly
-     $irc->yield(privmsg => '#æði', 'æði');
-
-     # good: same as the last one, except now they're both in UTF-8,
-     # which means we'll be sending the message to a different channel
-     use utf8;
-     $irc->yield(privmsg => '#æði', 'æði');
-
-     # good: $where and $msg_bytes are both byte strings
-     my $msg_bytes = encode_utf8('æði');
-     $irc->yield(privmsg => $where, $msg_bytes);
-
-     # good: $chan_bytes and $what are both byte strings
-     my $chan_bytes = encode_utf8('#æði');
-     $irc->yield(privmsg => $chan_bytes, $what);
- }
-
-See also L<Encode|Encode>, L<perluniintro>, L<perlunitut>, L<perlunicode>,
-and L<perlunifaq>.
+This can be an issue. Take a look at L<IRC::Utils' section|IRC::Utils/ENCODING>
+on it.
 
 =head1 BUGS
 
@@ -3050,7 +3106,7 @@ You can find the latest source on github:
 L<http://github.com/bingos/poe-component-irc>
 
 The project's developers usually hang out in the C<#poe> IRC channel on
-irc.freenode.org. Do drop us a line.
+irc.perl.org.org. Do drop us a line.
 
 =head1 MAINTAINERS
 
@@ -3088,6 +3144,9 @@ Jeff 'japhy' Pinyan, <japhy@perlmonk.org>, for Pipeline.
 Thanks to the merry band of POE pixies from #PoE @ irc.perl.org,
 including ( but not limited to ), ketas, ct, dec, integral, webfox,
 immute, perigrin, paulv, alias.
+
+IP functions are shamelessly 'borrowed' from L<Net::IP|Net::IP> by Manuel
+Valente
 
 Check out the Changes file for further contributors.
 
