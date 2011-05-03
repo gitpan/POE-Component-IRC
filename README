@@ -223,7 +223,10 @@ CONSTRUCTORS
 
     'Username', your client's username;
 
-    'Ircname', some cute comment or something.
+
+
+    'Bitmode', an integer representing your initial user modes set in the
+    USER command. See RFC 2812. If you do not set this, 8 (+i) will be used.
 
     'UseSSL', set to some true value if you want to connect using SSL.
 
@@ -351,8 +354,8 @@ CONSTRUCTORS
 
 METHODS
     These are methods supported by the POE::Component::IRC object. It also
-    inherits a few from Object::Pluggable. See its documentation for
-    details.
+    inherits a few from Object::Pluggable and POE::Component::Syndicator.
+    See those modules' documentation for details.
 
   "server"
     Takes no arguments. Returns the server host we are currently connected
@@ -375,16 +378,6 @@ METHODS
 
   "localaddr"
     Takes no arguments. Returns the IP address being used.
-
-  "session_id"
-    Takes no arguments. Returns the ID of the component's session. Ideal for
-    posting events to the component.
-
-     $kernel->post($irc->session_id() => 'mode' => $channel => '+o' => $dude);
-
-  "session_alias"
-    Takes no arguments. Returns the session alias that has been set through
-    "spawn"'s alias argument.
 
   "send_queue"
     The component provides anti-flood throttling. This method takes no
@@ -416,7 +409,27 @@ METHODS
     Takes no arguments, returns a list of the available server capabilities
     keys, which can be used with "isupport".
 
+  "resolver"
+    Returns a reference to the POE::Component::Client::DNS object that is
+    internally created by the component.
+
+  "session_id"
+    *Inherited from POE::Component::Syndicator*
+
+    Takes no arguments. Returns the ID of the component's session. Ideal for
+    posting events to the component.
+
+     $kernel->post($irc->session_id() => 'mode' => $channel => '+o' => $dude);
+
+  "session_alias"
+    *Inherited from POE::Component::Syndicator*
+
+    Takes no arguments. Returns the session alias that has been set through
+    "spawn"'s alias argument.
+
   "yield"
+    *Inherited from POE::Component::Syndicator*
+
     This method provides an alternative object based means of posting events
     to the component. First argument is the event to post, following
     arguments are sent as arguments to the resultant post.
@@ -424,6 +437,8 @@ METHODS
      $irc->yield(mode => $channel => '+o' => $dude);
 
   "call"
+    *Inherited from POE::Component::Syndicator*
+
     This method provides an alternative object based means of calling events
     to the component. First argument is the event to call, following
     arguments are sent as arguments to the resultant call.
@@ -431,6 +446,8 @@ METHODS
      $irc->call(mode => $channel => '+o' => $dude);
 
   "delay"
+    *Inherited from POE::Component::Syndicator*
+
     This method provides a way of posting delayed events to the component.
     The first argument is an arrayref consisting of the delayed command to
     post and any command arguments. The second argument is the time in
@@ -442,6 +459,8 @@ METHODS
     delayed event. This will be undefined if something went wrong.
 
   "delay_remove"
+    *Inherited from POE::Component::Syndicator*
+
     This method removes a previously scheduled delayed event from the
     component. Takes one argument, the "alarm_id" that was returned by a
     "delay" method call.
@@ -450,16 +469,16 @@ METHODS
 
     Returns an arrayref that was originally requested to be delayed.
 
-  "resolver"
-    Returns a reference to the POE::Component::Client::DNS object that is
-    internally created by the component.
-
   "send_event"
+    *Inherited from POE::Component::Syndicator*
+
     Sends an event through the component's event handling system. These will
     get processed by plugins then by registered sessions. First argument is
     the event name, followed by any parameters for that event.
 
   "send_event_next"
+    *Inherited from POE::Component::Syndicator*
+
     This sends an event right after the one that's currently being
     processed. Useful if you want to generate some event which is directly
     related to another event so you want them to appear together. This
@@ -468,11 +487,120 @@ METHODS
     "send_event" in "send_event".
 
   "send_event_now"
+    *Inherited from POE::Component::Syndicator*
+
     This will send an event to be processed immediately. This means that if
     an event is currently being processed and there are plugins or sessions
     which will receive it after you do, then an event sent with
     "send_event_now" will be received by those plugins/sessions *before* the
     current event. Takes the same arguments as "send_event" in "send_event".
+
+  "pipeline"
+    *Inherited from Object::Pluggable*
+
+    Returns the Object::Pluggable::Pipeline object.
+
+  "plugin_add"
+    *Inherited from Object::Pluggable*
+
+    Accepts two arguments:
+
+     The alias for the plugin
+     The actual plugin object
+     Any number of extra arguments
+
+    The alias is there for the user to refer to it, as it is possible to
+    have multiple plugins of the same kind active in one Object::Pluggable
+    object.
+
+    This method goes through the pipeline's "push()" method, which will call
+    "$plugin->plugin_register($pluggable, @args)".
+
+    Returns the number of plugins now in the pipeline if plugin was
+    initialized, "undef"/an empty list if not.
+
+  "plugin_del"
+    *Inherited from Object::Pluggable*
+
+    Accepts the following arguments:
+
+     The alias for the plugin or the plugin object itself
+     Any number of extra arguments
+
+    This method goes through the pipeline's "remove()" method, which will
+    call "$plugin->plugin_unregister($pluggable, @args)".
+
+    Returns the plugin object if the plugin was removed, "undef"/an empty
+    list if not.
+
+  "plugin_get"
+    *Inherited from Object::Pluggable*
+
+    Accepts the following arguments:
+
+     The alias for the plugin
+
+    This method goes through the pipeline's "get()" method.
+
+    Returns the plugin object if it was found, "undef"/an empty list if not.
+
+  "plugin_list"
+    *Inherited from Object::Pluggable*
+
+    Takes no arguments.
+
+    Returns a hashref of plugin objects, keyed on alias, or an empty list if
+    there are no plugins loaded.
+
+  "plugin_order"
+    *Inherited from Object::Pluggable*
+
+    Takes no arguments.
+
+    Returns an arrayref of plugin objects, in the order which they are
+    encountered in the pipeline.
+
+  "plugin_register"
+    *Inherited from Object::Pluggable*
+
+    Accepts the following arguments:
+
+     The plugin object
+     The type of the hook (the hook types are specified with _pluggable_init()'s 'types')
+     The event name[s] to watch
+
+    The event names can be as many as possible, or an arrayref. They
+    correspond to the prefixed events and naturally, arbitrary events too.
+
+    You do not need to supply events with the prefix in front of them, just
+    the names.
+
+    It is possible to register for all events by specifying 'all' as an
+    event.
+
+    Returns 1 if everything checked out fine, "undef"/an empty list if
+    something is seriously wrong.
+
+  "plugin_unregister"
+    *Inherited from Object::Pluggable*
+
+    Accepts the following arguments:
+
+     The plugin object
+     The type of the hook (the hook types are specified with _pluggable_init()'s 'types')
+     The event name[s] to unwatch
+
+    The event names can be as many as possible, or an arrayref. They
+    correspond to the prefixed events and naturally, arbitrary events too.
+
+    You do not need to supply events with the prefix in front of them, just
+    the names.
+
+    It is possible to register for all events by specifying 'all' as an
+    event.
+
+    Returns 1 if all the event name[s] was unregistered, undef if some was
+    not found.
 
 INPUT
     How to talk to your new IRC component... here's the events we'll accept.
@@ -495,6 +623,8 @@ INPUT
 
   Important Commands
    "register"
+    *Inherited from POE::Component::Syndicator*
+
     Takes N arguments: a list of event names that your session wants to
     listen for, minus the "irc_" prefix. So, for instance, if you just want
     a bot that keeps track of which people are on a channel, you'll need to
@@ -529,6 +659,18 @@ INPUT
     "irc_registered" event indicating that the component is up and ready to
     go.
 
+   "unregister"
+    *Inherited from POE::Component::Syndicator*
+
+    Takes N arguments: a list of event names which you *don't* want to
+    receive. If you've previously done a "register" for a particular event
+    which you no longer care about, this event will tell the IRC connection
+    to stop sending them to you. (If you haven't, it just ignores you. No
+    big deal.)
+
+    If you have registered with 'all', attempting to unregister individual
+    events such as 'mode', etc. will not work. This is a 'feature'.
+
    "connect"
     Takes one argument: a hash reference of attributes for the new
     connection, see "spawn" for details. This event tells the IRC client to
@@ -557,11 +699,12 @@ INPUT
     boot, and an optional witty message to show them as they sail out the
     door.
 
-   "remove" (FreeNode only)
+   "remove"
     Tell the IRC server to forcibly evict a user from a particular channel.
     Takes at least 2 arguments: a channel name, the nick of the user to
     boot, and an optional witty message to show them as they sail out the
-    door. Similar to KICK but does an enforced PART instead.
+    door. Similar to KICK but does an enforced PART instead. Not supported
+    by all servers.
 
    "mode"
     Request a mode change on a particular channel or user. Takes at least
@@ -576,8 +719,9 @@ INPUT
     Allows you to change your nickname. Takes exactly one argument: the new
     username that you'd like to be known as.
 
-   "nickserv" (FreeNode, ratbox, et al)
-    Talks to NickServ. Takes any number of arguments.
+   "nickserv"
+    Talks to NickServ, on networks which have it. Takes any number of
+    arguments.
 
    "notice"
     Sends a NOTICE message to the nick(s) or channel(s) which you specify.
@@ -630,16 +774,6 @@ INPUT
     current topic. If called with the channel name and a string, it will set
     the channel topic to that string. Supply an empty string to unset a
     channel topic.
-
-   "unregister"
-    Takes N arguments: a list of event names which you *don't* want to
-    receive. If you've previously done a "register" for a particular event
-    which you no longer care about, this event will tell the IRC connection
-    to stop sending them to you. (If you haven't, it just ignores you. No
-    big deal.)
-
-    If you have registered with 'all', attempting to unregister individual
-    events such as 'mode', etc. will not work. This is a 'feature'.
 
    "debug"
     Takes one argument: 0 to turn debugging off or 1 to turn debugging on.
@@ -847,6 +981,33 @@ OUTPUT
     and its methods.
 
   Important Events
+   "irc_registered"
+    *Inherited from POE::Component::Syndicator*
+
+    Sent once to the requesting session on registration (see "register").
+    "ARG0" is a reference tothe component's object.
+
+   "irc_shutdown"
+    *Inherited from POE::Component::Syndicator*
+
+    Sent to all registered sessions when the component has been asked to
+    "shutdown". "ARG0" will be the session ID of the requesting session.
+
+   "irc_delay_set"
+    *Inherited from POE::Component::Syndicator*
+
+    Emitted on a successful addition of a delayed event using the "delay"
+    method. "ARG0" will be the alarm_id which can be used later with
+    "delay_remove". Subsequent parameters are the arguments that were passed
+    to "delay".
+
+   "irc_delay_removed"
+    *Inherited from POE::Component::Syndicator*
+
+    Emitted when a delayed command is successfully removed. "ARG0" will be
+    the alarm_id that was removed. Subsequent parameters are the arguments
+    that were passed to "delay".
+
    "irc_connected"
     The IRC component will send an "irc_connected" event as soon as it
     establishes a connection to an IRC server, before attempting to log in.
@@ -1023,29 +1184,10 @@ OUTPUT
     "raw_events" with a true argument. "ARG0" is the raw IRC string sent by
     the component to the the IRC server.
 
-   "irc_registered"
-    Sent once to the requesting session on registration (see "register").
-    "ARG0" is a reference tothe component's object.
-
-   "irc_shutdown"
-    Sent to all registered sessions when the component has been asked to
-    "shutdown". "ARG0" will be the session ID of the requesting session.
-
    "irc_isupport"
     Emitted by the first event after an "irc_005", to indicate that isupport
     information has been gathered. "ARG0" is the
     POE::Component::IRC::Plugin::ISupport object.
-
-   "irc_delay_set"
-    Emitted on a successful addition of a delayed event using the "delay"
-    method. "ARG0" will be the alarm_id which can be used later with
-    "delay_remove". Subsequent parameters are the arguments that were passed
-    to "delay".
-
-   "irc_delay_removed"
-    Emitted when a delayed command is successfully removed. "ARG0" will be
-    the alarm_id that was removed. Subsequent parameters are the arguments
-    that were passed to "delay".
 
    "irc_socks_failed"
     Emitted whenever we fail to connect successfully to a SOCKS server or
@@ -1077,10 +1219,13 @@ OUTPUT
     informational purposes.
 
    "irc_snotice"
-    A weird, non-RFC-compliant message from an IRC server. Don't worry about
-    it. "ARG0" is the text of the server's message. Servers vary as to
-    whether these notices include a server name as the sender, or no sender
-    at all. "ARG1" is the sender, if any.
+    A weird, non-RFC-compliant message from an IRC server. Usually sent
+    during to you during an authentication phase right after you connect,
+    while the server does a hostname lookup or similar tasks. "ARG0" is the
+    text of the server's message. "ARG1" is the target, which could be '*'
+    or 'AUTH' or whatever. Servers vary as to whether these notices include
+    a server name as the sender, or no sender at all. "ARG1" is the sender,
+    if any.
 
   All numeric events
     Most messages from IRC servers are identified only by three-digit
@@ -1100,6 +1245,8 @@ SIGNALS
     using POE::Kernel's "signal" method.
 
   "POCOIRC_REGISTER"
+    *Inherited from POE::Component::Syndicator*
+
     Registering with multiple PoCo-IRC components has been a pita. Well, no
     more, using the power of POE::Kernel signals.
 
@@ -1149,6 +1296,8 @@ SIGNALS
      }
 
   "POCOIRC_SHUTDOWN"
+    *Inherited from POE::Component::Syndicator*
+
     Telling multiple poco-ircs to shutdown was a pita as well. The same
     principle as with registering applies to shutdown too.
 
@@ -1173,7 +1322,7 @@ DEVELOPMENT
     <http://github.com/bingos/poe-component-irc>
 
     The project's developers usually hang out in the "#poe" IRC channel on
-    irc.perl.org.org. Do drop us a line.
+    irc.perl.org. Do drop us a line.
 
 MAINTAINERS
     Chris "BinGOs" Williams <chris@bingosnet.co.uk>
@@ -1224,4 +1373,11 @@ SEE ALSO
     devoted to IRC programming <http://poe.perl.org/?POE_Cookbook>.
 
     The examples/ folder of this distribution.
+
+POD ERRORS
+    Hey! The above document had some coding errors, which are explained
+    below:
+
+    Around line 1694:
+        A non-empty Z<>
 

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Filter::IRC::Compat::VERSION = '6.61';
+  $POE::Filter::IRC::Compat::VERSION = '6.62';
 }
 
 use strict;
@@ -51,6 +51,7 @@ my %irc_cmds = (
             $event->{name} = 'snotice';
             $event->{args} = [
                 $line->{params}->[1],
+                $line->{params}->[0],
                 (defined $line->{prefix} ? _decolon($line->{prefix}) : ()),
             ];
         }

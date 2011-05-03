@@ -3,14 +3,14 @@ BEGIN {
   $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::State::VERSION = '6.61';
+  $POE::Component::IRC::Qnet::State::VERSION = '6.62';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
 use POE;
-use IRC::Utils qw(uc_irc parse_mask);
+use IRC::Utils qw(uc_irc parse_mask parse_user);
 use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC::State POE::Component::IRC::Qnet);
 

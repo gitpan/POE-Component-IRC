@@ -3,13 +3,13 @@ BEGIN {
   $POE::Component::IRC::Plugin::Proxy::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.61';
+  $POE::Component::IRC::Plugin::Proxy::VERSION = '6.62';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
-use Socket;
+use Socket qw(inet_ntoa);
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD
            Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);

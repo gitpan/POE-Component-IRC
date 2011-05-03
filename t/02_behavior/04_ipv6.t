@@ -2,21 +2,37 @@ use strict;
 use warnings FATAL => 'all';
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::Line);
 use POE::Component::IRC;
-use Socket;
 use Test::More;
 
 my $tests = 4;
 
-eval {
-    require Socket6;
-    import Socket6;
-};
-
-if ($@ or not exists($INC{'Socket6.pm'}) ) {
-    plan skip_all => 'Socket6 is needed for IPv6 tests';
+BEGIN {
+    my $GOT_SOCKET6;
+    eval {
+        Socket->import(qw(AF_INET6 unpack_sockaddr_in6 inet_pton));
+        $GOT_SOCKET6 = 1;
+    };
+    if (!$GOT_SOCKET6) {
+        eval {
+            require Socket6;
+            Socket6->import(qw(AF_INET6 unpack_sockaddr_in6 inet_pton));
+            $GOT_SOCKET6 = 1;
+        };
+        plan skip_all => 'Socket6 is needed for IPv6 tests' if !$GOT_SOCKET6;
+    }
 }
 
-my $addr = Socket6::inet_pton(&Socket6::AF_INET6, "::1");
+# Argh, we need to be "smart" and see if we need GAI or not...
+# Perl-5.14.0 will core getaddrinfo() in it's Socket.pm
+eval { Socket->import('getaddrinfo') };
+if ($@) {
+    eval { require Socket::GetAddrInfo };
+    if ($@) {
+        plan skip_all => 'Socket::GetAddrInfo is needed for IPv6 tests';
+    }
+}
+
+my $addr = inet_pton(AF_INET6, "::1");
 if (!defined $addr) {
     plan skip_all => "IPv6 tests require a configured localhost address ('::1')";
 }

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Common::VERSION = '6.61';
+  $POE::Component::IRC::Common::VERSION = '6.62';
 }
 
 use strict;
@@ -22,7 +22,7 @@ our @EXPORT_OK = qw(
 );
 our %EXPORT_TAGS = ( ALL => [@EXPORT_OK] );
 
-no warnings 'once';
+no warnings 'once'; ## no critic (TestingAndDebugging::ProhibitNoWarnings)
 *NORMAL      = *IRC::Utils::NORMAL;
 *BOLD        = *IRC::Utils::BOLD;
 *UNDERLINE   = *IRC::Utils::UNDERLINE;

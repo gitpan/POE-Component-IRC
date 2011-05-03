@@ -3,12 +3,13 @@ BEGIN {
   $POE::Component::IRC::Plugin::Console::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Console::VERSION = '6.61';
+  $POE::Component::IRC::Plugin::Console::VERSION = '6.62';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
+use IRC::Utils qw(decode_irc);
 use POE qw(Wheel::SocketFactory Wheel::ReadWrite Filter::IRCD Filter::Line Filter::Stackable);
 use POE::Component::IRC::Plugin qw( :ALL );
 use Scalar::Util qw(looks_like_number);
@@ -64,10 +65,12 @@ sub _dump {
         return '{'. join(', ', map { "$_->[0] => $_->[1]" } @pairs) .'}';
     }
     elsif (ref $arg) {
-        return $arg;
+        require overload;
+        return overload::StrVal($arg);
     }
     elsif (defined $arg) {
-        return looks_like_number($arg) ? $arg : "'$arg'";
+        return $arg if looks_like_number($arg);
+        return "'".decode_irc($arg)."'";
     }
     else {
         return 'undef';

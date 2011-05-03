@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.61';
+  $POE::Component::IRC::State::VERSION = '6.62';
 }
 
 use strict;
@@ -820,7 +820,11 @@ sub nick_info {
 
     my $user = $self->{STATE}{Nicks}{ $unick };
     my %result = %{ $user };
-    $result{Userhost} = "$result{User}\@$result{Host}";
+
+    # maybe we haven't synced this user's info yet
+    if (defined $result{User} && defined $result{Host}) {
+        $result{Userhost} = "$result{User}\@$result{Host}";
+    }
     delete $result{'CHANS'};
 
     return \%result;

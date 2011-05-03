@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::Logger::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::Logger::VERSION = '6.61';
+  $POE::Component::IRC::Plugin::Logger::VERSION = '6.62';
 }
 
 use strict;
@@ -405,7 +405,7 @@ sub _open_log {
     my ($self, $file_name) = @_;
     sysopen(my $log, $file_name, O_WRONLY|O_APPEND|O_CREAT, $self->{file_perm})
         or die "Couldn't open or create file '$file_name': $!; aborted";
-    binmode($log, ':utf8');
+    binmode($log, ':encoding(utf8)');
     $log->autoflush(1);
     return $log;
 }
