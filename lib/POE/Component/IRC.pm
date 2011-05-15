@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.62';
+  $POE::Component::IRC::VERSION = '6.63';
 }
 
 use strict;
@@ -149,7 +149,6 @@ sub _create {
         sl_delayed
         sl_prioritized
         topic
-        unregister
         userhost
     )];
 
