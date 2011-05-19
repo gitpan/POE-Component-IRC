@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.64';
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.65';
 }
 
 use strict;
@@ -51,8 +51,12 @@ sub S_msg {
     return PCI_EAT_NONE if !$self->{In_private};
     $what = $self->_normalize($what);
 
+    if (!$self->{Bare_private}) {
+        return PCI_EAT_NONE if $what !~ s/^\Q$self->{Prefix}\E//;
+    }
+
     my ($cmd, $args);
-    if (!(($cmd, $args) = $what =~ /^$self->{Prefix}(\w+)(?:\s+(.+))?$/)) {
+    if (!(($cmd, $args) = $what =~ /^(\w+)(?:\s+(.+))?$/)) {
         return PCI_EAT_NONE;
     }
 
@@ -74,7 +78,7 @@ sub S_public {
         return PCI_EAT_NONE if !(($what) = $what =~ m/^\s*\Q$me\E[:,;.!?~]?\s*(.*)$/);
     }
     else {
-        return PCI_EAT_NONE if $what !~ s/^$self->{Prefix}//;
+        return PCI_EAT_NONE if $what !~ s/^\Q$self->{Prefix}\E//;
     }
 
     my ($cmd, $args);
@@ -287,7 +291,7 @@ command yourself, that one will be used instead.
 =head2 C<new>
 
 B<'Commands'>, a hash reference, with your commands as keys, and usage
-information as values. If the usage string contains newlines, the component
+information as values. If the usage string contains newlines, the plugin
 will send one message for each line.
 
 =head3 Accepting commands
@@ -305,19 +309,24 @@ B<'Prefix'>, a string which all commands must be prefixed with (except in
 channels when B<'Addressed'> is true). Default is '!'. You can set it to ''
 to allow bare commands.
 
+B<'Bare_private'>, a boolean value indicating whether bare commands (without
+the prefix) are allowed in private messages. Default is false.
+
 =head3 Authorization
 
 B<'Auth_sub'>, a subroutine reference which, if provided, will be called
 for every command. The subroutine will be called in list context. If the
-first value returned is true the command will be processed as normal. If the
-value is false, then no events will be generated, and an error message will
-possibly be sent back to the user. You can override the default error message
-by returning an array reference of (zero or more) strings. Each string will
-be sent as a message to the user.
+first value returned is true, the command will be processed as normal. If
+the value is false, then no events will be generated, and an error message
+will possibly be sent back to the user.
 
-The sub will get the following arguments:
+You can override the default error message by returning a second value, an
+array reference of (zero or more) strings. Each string will be sent as a
+message to the user.
 
-=over
+Your subroutine will be called with the following arguments:
+
+=over 4
 
 =item 1. The IRC component object
 
@@ -374,11 +383,19 @@ command names and the values being the usage strings.
 
 You will receive an event like this for every valid command issued. E.g. if
 'slap' were a valid command, you would receive an C<irc_botcmd_slap> event
-every time someone issued that command. C<ARG0> is the nick!hostmask of the
-user who issued the command. C<ARG1> is the name of the channel in which the
-command was issued, or the sender's nickname if this was a private message.
-If the command was followed by any arguments, C<ARG2> will be a string
-containing them, otherwise it will be undefined.
+every time someone issued that command. It receives the following arguments:
+
+=over 4
+
+=item * C<ARG0>: the nick!hostmask of the user who issued the command.
+
+=item * C<ARG1> is the name of the channel in which the command was issued,
+or the sender's nickname if this was a private message.
+
+=item * C<ARG2>: a string of arguments to the command, or undef if there
+were no arguments
+
+=back
 
 =head1 AUTHOR
 
