@@ -3,14 +3,14 @@ BEGIN {
   $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::State::VERSION = '6.67';
+  $POE::Component::IRC::Qnet::State::VERSION = '6.68';
 }
 
 use strict;
 use warnings FATAL => 'all';
 use Carp;
 use POE;
-use IRC::Utils qw(uc_irc parse_mask parse_user);
+use IRC::Utils qw(uc_irc normalize_mask parse_user);
 use POE::Component::IRC::Plugin qw(:ALL);
 use base qw(POE::Component::IRC::State POE::Component::IRC::Qnet);
 
@@ -401,7 +401,7 @@ sub find_auth_nicks {
 
 sub ban_mask {
     my ($self, $channel, $mask) = @_;
-    $mask = parse_mask($mask);
+    $mask = normalize_mask($mask);
     my $mapping = $self->isupport('CASEMAPPING');
     my @result;
 

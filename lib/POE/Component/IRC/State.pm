@@ -3,12 +3,12 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.67';
+  $POE::Component::IRC::State::VERSION = '6.68';
 }
 
 use strict;
 use warnings FATAL => 'all';
-use IRC::Utils qw(uc_irc parse_mode_line parse_mask);
+use IRC::Utils qw(uc_irc parse_mode_line normalize_mask);
 use POE;
 use POE::Component::IRC::Plugin qw(PCI_EAT_NONE);
 use base qw(POE::Component::IRC);
@@ -1117,7 +1117,7 @@ sub ban_mask {
     }
 
     my $map = $self->isupport('CASEMAPPING');
-    $mask = parse_mask($mask);
+    $mask = normalize_mask($mask);
     my @result;
 
     return if !$self->_channel_exists($chan);
