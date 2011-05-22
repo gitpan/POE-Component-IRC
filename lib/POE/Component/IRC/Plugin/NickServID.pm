@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.66';
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.67';
 }
 
 use strict;
@@ -104,7 +104,7 @@ Arguments:
 Returns a plugin object suitable for feeding to
 L<POE::Component::IRC|POE::Component::IRC>'s plugin_add() method.
 
-=head1 OUTPUT
+=head1 OUTPUT EVENTS
 
 =head2 C<irc_identified>
 

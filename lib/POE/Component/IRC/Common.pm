@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Common::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Common::VERSION = '6.66';
+  $POE::Component::IRC::Common::VERSION = '6.67';
 }
 
 use strict;
@@ -49,7 +49,7 @@ no warnings 'once'; ## no critic (TestingAndDebugging::ProhibitNoWarnings)
 *u_irc              = *IRC::Utils::uc_irc;
 *l_irc              = *IRC::Utils::lc_irc;
 *parse_mode_line    = *IRC::Utils::parse_mode_line;
-*parse_ban_mask     = *IRC::Utils::parse_mask;
+*parse_ban_mask     = *IRC::Utils::normalize_mask;
 *parse_user         = *IRC::Utils::parse_user;
 *matches_mask       = *IRC::Utils::matches_mask;
 *matches_mask_array = *IRC::Utils::matches_mask_array;

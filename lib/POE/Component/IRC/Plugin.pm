@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::VERSION = '6.66';
+  $POE::Component::IRC::Plugin::VERSION = '6.67';
 }
 
 use strict;
@@ -310,8 +310,8 @@ will know what to do.
  ...
 
 Keep in mind that they are always lowercased. Check out the
-L<OUTPUT|POE::Component::IRC/OUTPUT> section of POE::Component::IRC's
-documentation for the complete list of events.
+L<OUTPUT EVENTS|POE::Component::IRC/OUTPUT EVENTS> section of
+POE::Component::IRC's documentation for the complete list of events.
 
 =head2 USER hooks
 

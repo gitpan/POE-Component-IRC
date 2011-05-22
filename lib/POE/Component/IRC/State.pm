@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.66';
+  $POE::Component::IRC::State::VERSION = '6.67';
 }
 
 use strict;
@@ -1552,7 +1552,7 @@ is returned.
 
 Takes no parameters. Returns the current user mode set for the bot.
 
-=head1 OUTPUT
+=head1 OUTPUT EVENTS
 
 =head2 Augmented events
 

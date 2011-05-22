@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Qnet::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Qnet::State::VERSION = '6.66';
+  $POE::Component::IRC::Qnet::State::VERSION = '6.67';
 }
 
 use strict;
@@ -600,7 +600,7 @@ event for each of the given channels (assuming that nick is on each of those cha
 
 =back
 
-=head1 OUTPUT
+=head1 OUTPUT EVENTS
 
 This module returns one additional event over and above the usual events:
 

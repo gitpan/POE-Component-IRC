@@ -123,16 +123,19 @@ DESCRIPTION
     they are subclasses they support all the methods, etc. documented here
     and have additional methods and quirks which are documented separately:
 
-    POE::Component::IRC::State
+    *   POE::Component::IRC::State
+
         POE::Component::IRC::State provides all the functionality of
         POE::Component::IRC but also tracks IRC state entities such as nicks
         and channels.
 
-    POE::Component::IRC::Qnet
+    *   POE::Component::IRC::Qnet
+
         POE::Component::IRC::Qnet is POE::Component::IRC tweaked for use on
         Quakenet IRC network.
 
-    POE::Component::IRC::Qnet::State
+    *   POE::Component::IRC::Qnet::State
+
         POE::Component::IRC::Qnet::State is a tweaked version of
         POE::Component::IRC::State for use on the Quakenet IRC network.
 
@@ -144,58 +147,73 @@ DESCRIPTION
     A number of useful plugins have made their way into the core
     distribution:
 
-    POE::Component::IRC::Plugin::DCC
+    *   POE::Component::IRC::Plugin::DCC
+
         Provides DCC support. Loaded by default.
 
-    POE::Component::IRC::Plugin::AutoJoin
+    *   POE::Component::IRC::Plugin::AutoJoin
+
         Keeps you on your favorite channels throughout reconnects and even
         kicks.
 
-    POE::Component::IRC::Plugin::Connector
+    *   POE::Component::IRC::Plugin::Connector
+
         Glues an irc bot to an IRC network, i.e. deals with maintaining ircd
         connections.
 
-    POE::Component::IRC::Plugin::BotTraffic
+    *   POE::Component::IRC::Plugin::BotTraffic
+
         Under normal circumstances irc bots do not normal the msgs and
         public msgs that they generate themselves. This plugin enables you
         to handle those events.
 
-    POE::Component::IRC::Plugin::BotAddressed
+    *   POE::Component::IRC::Plugin::BotAddressed
+
         Generates "irc_bot_addressed" / "irc_bot_mentioned" /
         "irc_bot_mentioned_action" events whenever your bot's name comes up
         in channel discussion.
 
-    POE::Component::IRC::Plugin::BotCommand
+    *   POE::Component::IRC::Plugin::BotCommand
+
         Provides an easy way to handle commands issued to your bot.
 
-    POE::Component::IRC::Plugin::Console
+    *   POE::Component::IRC::Plugin::Console
+
         See inside the component. See what events are being sent. Generate
         irc commands manually. A TCP based console.
 
-    POE::Component::IRC::Plugin::FollowTail
+    *   POE::Component::IRC::Plugin::FollowTail
+
         Follow the tail of an ever-growing file.
 
-    POE::Component::IRC::Plugin::Logger
+    *   POE::Component::IRC::Plugin::Logger
+
         Log public and private messages to disk.
 
-    POE::Component::IRC::Plugin::NickServID
+    *   POE::Component::IRC::Plugin::NickServID
+
         Identify with NickServ when needed.
 
-    POE::Component::IRC::Plugin::Proxy
+    *   *POE::Component::IRC::Plugin::Proxy
+
         A lightweight IRC proxy/bouncer.
 
-    POE::Component::IRC::Plugin::CTCP
+    *   POE::Component::IRC::Plugin::CTCP
+
         Automagically generates replies to ctcp version, time and userinfo
         queries.
 
-    POE::Component::IRC::Plugin::PlugMan
+    *   POE::Component::IRC::Plugin::PlugMan
+
         An experimental Plugin Manager plugin.
 
-    POE::Component::IRC::Plugin::NickReclaim
+    *   POE::Component::IRC::Plugin::NickReclaim
+
         Automagically deals with your nickname being in use and reclaiming
         it.
 
-    POE::Component::IRC::Plugin::CycleEmpty
+    *   POE::Component::IRC::Plugin::CycleEmpty
+
         Cycles (parts and rejoins) channels if they become empty and opless,
         in order to gain ops.
 
@@ -209,85 +227,94 @@ CONSTRUCTORS
     below may be supplied to the "connect" input event as well, except for
     'alias', 'options', 'NoDNS', 'debug', and 'plugin_debug'.
 
-    'alias', a name (kernel alias) that this instance will be known by;
+    *   'alias', a name (kernel alias) that this instance will be known by;
 
-    'options', a hashref containing POE::Session options;
+    *   'options', a hashref containing POE::Session options;
 
-    'Server', the server name;
+    *   'Server', the server name;
 
-    'Port', the remote port number;
+    *   'Port', the remote port number;
 
-    'Password', an optional password for restricted servers;
+    *   'Password', an optional password for restricted servers;
 
-    'Nick', your client's IRC nickname;
+    *   'Nick', your client's IRC nickname;
 
-    'Username', your client's username;
+    *   'Username', your client's username;
 
+    *   'Ircname', some cute comment or something.
 
+    *   'Bitmode', an integer representing your initial user modes set in
+        the USER command. See RFC 2812. If you do not set this, 8 (+i) will
+        be used.
 
-    'Bitmode', an integer representing your initial user modes set in the
-    USER command. See RFC 2812. If you do not set this, 8 (+i) will be used.
+    *   'UseSSL', set to some true value if you want to connect using SSL.
 
-    'UseSSL', set to some true value if you want to connect using SSL.
+    *   'Raw', set to some true value to enable the component to send
+        "irc_raw" and "irc_raw_out" events.
 
-    'Raw', set to some true value to enable the component to send "irc_raw"
-    and "irc_raw_out" events.
+    *   'LocalAddr', which local IP address on a multihomed box to connect
+        as;
 
-    'LocalAddr', which local IP address on a multihomed box to connect as;
+    *   'LocalPort', the local TCP port to open your socket on;
 
-    'LocalPort', the local TCP port to open your socket on;
+    *   'NoDNS', set this to 1 to disable DNS lookups using PoCo-Client-DNS.
+        (See note below).
 
-    'NoDNS', set this to 1 to disable DNS lookups using PoCo-Client-DNS.
-    (See note below).
+    *   'Flood', when true, it disables the component's flood protection
+        algorithms, allowing it to send messages to an IRC server at full
+        speed. Disconnects and k-lines are some common side effects of
+        flooding IRC servers, so care should be used when enabling this
+        option. Default is false.
 
-    'Flood', set this to 1 to get quickly disconnected and klined from an
-    ircd >;]
+        Two new attributes are 'Proxy' and 'ProxyPort' for sending your
+        =item * 'Proxy', IP address or server name of a proxy server to use.
 
-    'Proxy', IP address or server name of a proxy server to use.
+    *   'ProxyPort', which tcp port on the proxy to connect to.
 
-    'ProxyPort', which tcp port on the proxy to connect to.
+    *   'NATAddr', what other clients see as your IP address.
 
-    'NATAddr', what other clients see as your IP address.
+    *   'DCCPorts', an arrayref containing tcp ports that can be used for
+        DCC sends.
 
-    'DCCPorts', an arrayref containing tcp ports that can be used for DCC
-    sends.
+    *   'Resolver', provide a POE::Component::Client::DNS object for the
+        component to use.
 
-    'Resolver', provide a POE::Component::Client::DNS object for the
-    component to use.
+    *   'msg_length', the maximum length of IRC messages, in bytes. Default
+        is 450. The IRC component shortens all messages longer than this
+        value minus the length of your current nickname. IRC only allows raw
+        protocol lines messages that are 512 bytes or shorter, including the
+        trailing "\r\n". This is most relevant to long PRIVMSGs. The IRC
+        component can't be sure how long your user@host mask will be every
+        time you send a message, considering that most networks mangle the
+        'user' part and some even replace the whole string (think FreeNode
+        cloaks). If you have an unusually long user@host mask you might want
+        to decrease this value if you're prone to sending long messages.
+        Conversely, if you have an unusually short one, you can increase
+        this value if you want to be able to send as long a message as
+        possible. Be careful though, increase it too much and the IRC server
+        might disconnect you with a "Request too long" message when you try
+        to send a message that's too long.
 
-    'msg_length', the maximum length of IRC messages, in bytes. Default is
-    450. The IRC component shortens all messages longer than this value
-    minus the length of your current nickname. IRC only allows raw protocol
-    lines messages that are 512 bytes or shorter, including the trailing
-    "\r\n". This is most relevant to long PRIVMSGs. The IRC component can't
-    be sure how long your user@host mask will be every time you send a
-    message, considering that most networks mangle the 'user' part and some
-    even replace the whole string (think FreeNode cloaks). If you have an
-    unusually long user@host mask you might want to decrease this value if
-    you're prone to sending long messages. Conversely, if you have an
-    unusually short one, you can increase this value if you want to be able
-    to send as long a message as possible. Be careful though, increase it
-    too much and the IRC server might disconnect you with a "Request too
-    long" message when you try to send a message that's too long.
+    *   'debug', if set to a true value causes the IRC component to print
+        every message sent to and from the server, as well as print some
+        warnings when it receives malformed messages. This option will be
+        enabled if the "POCOIRC_DEBUG" environment variable is set to a true
+        value.
 
-    'debug', if set to a true value causes the IRC component to print every
-    message sent to and from the server, as well as print some warnings when
-    it receives malformed messages. This option will be enabled if the
-    "POCOIRC_DEBUG" environment variable is set to a true value.
+    *   'plugin_debug', set to some true value to print plugin debug info,
+        default 0. Plugins are processed inside an eval. When you enable
+        this option, you will be notified when (and why) a plugin raises an
+        exception. This option will be enabled if the "POCOIRC_DEBUG"
+        environment variable is set to a true value.
 
-    'plugin_debug', set to some true value to print plugin debug info,
-    default 0. Plugins are processed inside an eval. When you enable this
-    option, you will be notified when (and why) a plugin raises an
-    exception. This option will be enabled if the "POCOIRC_DEBUG"
-    environment variable is set to a true value.
+    *   'socks_proxy', specify a SOCKS4/SOCKS4a proxy to use.
 
-    'socks_proxy', specify a SOCKS4/SOCKS4a proxy to use.
+    *   'socks_port', the SOCKS port to use, defaults to 1080 if not
+        specified.
 
-    'socks_port', the SOCKS port to use, defaults to 1080 if not specified.
+    *   'socks_id', specify a SOCKS user_id. Default is none.
 
-    'socks_id', specify a SOCKS user_id. Default is none.
-
-    'useipv6', enable the use of IPv6 for connections.
+    *   'useipv6', enable the use of IPv6 for connections.
 
     "spawn" will supply reasonable defaults for any of these attributes
     which are missing, so don't feel obliged to write them all out.
@@ -296,19 +323,12 @@ CONSTRUCTORS
     will use that to resolve the server name passed. Disable this behaviour
     if you like, by passing: "NoDNS => 1".
 
-    Additionally there is a 'Flood' parameter. When true, it disables the
-    component's flood protection algorithms, allowing it to send messages to
-    an IRC server at full speed. Disconnects and k-lines are some common
-    side effects of flooding IRC servers, so care should be used when
-    enabling this option.
-
-    Two new attributes are 'Proxy' and 'ProxyPort' for sending your IRC
-    traffic through a proxy server. 'Proxy''s value should be the IP address
-    or server name of the proxy. 'ProxyPort''s value should be the port on
-    the proxy to connect to. "connect" will default to using the *actual*
-    IRC server's port if you provide a proxy but omit the proxy's port.
-    These are for HTTP Proxies. See 'socks_proxy' for SOCKS4 and SOCKS4a
-    support.
+    IRC traffic through a proxy server. 'Proxy''s value should be the IP
+    address or server name of the proxy. 'ProxyPort''s value should be the
+    port on the proxy to connect to. "connect" will default to using the
+    *actual* IRC server's port if you provide a proxy but omit the proxy's
+    port. These are for HTTP Proxies. See 'socks_proxy' for SOCKS4 and
+    SOCKS4a support.
 
     For those people who run bots behind firewalls and/or Network Address
     Translation there are two additional attributes for DCC. 'DCCPorts', is
@@ -337,8 +357,8 @@ CONSTRUCTORS
     currently.
 
     IPv6 support is available for connecting to IPv6 enabled ircds (it won't
-    work for DCC though). To enable it, specify 'useipv6'. Socket6 is
-    required to be installed. If you have Socket6 and
+    work for DCC though). To enable it, specify 'useipv6'. Perl >=5.14 or
+    Socket6 (for older Perls) is required. If you that and
     POE::Component::Client::DNS installed and specify a hostname that
     resolves to an IPv6 address then IPv6 will be used. If you specify an
     ipv6 'localaddr' then IPv6 will be used.
@@ -353,67 +373,60 @@ CONSTRUCTORS
     plans to make it die() >;]
 
 METHODS
-    These are methods supported by the POE::Component::IRC object. It also
-    inherits a few from Object::Pluggable and POE::Component::Syndicator.
-    See those modules' documentation for details.
-
-  "server"
+  Information
+   "server"
     Takes no arguments. Returns the server host we are currently connected
     to (or trying to connect to).
 
-  "port"
+   "port"
     Takes no arguments. Returns the server port we are currently connected
     to (or trying to connect to).
 
-  "server_name"
+   "server_name"
     Takes no arguments. Returns the name of the IRC server that the
     component is currently connected to.
 
-  "server_version"
+   "server_version"
     Takes no arguments. Returns the IRC server version.
 
-  "nick_name"
+   "nick_name"
     Takes no arguments. Returns a scalar containing the current nickname
     that the bot is using.
 
-  "localaddr"
+   "localaddr"
     Takes no arguments. Returns the IP address being used.
 
-  "send_queue"
+   "send_queue"
     The component provides anti-flood throttling. This method takes no
     arguments and returns a scalar representing the number of messages that
     are queued up waiting for dispatch to the irc server.
 
-  "logged_in"
+   "logged_in"
     Takes no arguments. Returns true or false depending on whether the IRC
     component is logged into an IRC network.
 
-  "connected"
+   "connected"
     Takes no arguments. Returns true or false depending on whether the
     component's socket is currently connected.
 
-  "disconnect"
+   "disconnect"
     Takes no arguments. Terminates the socket connection disgracefully >;o]
 
-  "raw_events"
-    With no arguments, returns true or false depending on whether "irc_raw"
-    and "irc_raw_out" events are being generated or not. Provide a true or
-    false argument to enable or disable this feature accordingly.
-
-  "isupport"
+   "isupport"
     Takes one argument, a server capability to query. Returns "undef" on
     failure or a value representing the applicable capability. A full list
     of capabilities is available at <http://www.irc.org/tech_docs/005.html>.
 
-  "isupport_dump_keys"
+   "isupport_dump_keys"
     Takes no arguments, returns a list of the available server capabilities
     keys, which can be used with "isupport".
 
-  "resolver"
+   "resolver"
     Returns a reference to the POE::Component::Client::DNS object that is
     internally created by the component.
 
-  "session_id"
+  Events
+   "session_id"
     *Inherited from POE::Component::Syndicator*
 
     Takes no arguments. Returns the ID of the component's session. Ideal for
@@ -421,13 +434,18 @@ METHODS
 
      $kernel->post($irc->session_id() => 'mode' => $channel => '+o' => $dude);
 
-  "session_alias"
+   "session_alias"
     *Inherited from POE::Component::Syndicator*
 
     Takes no arguments. Returns the session alias that has been set through
-    "spawn"'s alias argument.
+    "spawn"'s 'alias' argument.
 
-  "yield"
+   "raw_events"
+    With no arguments, returns true or false depending on whether "irc_raw"
+    and "irc_raw_out" events are being generated or not. Provide a true or
+    false argument to enable or disable this feature accordingly.
+
+   "yield"
     *Inherited from POE::Component::Syndicator*
 
     This method provides an alternative object based means of posting events
@@ -436,7 +454,7 @@ METHODS
 
      $irc->yield(mode => $channel => '+o' => $dude);
 
-  "call"
+   "call"
     *Inherited from POE::Component::Syndicator*
 
     This method provides an alternative object based means of calling events
@@ -445,7 +463,7 @@ METHODS
 
      $irc->call(mode => $channel => '+o' => $dude);
 
-  "delay"
+   "delay"
     *Inherited from POE::Component::Syndicator*
 
     This method provides a way of posting delayed events to the component.
@@ -458,7 +476,7 @@ METHODS
     Returns an alarm ID that can be used with "delay_remove" to cancel the
     delayed event. This will be undefined if something went wrong.
 
-  "delay_remove"
+   "delay_remove"
     *Inherited from POE::Component::Syndicator*
 
     This method removes a previously scheduled delayed event from the
@@ -469,14 +487,14 @@ METHODS
 
     Returns an arrayref that was originally requested to be delayed.
 
-  "send_event"
+   "send_event"
     *Inherited from POE::Component::Syndicator*
 
     Sends an event through the component's event handling system. These will
     get processed by plugins then by registered sessions. First argument is
     the event name, followed by any parameters for that event.
 
-  "send_event_next"
+   "send_event_next"
     *Inherited from POE::Component::Syndicator*
 
     This sends an event right after the one that's currently being
@@ -484,23 +502,24 @@ METHODS
     related to another event so you want them to appear together. This
     method can only be called when POE::Component::IRC is processing an
     event, e.g. from one of your event handlers. Takes the same arguments as
-    "send_event" in "send_event".
+    "send_event".
 
-  "send_event_now"
+   "send_event_now"
     *Inherited from POE::Component::Syndicator*
 
     This will send an event to be processed immediately. This means that if
     an event is currently being processed and there are plugins or sessions
     which will receive it after you do, then an event sent with
     "send_event_now" will be received by those plugins/sessions *before* the
-    current event. Takes the same arguments as "send_event" in "send_event".
+    current event. Takes the same arguments as "send_event".
 
-  "pipeline"
+  Plugins
+   "pipeline"
     *Inherited from Object::Pluggable*
 
     Returns the Object::Pluggable::Pipeline object.
 
-  "plugin_add"
+   "plugin_add"
     *Inherited from Object::Pluggable*
 
     Accepts two arguments:
@@ -519,7 +538,7 @@ METHODS
     Returns the number of plugins now in the pipeline if plugin was
     initialized, "undef"/an empty list if not.
 
-  "plugin_del"
+   "plugin_del"
     *Inherited from Object::Pluggable*
 
     Accepts the following arguments:
@@ -533,7 +552,7 @@ METHODS
     Returns the plugin object if the plugin was removed, "undef"/an empty
     list if not.
 
-  "plugin_get"
+   "plugin_get"
     *Inherited from Object::Pluggable*
 
     Accepts the following arguments:
@@ -544,7 +563,7 @@ METHODS
 
     Returns the plugin object if it was found, "undef"/an empty list if not.
 
-  "plugin_list"
+   "plugin_list"
     *Inherited from Object::Pluggable*
 
     Takes no arguments.
@@ -552,7 +571,7 @@ METHODS
     Returns a hashref of plugin objects, keyed on alias, or an empty list if
     there are no plugins loaded.
 
-  "plugin_order"
+   "plugin_order"
     *Inherited from Object::Pluggable*
 
     Takes no arguments.
@@ -560,7 +579,7 @@ METHODS
     Returns an arrayref of plugin objects, in the order which they are
     encountered in the pipeline.
 
-  "plugin_register"
+   "plugin_register"
     *Inherited from Object::Pluggable*
 
     Accepts the following arguments:
@@ -581,7 +600,7 @@ METHODS
     Returns 1 if everything checked out fine, "undef"/an empty list if
     something is seriously wrong.
 
-  "plugin_unregister"
+   "plugin_unregister"
     *Inherited from Object::Pluggable*
 
     Accepts the following arguments:
@@ -602,7 +621,7 @@ METHODS
     Returns 1 if all the event name[s] was unregistered, undef if some was
     not found.
 
-INPUT
+INPUT EVENTS
     How to talk to your new IRC component... here's the events we'll accept.
     These are events that are posted to the component, either via
     "$poe_kernel->post()" or via the object method "yield".
@@ -961,7 +980,7 @@ INPUT
     server administrators. Takes one argument: some clever, witty message to
     send.
 
-OUTPUT
+OUTPUT EVENTS
     The events you will receive (or can ask to receive) from your running
     IRC component. Note that all incoming event names your session will
     receive are prefixed by "irc_", to inhibit event namespace pollution.
@@ -992,21 +1011,6 @@ OUTPUT
 
     Sent to all registered sessions when the component has been asked to
     "shutdown". "ARG0" will be the session ID of the requesting session.
-
-   "irc_delay_set"
-    *Inherited from POE::Component::Syndicator*
-
-    Emitted on a successful addition of a delayed event using the "delay"
-    method. "ARG0" will be the alarm_id which can be used later with
-    "delay_remove". Subsequent parameters are the arguments that were passed
-    to "delay".
-
-   "irc_delay_removed"
-    *Inherited from POE::Component::Syndicator*
-
-    Emitted when a delayed command is successfully removed. "ARG0" will be
-    the alarm_id that was removed. Subsequent parameters are the arguments
-    that were passed to "delay".
 
    "irc_connected"
     The IRC component will send an "irc_connected" event as soon as it
@@ -1135,40 +1139,36 @@ OUTPUT
     Sent in response to a WHOIS query. "ARG0" is a hashref, with the
     following keys:
 
-    'nick', the users nickname;
+    *   'nick', the users nickname;
 
-    'user', the users username;
+    *   'user', the users username;
 
-    'host', their hostname;
+    *   'host', their hostname;
 
-    'real', their real name;
+    *   'real', their real name;
 
-    'idle', their idle time in seconds;
+    *   'idle', their idle time in seconds;
 
-    'signon', the epoch time they signed on (will be undef if ircd does not
-    support this);
+    *   'signon', the epoch time they signed on (will be undef if ircd does
+        not support this);
 
-    'channels', an arrayref listing visible channels they are on, the
-    channel is prefixed with '@','+','%' depending on whether they have +o
-    +v or +h;
+    *   'channels', an arrayref listing visible channels they are on, the
+        channel is prefixed with '@','+','%' depending on whether they have
+        +o +v or +h;
 
-    'server', their server ( might not be useful on some networks );
+    *   'server', their server (might not be useful on some networks);
 
-    'oper', whether they are an IRCop, contains the IRC operator string if
-    they are, undef if they aren't.
+    *   'oper', whether they are an IRCop, contains the IRC operator string
+        if they are, undef if they aren't.
 
-    'actually', some ircds report the users actual ip address, that'll be
-    here;
+    *   'actually', some ircds report the users actual ip address, that'll
+        be here;
 
-    On ircu/seven IRCDs (e.g. FreeNode), if the user has registered with
-    services, there will be another key:
+    *   'account' , if the user has registered with services (only on
+        ircu/seven IRCDs, such as FreeNode)
 
-    'account'.
-
-    On Hyperion IRCDs, if the user has identified with NICKSERV there will
-    be an additional key:
-
-    'identified'.
+    *   'identified'. if the user has identified with NICKSERV (only on
+        Hyperion IRCDs)
 
    "irc_whowas"
     Similar to the above, except some keys will be missing.
@@ -1199,6 +1199,25 @@ OUTPUT
     "ARG0" is the SOCKS code, "ARG1" the SOCKS server address, "ARG2" the
     SOCKS port and "ARG3" the SOCKS user id (if defined).
 
+   "irc_plugin_add"
+    *Inherited from Object::Pluggable*
+
+    Emitted whenever a new plugin is added to the pipeline. "ARG0" is the
+    plugin alias. "ARG1" is the plugin object.
+
+   "irc_plugin_del"
+    *Inherited from Object::Pluggable*
+
+    Emitted whenever a plugin is removed from the pipeline. "ARG0" is the
+    plugin alias. "ARG1" is the plugin object.
+
+   "irc_plugin_error"
+    *Inherited from Object::Pluggable*
+
+    Emitted when an error occurs while executing a plugin handler. "ARG0" is
+    the error message. "ARG1" is the plugin alias. "ARG2" is the plugin
+    object.
+
   Somewhat Less Important Events
    "irc_cap"
     A reply from the server regarding protocol capabilities. "ARG0" is the
@@ -1226,6 +1245,21 @@ OUTPUT
     or 'AUTH' or whatever. Servers vary as to whether these notices include
     a server name as the sender, or no sender at all. "ARG1" is the sender,
     if any.
+
+   "irc_delay_set"
+    *Inherited from POE::Component::Syndicator*
+
+    Emitted on a successful addition of a delayed event using the "delay"
+    method. "ARG0" will be the alarm_id which can be used later with
+    "delay_remove". Subsequent parameters are the arguments that were passed
+    to "delay".
+
+   "irc_delay_removed"
+    *Inherited from POE::Component::Syndicator*
+
+    Emitted when a delayed command is successfully removed. "ARG0" will be
+    the alarm_id that was removed. Subsequent parameters are the arguments
+    that were passed to "delay".
 
   All numeric events
     Most messages from IRC servers are identified only by three-digit
@@ -1378,6 +1412,6 @@ POD ERRORS
     Hey! The above document had some coding errors, which are explained
     below:
 
-    Around line 1693:
-        A non-empty Z<>
+    Around line 1643:
+        Expected '=item *'
 

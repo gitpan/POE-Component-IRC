@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::DCC::VERSION = '6.66';
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.67';
 }
 
 use strict;
@@ -730,7 +730,7 @@ connections to close gracefully. Takes one argument: the wheel id of the
 connection which you got from an L<C<irc_dcc_start>|/irc_dcc_start>
 (or similar) event.
 
-=head1 OUTPUT
+=head1 OUTPUT EVENTS
 
 =head2 C<irc_dcc_request>
 

@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.66';
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.67';
 }
 
 use strict;
@@ -217,7 +217,7 @@ Denotes the capabilities of the server.
 Once the next signal is received that is I<greater> than C<irc_005>,
 it emits an C<irc_isupport> signal.
 
-=head1 OUTPUT
+=head1 OUTPUT EVENTS
 
 =head2 C<irc_isupport>
 

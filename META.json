@@ -33,7 +33,7 @@
             "POE::Component::Client::DNS" : "0.99"
          },
          "requires" : {
-            "IRC::Utils" : "0.06",
+            "IRC::Utils" : "0.10",
             "POE" : "1.311",
             "POE::Component::Syndicator" : 0,
             "POE::Driver::SysRW" : 0,
@@ -69,7 +69,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.66",
+   "version" : "6.67",
    "x_authority" : "cpan:HINRIK"
 }
 

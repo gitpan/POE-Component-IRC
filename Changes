@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.67  Sun May 22 16:43:27 GMT 2011
+    - Add missing documentation for irc_plugin_(add|del|error) events
+    - IRC.pm: Improved the layout of the documentation
+    - Common.pm: Fix to work with latest IRC::Utils
+
 6.66  Thu May 19 22:32:07 GMT 2011
     - BotCommand.pm: Allow commands to be \S+, not just \w+
 
