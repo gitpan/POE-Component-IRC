@@ -23,7 +23,7 @@ no_index:
 recommends:
   POE::Component::Client::DNS: 0.99
 requires:
-  IRC::Utils: 0.10
+  IRC::Utils: 0.11
   POE: 1.311
   POE::Component::Syndicator: 0
   POE::Driver::SysRW: 0
@@ -37,8 +37,8 @@ requires:
   perl: 5.008001
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC
-  homepage: http://search.cpan.org/dist/POE-Component-IRC/
+  homepage: http://metacpan.org/release/POE-Component-IRC
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.68
+version: 6.69
 x_authority: cpan:HINRIK

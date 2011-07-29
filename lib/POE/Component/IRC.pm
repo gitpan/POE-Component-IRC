@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.68';
+  $POE::Component::IRC::VERSION = '6.69';
 }
 
 use strict;
@@ -1640,7 +1640,7 @@ Log public and private messages to disk.
 
 Identify with NickServ when needed.
 
-=item *L<POE::Component::IRC::Plugin::Proxy|POE::Component::IRC::Plugin::Proxy>
+=item * L<POE::Component::IRC::Plugin::Proxy|POE::Component::IRC::Plugin::Proxy>
 
 A lightweight IRC proxy/bouncer.
 
@@ -2265,6 +2265,12 @@ the text of the message to send.
 Have a look at the constants in L<IRC::Utils|IRC::Utils> if you would
 like to use formatting and color codes in your messages.
 
+ $irc->yield('primvsg', '#mychannel', 'Hello there');
+
+ # same, but with a green Hello
+ use IRC::Utils qw(GREEN NORMAL);
+ $irc->yield('primvsg', '#mychannel', GREEN.'Hello'.NORMAL.' there');
+
 =head3 C<quit>
 
 Tells the IRC server to disconnect you. Takes one optional argument:
@@ -2731,14 +2737,13 @@ the channel is prefixed with '@','+','%' depending on whether they have
 =item * B<'oper'>, whether they are an IRCop, contains the IRC operator
 string if they are, undef if they aren't.
 
-=item * B<'actually'>, some ircds report the users actual ip address,
+=item * B<'actually'>, some ircds report the user's actual ip address,
 that'll be here;
 
-=item * B<'account'> , if the user has registered with services (only on
-ircu/seven IRCDs, such as FreeNode)
+=item * B<'identified'>. if the user has identified with NICKSERV
+(ircu, seven, Plexus)
 
-=item * B<'identified'>. if the user has identified with NICKSERV (only on
-Hyperion IRCDs)
+=item * B<'modes'>, a string describing the user's modes (Rizon)
 
 =back
 

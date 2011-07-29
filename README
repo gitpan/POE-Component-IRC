@@ -194,7 +194,7 @@ DESCRIPTION
 
         Identify with NickServ when needed.
 
-    *   *POE::Component::IRC::Plugin::Proxy
+    *   POE::Component::IRC::Plugin::Proxy
 
         A lightweight IRC proxy/bouncer.
 
@@ -764,6 +764,12 @@ INPUT EVENTS
     Have a look at the constants in IRC::Utils if you would like to use
     formatting and color codes in your messages.
 
+     $irc->yield('primvsg', '#mychannel', 'Hello there');
+
+     # same, but with a green Hello
+     use IRC::Utils qw(GREEN NORMAL);
+     $irc->yield('primvsg', '#mychannel', GREEN.'Hello'.NORMAL.' there');
+
    "quit"
     Tells the IRC server to disconnect you. Takes one optional argument:
     some clever, witty string that other users in your channels will see as
@@ -1161,14 +1167,13 @@ OUTPUT EVENTS
     *   'oper', whether they are an IRCop, contains the IRC operator string
         if they are, undef if they aren't.
 
-    *   'actually', some ircds report the users actual ip address, that'll
+    *   'actually', some ircds report the user's actual ip address, that'll
         be here;
 
-    *   'account' , if the user has registered with services (only on
-        ircu/seven IRCDs, such as FreeNode)
+    *   'identified'. if the user has identified with NICKSERV (ircu, seven,
+        Plexus)
 
-    *   'identified'. if the user has identified with NICKSERV (only on
-        Hyperion IRCDs)
+    *   'modes', a string describing the user's modes (Rizon)
 
    "irc_whowas"
     Similar to the above, except some keys will be missing.
@@ -1407,11 +1412,4 @@ SEE ALSO
     devoted to IRC programming <http://poe.perl.org/?POE_Cookbook>.
 
     The examples/ folder of this distribution.
-
-POD ERRORS
-    Hey! The above document had some coding errors, which are explained
-    below:
-
-    Around line 1643:
-        Expected '=item *'
 
