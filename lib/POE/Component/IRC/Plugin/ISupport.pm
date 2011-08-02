@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::ISupport::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.69';
+  $POE::Component::IRC::Plugin::ISupport::VERSION = '6.70';
 }
 
 use strict;
@@ -128,8 +128,8 @@ sub S_005 {
             }
             else {
                 # ACCEPT CALLERID CAPAB CNOTICE CPRIVMSG FNC KNOCK MAXNICKLEN
-                # NOQUIT PENALTY RFC2812 SAFELIST USERIP VCHANS WALLCHOPS
-                # WALLVOICES WHOX
+                # NAMESX NOQUIT PENALTY RFC2812 SAFELIST UHNAMES USERIP
+                # VCHANS WALLCHOPS WALLVOICES WHOX
                 $support->{$val} = 'on';
             }
         }

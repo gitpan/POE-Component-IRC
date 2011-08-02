@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.69';
+  $POE::Component::IRC::State::VERSION = '6.70';
 }
 
 use strict;
@@ -84,7 +84,16 @@ sub S_join {
             Name => $chan,
             Mode => ''
         };
-        $self->yield(who => $chan);
+
+        # fake a WHO sync if we're only interested in people's user@host
+        # and the server provides those in the NAMES reply
+        if (exists $self->{whojoiners} && !$self->{whojoiners}
+            && $self->isupport('UHNAMES')) {
+            $self->_channel_sync($chan, 'WHO');
+        }
+        else {
+            $self->yield(who => $chan);
+        }
         $self->yield(mode => $chan);
         $self->yield(mode => $chan => 'b');
     }
@@ -296,6 +305,18 @@ sub S_221 {
     return PCI_EAT_NONE;
 }
 
+# RPL_CHANNEL_URL
+sub S_328 {
+    my ($self, undef) = splice @_, 0, 2;
+    my ($chan, $url) = @{ ${ $_[2] } };
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = uc_irc($chan, $map);
+
+    return PCI_EAT_NONE if !$self->_channel_exists($chan);
+    $self->{STATE}{Chans}{ $uchan }{Url} = $url;
+    return PCI_EAT_NONE;
+}
+
 # RPL_UNAWAY
 sub S_305 {
     my ($self, undef) = splice @_, 0, 2;
@@ -426,32 +447,46 @@ sub S_topic {
 # RPL_NAMES
 sub S_353 {
     my ($self, undef) = splice @_, 0, 2;
-    my @data = @{ ${ $_[2] } };
+    my @data   = @{ ${ $_[2] } };
     shift @data if $data[0] =~ /^[@=*]$/;
-    my $chan = shift @data;
-    my @nicks = split /\s+/, shift @data;
-    my $map   = $self->isupport('CASEMAPPING');
-    my $uchan = uc_irc($chan, $map);
+    my $chan   = shift @data;
+    my @nicks  = split /\s+/, shift @data;
+    my $map    = $self->isupport('CASEMAPPING');
+    my $uchan  = uc_irc($chan, $map);
     my $prefix = $self->isupport('PREFIX') || { o => '@', v => '+' };
     my $search = join '|', map { quotemeta } values %$prefix;
-    foreach my $user ( @nicks ) {
-       my $status;
-       if ( ($status) = $user =~ /^($search)/ ) {
-          $user =~ s/^($search)//g;
-       }
-       $status = '' unless $status;
-       my $whatever = '';
-       my $unick = uc_irc($user,$map);
-       my $existing = $self->{STATE}{Nicks}{ $unick }{CHANS}{ $uchan } || '';
-       for my $mode ( keys %{ $prefix } ) {
-         if ($status =~ /\Q$prefix->{$mode}/ && $existing !~ /\Q$prefix->{$mode}/ ) {
-           $whatever .= $mode;
-         }
-       }
-       $existing .= $whatever if !$existing || $existing !~ /$whatever/;
-       $self->{STATE}{Nicks}{ $unick }{CHANS}{ $uchan } = $existing;
-       $self->{STATE}{Chans}{ $uchan }{Nicks}{ $unick } = $existing;
-       $self->{STATE}{Nicks}{ $unick }{Nick} = $user;
+    $search    = qr/(?:$search)/;
+
+    for my $nick (@nicks) {
+        my $status;
+        if ( ($status) = $nick =~ /^($search+)/ ) {
+           $nick =~ s/^($search+)//;
+        }
+
+        my ($user, $host);
+        if ($self->isupport('UHNAMES')) {
+            ($nick, $user, $host) = split /[!@]/, $nick;
+        }
+
+        my $unick    = uc_irc($nick, $map);
+        $status      = '' if !length $status;
+        my $whatever = '';
+        my $existing = $self->{STATE}{Nicks}{$unick}{CHANS}{$uchan} || '';
+
+        for my $mode (keys %$prefix) {
+            if ($status =~ /\Q$prefix->{$mode}/ && $existing !~ /\Q$prefix->{$mode}/) {
+                $whatever .= $mode;
+            }
+        }
+
+        $existing .= $whatever if !length $existing || $existing !~ /$whatever/;
+        $self->{STATE}{Nicks}{$unick}{CHANS}{$uchan} = $existing;
+        $self->{STATE}{Chans}{$uchan}{Nicks}{$unick} = $existing;
+        $self->{STATE}{Nicks}{$unick}{Nick} = $nick;
+        if ($self->isupport('UHNAMES')) {
+            $self->{STATE}{Nicks}{$unick}{User} = $user;
+            $self->{STATE}{Nicks}{$unick}{Host} = $host;
+        }
     }
     return PCI_EAT_NONE;
 }
@@ -1222,6 +1257,21 @@ sub channel_topic {
     return \%result;
 }
 
+sub channel_url {
+    my ($self, $chan) = @_;
+
+    if (!defined $chan) {
+        warn 'Channel is undefined';
+        return;
+    }
+
+    my $map   = $self->isupport('CASEMAPPING');
+    my $uchan = uc_irc($chan, $map);
+
+    return if !$self->_channel_exists($chan);
+    return $self->{STATE}{Chans}{ $uchan }{Url};
+}
+
 sub nick_channel_modes {
     my ($self, $chan, $nick) = @_;
 
@@ -1449,7 +1499,12 @@ will hold the topic itself, the nick!hostmask of the user who set it (or just
 the nick if it's all the ircd gives us), and the time at which it was set
 respectively.
 
-If the component happens to not be on any channels an empty hashref is returned.
+If the component happens to not be on the channel, nothing will be returned.
+
+=head2 C<channel_url>
+
+Expects a channel as a parameter. Returns the channel's URL. If the channel
+has no URL or the component is not on the channel, nothing will be returned.
 
 =head2 C<has_channel_voice>
 

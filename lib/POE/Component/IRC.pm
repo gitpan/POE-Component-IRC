@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.69';
+  $POE::Component::IRC::VERSION = '6.70';
 }
 
 use strict;
@@ -462,7 +462,8 @@ sub _send_login {
     # Now that we're connected, attempt to log into the server.
 
     # for servers which support CAP, it's customary to start with that
-    $kernel->call($session, 'sl_login', 'CAP REQ identify-msg');
+    $kernel->call($session, 'sl_login', 'CAP REQ :identify-msg');
+    $kernel->call($session, 'sl_login', 'CAP REQ :multi-prefix');
     $kernel->call($session, 'sl_login', 'CAP LS');
     $kernel->call($session, 'sl_login', 'CAP END');
 
@@ -1337,6 +1338,8 @@ sub S_isupport {
     my $isupport = ${ $_[0] };
     $self->{ircd_compat}->chantypes( $isupport->isupport('CHANTYPES') || [ '#', '&' ] );
     $irc->yield(sl_login => 'CAPAB IDENTIFY-MSG') if $isupport->isupport('CAPAB');
+    $irc->yield(sl_login => 'PROTOCTL NAMESX') if $isupport->isupport('NAMESX');
+    $irc->yield(sl_login => 'PROTOCTL UHNAMES') if $isupport->isupport('UHNAMES');
     return PCI_EAT_NONE;
 }
 
