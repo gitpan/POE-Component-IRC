@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::CTCP::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::Plugin::CTCP::VERSION = '6.70';
+  $POE::Component::IRC::Plugin::CTCP::VERSION = '6.71';
 }
 
 use strict;

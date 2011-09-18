@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::VERSION = '6.70';
+  $POE::Component::IRC::VERSION = '6.71';
 }
 
 use strict;
@@ -164,6 +164,7 @@ sub _configure {
 
     if (ref $args eq 'HASH' && keys %{ $args }) {
         $spawned = delete $args->{spawned};
+        $self->{use_localaddr} = delete $args->{localaddr};
         @{ $self }{ keys %{ $args } } = values %{ $args };
     }
 
@@ -191,8 +192,8 @@ sub _configure {
     $self->{port} = 6667 if !$self->{port};
     $self->{msg_length} = 450 if !defined $self->{msg_length};
 
-    if ($self->{localaddr} && $self->{localport}) {
-        $self->{localaddr} .= ':' . $self->{localport};
+    if ($self->{use_localaddr} && $self->{localport}) {
+        $self->{localaddr} = $self->{use_localaddr}.':'.$self->{localport};
     }
 
     # Make sure that we have reasonable defaults for all the attributes.
@@ -258,6 +259,7 @@ sub _sock_down {
 
     # Destroy the RW wheel for the socket.
     delete $self->{socket};
+    delete $self->{localaddr};
     $self->{connected} = 0;
 
     # Stop any delayed sends.
@@ -621,7 +623,7 @@ sub _do_connect {
         $self->{socks_port} = 1080;
     }
 
-    for my $address (qw(socks_proxy proxy server resolved_server localaddr)) {
+    for my $address (qw(socks_proxy proxy server resolved_server use_localaddr)) {
         next if !$self->{$address} || !_ip_is_ipv6( $self->{$address} );
         if (!$GOT_SOCKET6) {
             warn "IPv6 address specified for '$address' but Socket6 not found\n";
@@ -638,7 +640,7 @@ sub _do_connect {
         RemotePort     => $self->{socks_port} || $self->{proxyport} || $self->{port},
         SuccessEvent   => '_sock_up',
         FailureEvent   => '_sock_failed',
-        ($self->{localaddr} ? (BindAddress => $self->{localaddr}) : ()),
+        ($self->{use_localaddr} ? (BindAddress => $self->{use_localaddr}) : ()),
     );
 
     return;

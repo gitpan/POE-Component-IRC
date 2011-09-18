@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
 BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.70';
+  $POE::Component::IRC::State::VERSION = '6.71';
 }
 
 use strict;
@@ -434,6 +434,7 @@ sub S_topic {
     my $topic = ${ $_[2] };
     my $map   = $self->isupport('CASEMAPPING');
     my $uchan = uc_irc($chan, $map);
+    push @{ $_[-1] }, $self->{STATE}{Chans}{$uchan}{Topic};
 
     $self->{STATE}{Chans}{ $uchan }{Topic} = {
         Value => $topic,
@@ -469,7 +470,7 @@ sub S_353 {
         }
 
         my $unick    = uc_irc($nick, $map);
-        $status      = '' if !length $status;
+        $status      = '' if !defined $status;
         my $whatever = '';
         my $existing = $self->{STATE}{Nicks}{$unick}{CHANS}{$uchan} || '';
 
@@ -1637,6 +1638,14 @@ L<POE::Component::IRC|POE::Component::IRC>.
 
 Additional parameter C<ARG4> contains the full nick!user@host of the kicked
 individual.
+
+=head3 C<irc_topic>
+
+See also L<C<irc_kick>|POE::Component::IRC/irc_kick> in
+L<POE::Component::IRC|POE::Component::IRC>.
+
+Additional parameter C<ARG3> contains the old topic hashref, like the one
+returned by L<C<channel_topic>|/channel_topic>.
 
 =head3 C<irc_disconnected>
 
