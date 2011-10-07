@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::BotCommand;
 BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.71';
+{
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.72';
 }
 
 use strict;

@@ -143,14 +143,12 @@ t/04_plugins/17_dcc/05_resume.t
 t/04_plugins/17_dcc/06_chat.t
 t/04_plugins/17_dcc/07_nat.t
 t/05_regression/01_dcc_chat_close.t
-t/inc/Algorithm/Diff.pm
-t/inc/Algorithm/DiffOld.pm
 t/inc/Crypt/PasswdMD5.pm
 t/inc/Net/Netmask.pm
 t/inc/POE/Component/IRC/Test/Plugin.pm
 t/inc/POE/Component/Server/IRC.pm
 t/inc/POE/Component/Server/IRC/Backend.pm
 t/inc/POE/Component/Server/IRC/Common.pm
-t/inc/POE/Component/Server/IRC/OperServ.pm
-t/inc/POE/Component/Server/IRC/Pipeline.pm
 t/inc/POE/Component/Server/IRC/Plugin.pm
+t/inc/POE/Component/Server/IRC/Plugin/Auth.pm
+t/inc/POE/Component/Server/IRC/Plugin/OperServ.pm

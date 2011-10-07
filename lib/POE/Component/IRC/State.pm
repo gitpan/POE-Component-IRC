@@ -2,8 +2,8 @@ package POE::Component::IRC::State;
 BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.71';
+{
+  $POE::Component::IRC::State::VERSION = '6.72';
 }
 
 use strict;
@@ -1612,7 +1612,7 @@ Takes no parameters. Returns the current user mode set for the bot.
 
 =head2 Augmented events
 
-New paramaters are added to the following
+New parameters are added to the following
 L<POE::Component::IRC|POE::Component::IRC> events.
 
 =head3 C<irc_quit>
@@ -1620,7 +1620,7 @@ L<POE::Component::IRC|POE::Component::IRC> events.
 See also L<C<irc_quit>|POE::Component::IRC/irc_quit> in
 L<POE::Component::IRC|POE::Component::IRC>.
 
-Additional paramater C<ARG2> contains an arrayref of channel names that are
+Additional parameter C<ARG2> contains an arrayref of channel names that are
 common to the quitting client and the component.
 
 =head3 C<irc_nick>

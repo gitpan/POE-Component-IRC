@@ -5,7 +5,7 @@ use POE;
 use POE::Component::IRC::Common qw(parse_user);
 use POE::Component::IRC::State;
 use POE::Component::Server::IRC;
-use Test::More tests => 46;
+use Test::More 'no_plan';
 
 my $bot = POE::Component::IRC::State->spawn(Flood => 1);
 my $ircd = POE::Component::Server::IRC->spawn(
@@ -208,7 +208,7 @@ sub irc_user_mode {
 
     $mode =~ s/\+//g;
     ok($irc->is_user_mode_set($mode), "User Mode Set: $mode");
-    is($irc->umode(), $mode, 'Correct user mode in state');
+    like($irc->umode(), qr/$mode/, 'Correct user mode in state');
 }
 
 sub irc_mode {
