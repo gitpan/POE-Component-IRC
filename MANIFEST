@@ -145,6 +145,9 @@ t/04_plugins/17_dcc/07_nat.t
 t/05_regression/01_dcc_chat_close.t
 t/inc/Crypt/PasswdMD5.pm
 t/inc/Net/Netmask.pm
+t/inc/POE/Component/Client/DNS.pm
+t/inc/POE/Component/Client/Ident.pm
+t/inc/POE/Component/Client/Ident/Agent.pm
 t/inc/POE/Component/IRC/Test/Plugin.pm
 t/inc/POE/Component/Server/IRC.pm
 t/inc/POE/Component/Server/IRC/Backend.pm
@@ -152,3 +155,4 @@ t/inc/POE/Component/Server/IRC/Common.pm
 t/inc/POE/Component/Server/IRC/Plugin.pm
 t/inc/POE/Component/Server/IRC/Plugin/Auth.pm
 t/inc/POE/Component/Server/IRC/Plugin/OperServ.pm
+t/inc/POE/Filter/Ident.pm

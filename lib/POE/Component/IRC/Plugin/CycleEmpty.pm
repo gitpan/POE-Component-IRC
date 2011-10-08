@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::CycleEmpty;
 BEGIN {
   $POE::Component::IRC::Plugin::CycleEmpty::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.72';
+BEGIN {
+  $POE::Component::IRC::Plugin::CycleEmpty::VERSION = '6.73';
 }
 
 use strict;

@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::Console;
 BEGIN {
   $POE::Component::IRC::Plugin::Console::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::Console::VERSION = '6.72';
+BEGIN {
+  $POE::Component::IRC::Plugin::Console::VERSION = '6.73';
 }
 
 use strict;

@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::Logger;
 BEGIN {
   $POE::Component::IRC::Plugin::Logger::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::Logger::VERSION = '6.72';
+BEGIN {
+  $POE::Component::IRC::Plugin::Logger::VERSION = '6.73';
 }
 
 use strict;
