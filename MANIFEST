@@ -152,4 +152,3 @@ t/inc/POE/Component/Server/IRC/Common.pm
 t/inc/POE/Component/Server/IRC/Plugin.pm
 t/inc/POE/Component/Server/IRC/Plugin/Auth.pm
 t/inc/POE/Component/Server/IRC/Plugin/OperServ.pm
-t/inc/POE/Filter/Ident.pm

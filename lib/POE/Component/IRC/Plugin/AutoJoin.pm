@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::AutoJoin;
 BEGIN {
   $POE::Component::IRC::Plugin::AutoJoin::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.74';
+{
+  $POE::Component::IRC::Plugin::AutoJoin::VERSION = '6.75';
 }
 
 use strict;

@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::DCC;
 BEGIN {
   $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::Plugin::DCC::VERSION = '6.74';
+{
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.75';
 }
 
 use strict;
@@ -349,6 +349,9 @@ sub _U_dcc_close {
 
     if (exists $self->{dcc}->{$id}->{wheel}) {
         delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
+        if ( $^O =~ /(cygwin|MSWin)/ ) {
+          $self->{dcc}->{$id}->{wheel}->$_ for qw(shutdown_input shutdown_output);
+        }
         delete $self->{dcc}->{$id}->{wheel};
     }
 

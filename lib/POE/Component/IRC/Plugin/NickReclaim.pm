@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::NickReclaim;
 BEGIN {
   $POE::Component::IRC::Plugin::NickReclaim::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::Plugin::NickReclaim::VERSION = '6.74';
+{
+  $POE::Component::IRC::Plugin::NickReclaim::VERSION = '6.75';
 }
 
 use strict;

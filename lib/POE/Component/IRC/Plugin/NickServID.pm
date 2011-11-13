@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::NickServID;
 BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.74';
+{
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.75';
 }
 
 use strict;
