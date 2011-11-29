@@ -5,7 +5,7 @@
       "Hinrik \u00c3\u0096rn Sigur\u00c3\u00b0sson <hinrik.sig@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Zilla version 4.300002, CPAN::Meta::Converter version 2.110930",
+   "generated_by" : "Dist::Zilla version 4.200006, CPAN::Meta::Converter version 2.110440",
    "license" : [
       "perl_5"
    ],
@@ -33,7 +33,7 @@
             "POE::Component::Client::DNS" : "0.99"
          },
          "requires" : {
-            "IRC::Utils" : "0.11",
+            "IRC::Utils" : "0.12",
             "POE" : "1.311",
             "POE::Component::Syndicator" : 0,
             "POE::Driver::SysRW" : 0,
@@ -49,6 +49,7 @@
       },
       "test" : {
          "requires" : {
+            "Test::Differences" : "0.61",
             "Test::More" : "0.47"
          }
       }
@@ -59,7 +60,7 @@
          "mailto" : "bug-POE-Component-IRC@rt.cpan.org",
          "web" : "https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC"
       },
-      "homepage" : "http://search.cpan.org/dist/POE-Component-IRC/",
+      "homepage" : "http://metacpan.org/release/POE-Component-IRC",
       "license" : [
          "http://dev.perl.org/licenses/"
       ],
@@ -69,7 +70,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.75",
+   "version" : "6.76",
    "x_authority" : "cpan:HINRIK"
 }
 

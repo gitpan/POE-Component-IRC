@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::BotTraffic;
 BEGIN {
   $POE::Component::IRC::Plugin::BotTraffic::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.75';
+BEGIN {
+  $POE::Component::IRC::Plugin::BotTraffic::VERSION = '6.76';
 }
 
 use strict;

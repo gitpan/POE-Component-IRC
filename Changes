@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::IRC.
 
+6.76  Tue Nov 29 03:24:55 GMT 2011
+    - DCC.pm: Fix DCC RESUME, it was broken
+    - NickReclaim.pm: Make it more robust and prevent an error from being
+      raised when we quit from IRC.
+
 6.75  Sun Nov 13 14:24:50 UTC 2011
     - Win32 fixes to the DCC plugin and netsplit test
     - You couldn't specify a localaddr without a localport. Fixed.

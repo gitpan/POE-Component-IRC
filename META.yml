@@ -4,11 +4,12 @@ author:
   - 'Chris Williams <chris@bingosnet.co.uk>'
   - 'Hinrik Örn Sigurðsson <hinrik.sig@gmail.com>'
 build_requires:
+  Test::Differences: 0.61
   Test::More: 0.47
 configure_requires:
   ExtUtils::MakeMaker: 6.30
 dynamic_config: 0
-generated_by: 'Dist::Zilla version 4.300002, CPAN::Meta::Converter version 2.110930'
+generated_by: 'Dist::Zilla version 4.200006, CPAN::Meta::Converter version 2.110440'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -23,7 +24,7 @@ no_index:
 recommends:
   POE::Component::Client::DNS: 0.99
 requires:
-  IRC::Utils: 0.11
+  IRC::Utils: 0.12
   POE: 1.311
   POE::Component::Syndicator: 0
   POE::Driver::SysRW: 0
@@ -37,8 +38,8 @@ requires:
   perl: 5.008001
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=POE-Component-IRC
-  homepage: http://search.cpan.org/dist/POE-Component-IRC/
+  homepage: http://metacpan.org/release/POE-Component-IRC
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.75
+version: 6.76
 x_authority: cpan:HINRIK

@@ -2,8 +2,8 @@ package POE::Component::IRC::Plugin::DCC;
 BEGIN {
   $POE::Component::IRC::Plugin::DCC::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::DCC::VERSION = '6.75';
+BEGIN {
+  $POE::Component::IRC::Plugin::DCC::VERSION = '6.76';
 }
 
 use strict;
@@ -48,6 +48,7 @@ sub PCI_register {
                 _U_dcc_chat
                 _U_dcc_close
                 _U_dcc_resume
+                _cancel_timeout
             )],
         ],
     );
@@ -136,6 +137,7 @@ sub S_dcc_request {
             next if $cookie->{nick} ne $nick;
             next if $cookie->{port} ne $port;
             $file = _quote_file($file);
+            $cookie->{done} = $size;
             $irc->yield(ctcp => $nick => "DCC ACCEPT $file $port $size");
             last;
         }
@@ -228,6 +230,10 @@ sub _U_dcc {
     # Tell the other end that we're waiting for them to connect.
     $irc->yield(ctcp => $nick => "DCC $type $basename $addr $port" . ($size ? " $size" : ''));
 
+    my $alarm_id = $kernel->delay_set(
+        '_dcc_timeout', ($timeout || LISTEN_TIMEOUT), $factory->ID,
+    );
+
     # Store the state for this connection.
     $self->{dcc}->{ $factory->ID } = {
         open      => 0,
@@ -241,13 +247,8 @@ sub _U_dcc {
         blocksize => ($blocksize || OUT_BLOCKSIZE),
         listener  => 1,
         factory   => $factory,
+        alarm_id  => $alarm_id,
     };
-
-    $kernel->alarm(
-        '_dcc_timeout',
-        time() + ($timeout || LISTEN_TIMEOUT),
-        $factory->ID,
-    );
 
     return;
 }
@@ -347,15 +348,7 @@ sub _U_dcc_close {
         push ( @{ $self->{dccports} }, $self->{dcc}->{$id}->{port} );
     }
 
-    if (exists $self->{dcc}->{$id}->{wheel}) {
-        delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
-        if ( $^O =~ /(cygwin|MSWin)/ ) {
-          $self->{dcc}->{$id}->{wheel}->$_ for qw(shutdown_input shutdown_output);
-        }
-        delete $self->{dcc}->{$id}->{wheel};
-    }
-
-    delete $self->{dcc}->{$id};
+    $self->_remove_dcc($id);
     return;
 }
 
@@ -366,22 +359,16 @@ sub _U_dcc_resume {
 
     my $sender_file = _quote_file($cookie->{file});
     $cookie->{file} = $myfile if defined $myfile;
-    my $size = -s $cookie->{file};
-    my $fraction = $size % IN_BLOCKSIZE;
-    $size -= $fraction;
+    $cookie->{done} = -s $cookie->{file};
+    $cookie->{resuming} = 1;
 
-    # we need to truncate the whole thing, adjust the size we are
-    # requesting to the size we will truncate the file to
     if (open(my $handle, '>>', $cookie->{file})) {
-        if (!truncate($handle, $size)) {
-            warn "dcc_resume: Can't truncate '$cookie->{file}' to size $size\n";
-            return;
-        }
-
-        $irc->yield(ctcp => $cookie->{nick} => "DCC RESUME $sender_file $cookie->{port} $size");
-
-        # save the cookie for later
+        $irc->yield(ctcp => $cookie->{nick} => "DCC RESUME $sender_file $cookie->{port} $cookie->{done}");
         $self->{resuming}->{"$cookie->{port}+$cookie->{nick}"} = $cookie;
+    }
+    else {
+        warn "dcc_resume: Can't append to file '$cookie->{file}'\n";
+        return;
     }
 
     return;
@@ -389,10 +376,13 @@ sub _U_dcc_resume {
 
 # Accept incoming data on a DCC socket.
 sub _dcc_read {
-    my ($self, $data, $id) = @_[OBJECT, ARG0, ARG1];
+    my ($kernel, $self, $data, $id) = @_[KERNEL, OBJECT, ARG0, ARG1];
     my $irc = $self->{irc};
 
     $id = $self->{wheelmap}->{$id};
+    if ($self->{dcc}{$id}{alarm_id}) {
+        $kernel->call($self->{session_id}, '_cancel_timeout', $id);
+    }
 
     if ($self->{dcc}->{$id}->{type} eq 'GET') {
         # Acknowledge the received data.
@@ -437,8 +427,8 @@ sub _dcc_read {
                     nick type port file size done peeraddr
                 )},
             );
-            delete $self->{wheelmap}->{ $self->{dcc}->{$id}->{wheel}->ID };
-            delete $self->{dcc}->{$id};
+
+            $self->_remove_dcc($id);
             return;
         }
 
@@ -500,10 +490,7 @@ sub _dcc_failed {
                 )},
             );
 
-            if ( $self->{dcc}->{$id}->{wheel} ) {
-                delete $self->{wheelmap}->{ $self->{dcc}->{$id}->{wheel}->ID };
-            }
-            delete $self->{dcc}->{$id};
+            $self->_remove_dcc($id);
         }
 
         return;
@@ -529,11 +516,7 @@ sub _dcc_failed {
         )},
     );
 
-    if (exists $self->{dcc}->{$id}->{wheel}) {
-        delete $self->{wheelmap}->{$self->{dcc}->{$id}->{wheel}->ID};
-    }
-    delete $self->{dcc}->{$id};
-
+    $self->_remove_dcc($id);
     return;
 }
 
@@ -586,7 +569,7 @@ sub _dcc_up {
     my $handle;
     if ($self->{dcc}->{$id}->{type} eq 'GET') {
         # check if we're resuming
-        my $mode = -s $self->{dcc}->{$id}->{file} ? '>>' : '>';
+        my $mode = $self->{dcc}->{$id}->{resuming} ? '>>' : '>';
 
         if ( !open $handle, $mode, $self->{dcc}->{$id}->{file} ) {
             $kernel->yield(_dcc_failed => 'open file', $! + 0, $!, $id);
@@ -603,6 +586,7 @@ sub _dcc_up {
         }
 
         binmode $handle;
+        seek $handle, $self->{dcc}{$id}{done}, 0;
         # Send the first packet to get the ball rolling.
         read $handle, my $buffer, $self->{dcc}->{$id}->{blocksize};
         $self->{dcc}->{$id}->{wheel}->put($buffer);
@@ -618,6 +602,34 @@ sub _dcc_up {
         )},
     );
 
+    return;
+}
+
+sub _cancel_timeout {
+    my ($kernel, $self, $id) = @_[KERNEL, OBJECT, ARG0];
+    my $alarm_id = delete $self->{dcc}{$id}{alarm_id};
+    $kernel->alarm_remove($alarm_id);
+    return;
+}
+
+sub _remove_dcc {
+    my ($self, $id) = @_;
+
+    if (exists $self->{dcc}{$id}{alarm_id}) {
+        $poe_kernel->call($self->{session_id}, '_cancel_timeout', $id);
+    }
+
+    if (exists $self->{dcc}{$id}{wheel}) {
+        delete $self->{wheelmap}{ $self->{dcc}{$id}{wheel}->ID };
+        if ($^O =~ /cygwin|MSWin/) {
+          $self->{dcc}{$id}{wheel}->$_ for qw(shutdown_input shutdown_output);
+        }
+    }
+
+    # flush the filehandle
+    close $self->{dcc}{$id}{fh} if $self->{dcc}{$id}{type} eq 'GET';
+
+    delete $self->{dcc}{$id};
     return;
 }
 
