@@ -2,8 +2,8 @@ package POE::Component::IRC::State;
 BEGIN {
   $POE::Component::IRC::State::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::State::VERSION = '6.78';
+{
+  $POE::Component::IRC::State::VERSION = '6.79';
 }
 
 use strict;
@@ -880,6 +880,7 @@ sub nick_long_form {
     return if !$self->_nick_exists($nick);
 
     my $user = $self->{STATE}{Nicks}{ $unick };
+    return unless exists $user->{User} && exists $user->{Host};
     return "$user->{Nick}!$user->{User}\@$user->{Host}";
 }
 

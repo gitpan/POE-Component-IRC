@@ -2,8 +2,8 @@ package POE::Component::IRC::Qnet;
 BEGIN {
   $POE::Component::IRC::Qnet::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Component::IRC::Qnet::VERSION = '6.78';
+{
+  $POE::Component::IRC::Qnet::VERSION = '6.79';
 }
 
 use strict;

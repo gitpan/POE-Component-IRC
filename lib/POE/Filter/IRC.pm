@@ -2,8 +2,8 @@ package POE::Filter::IRC;
 BEGIN {
   $POE::Filter::IRC::AUTHORITY = 'cpan:HINRIK';
 }
-BEGIN {
-  $POE::Filter::IRC::VERSION = '6.78';
+{
+  $POE::Filter::IRC::VERSION = '6.79';
 }
 
 use strict;

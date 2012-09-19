@@ -5,7 +5,7 @@
       "Hinrik \u00c3\u0096rn Sigur\u00c3\u00b0sson <hinrik.sig@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Zilla version 4.200006, CPAN::Meta::Converter version 2.110440",
+   "generated_by" : "Dist::Zilla version 4.300023, CPAN::Meta::Converter version 2.120921",
    "license" : [
       "perl_5"
    ],
@@ -35,15 +35,15 @@
          "requires" : {
             "IRC::Utils" : "0.12",
             "POE" : "1.311",
-            "POE::Component::Syndicator" : 0,
-            "POE::Driver::SysRW" : 0,
+            "POE::Component::Syndicator" : "0",
+            "POE::Driver::SysRW" : "0",
             "POE::Filter::IRCD" : "2.42",
-            "POE::Filter::Line" : 0,
-            "POE::Filter::Stackable" : 0,
-            "POE::Filter::Stream" : 0,
-            "POE::Session" : 0,
-            "POE::Wheel::ReadWrite" : 0,
-            "POE::Wheel::SocketFactory" : 0,
+            "POE::Filter::Line" : "0",
+            "POE::Filter::Stackable" : "0",
+            "POE::Filter::Stream" : "0",
+            "POE::Session" : "0",
+            "POE::Wheel::ReadWrite" : "0",
+            "POE::Wheel::SocketFactory" : "0",
             "perl" : "5.008001"
          }
       },
@@ -70,7 +70,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.78",
+   "version" : "6.79",
    "x_authority" : "cpan:HINRIK"
 }
 
