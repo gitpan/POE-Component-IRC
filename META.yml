@@ -25,6 +25,7 @@ recommends:
   POE::Component::Client::DNS: 0.99
 requires:
   IRC::Utils: 0.12
+  List::MoreUtils: 0
   POE: 1.311
   POE::Component::Syndicator: 0
   POE::Driver::SysRW: 0
@@ -41,5 +42,5 @@ resources:
   homepage: http://metacpan.org/release/POE-Component-IRC
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: 6.79
+version: 6.80
 x_authority: cpan:HINRIK

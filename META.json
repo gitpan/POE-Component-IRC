@@ -34,6 +34,7 @@
          },
          "requires" : {
             "IRC::Utils" : "0.12",
+            "List::MoreUtils" : "0",
             "POE" : "1.311",
             "POE::Component::Syndicator" : "0",
             "POE::Driver::SysRW" : "0",
@@ -70,7 +71,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.79",
+   "version" : "6.80",
    "x_authority" : "cpan:HINRIK"
 }
 
