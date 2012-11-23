@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
 {
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.80';
+  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.81';
 }
 
 use strict;
@@ -21,11 +21,11 @@ sub new {
 
     for my $cmd (keys %{ $args{Commands} }) {
         if (ref $args{Commands}->{$cmd} eq 'HASH') {
-            croak "$cmd: no info provided" 
+            croak "$cmd: no info provided"
                 if !exists $args{Commands}->{$cmd}->{info} ;
-            croak "$cmd: no arguments provided" 
+            croak "$cmd: no arguments provided"
                 if !@{ $args{Commands}->{$cmd}->{args} };
-            
+
         }
         $args{Commands}->{lc $cmd} = delete $args{Commands}->{$cmd};
     }
@@ -114,12 +114,12 @@ sub _handle_cmd {
 
     if (defined $self->{Commands}->{$cmd}) {
         if (ref $self->{Commands}->{$cmd} eq 'HASH') {
-            my @args_array = defined $args ? split /\s+/, $args : ();      
+            my @args_array = defined $args ? split /\s+/, $args : ();
             if (@args_array < @{ $self->{Commands}->{$cmd}->{args} } ||
-               (!defined $self->{Commands}->{$cmd}->{variable} && 
+               (!defined $self->{Commands}->{$cmd}->{variable} &&
                 @args_array > @{ $self->{Commands}->{$cmd}->{args} })
             ) {
-                  $irc->yield($self->{Method}, $where, 
+                  $irc->yield($self->{Method}, $where,
                       "Not enough or too many arguments. See help for $cmd");
                   return;
             }
@@ -134,19 +134,19 @@ sub _handle_cmd {
                     use List::MoreUtils qw(none);
                     # Check if argument has one of possible values
                     if (none { $_ eq $in_arg} @values) {
-                      $irc->yield($self->{Method}, $where, 
+                      $irc->yield($self->{Method}, $where,
                           "$_ can be one of ".join '|', @values);
                       return;
                     }
 
-                } 
+                }
                 $args->{$_} = $in_arg;
             }
 
             # Process remaining arguments if variable is set
             my $arg_cnt = 0;
             if (defined $self->{Commands}->{$cmd}->{variable}) {
-                for (@args_array) { 
+                for (@args_array) {
                     $args->{"opt".$arg_cnt++} = $_;
                 }
             }
@@ -196,9 +196,9 @@ sub _get_help {
             if (ref $self->{Commands}->{$cmd} eq 'HASH') {
                 push @help, "Syntax: $cmd ".
                     (join ' ', @{ $self->{Commands}->{$cmd}->{args} }).
-                    (defined $self->{Commands}->{$cmd}->{variable} ? 
+                    (defined $self->{Commands}->{$cmd}->{variable} ?
                         " ..."  : "");
-                push @help, split /\015?\012/, 
+                push @help, split /\015?\012/,
                     "Description: ".$self->{Commands}->{$cmd}->{info};
                 push @help, "Arguments:";
 
@@ -208,13 +208,13 @@ sub _get_help {
                         my @arg_usage = @{$self->{Commands}->{$cmd}->{$arg}};
                         push @help, "    $arg: ".$arg_usage[0].
                         " (".(join '|', @arg_usage[1..$#arg_usage]).")"
-                    } 
+                    }
                     else {
                         push @help, "    $arg: ".
                             $self->{Commands}->{$cmd}->{$arg};
                     }
                 }
-            } 
+            }
             else {
                 @help = split /\015?\012/, $self->{Commands}->{$cmd};
             }
@@ -226,7 +226,7 @@ sub _get_help {
     }
     else {
         if (keys %{ $self->{Commands} }) {
-            push @help, 'Commands: ' . join ', ', keys %{ $self->{Commands} };
+            push @help, 'Commands: ' . join ', ', sort keys %{ $self->{Commands} };
             push @help, "For more details, use: ${p}help <command>";
         }
         else {
@@ -458,8 +458,8 @@ L<POE::Component::IRC|POE::Component::IRC>'s C<plugin_add> method.
 =head2 C<add>
 
 Adds a new command. Takes two arguments, the name of the command, and a string
-or hash reference containing its usage information (see C<new>). Returns false 
-if the command has already been defined or no info or arguments are provided, 
+or hash reference containing its usage information (see C<new>). Returns false
+if the command has already been defined or no info or arguments are provided,
 true otherwise.
 
 =head2 C<remove>
