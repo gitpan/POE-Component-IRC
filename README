@@ -249,6 +249,17 @@ CONSTRUCTORS
 
     *   'UseSSL', set to some true value if you want to connect using SSL.
 
+    *   'SSLCert', set to a SSL Certificate(PAM encoded) to connect using a
+        client cert
+
+    *   'SSLKey', set to a SSL Key(PAM encoded) to connect using a client
+        cert
+
+    *   'SSLCtx', set to a SSL Context to configure the SSL Connection
+
+        The 'SSLCert' and 'SSLKey' both need to be specified. The 'SSLCtx'
+        takes precedence specified.
+
     *   'Raw', set to some true value to enable the component to send
         "irc_raw" and "irc_raw_out" events.
 

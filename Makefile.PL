@@ -11,10 +11,7 @@ use ExtUtils::MakeMaker 6.30;
 my %WriteMakefileArgs = (
   "ABSTRACT" => "A fully event-driven IRC client module",
   "AUTHOR" => "Chris Williams <chris\@bingosnet.co.uk>, Hinrik \303\226rn Sigur\303\260sson <hinrik.sig\@gmail.com>",
-  "BUILD_REQUIRES" => {
-    "Test::Differences" => "0.61",
-    "Test::More" => "0.47"
-  },
+  "BUILD_REQUIRES" => {},
   "CONFIGURE_REQUIRES" => {
     "ExtUtils::MakeMaker" => "6.30"
   },
@@ -36,12 +33,29 @@ my %WriteMakefileArgs = (
     "POE::Wheel::ReadWrite" => 0,
     "POE::Wheel::SocketFactory" => 0
   },
-  "VERSION" => "6.82",
+  "TEST_REQUIRES" => {
+    "Test::Differences" => "0.61",
+    "Test::More" => "0.47"
+  },
+  "VERSION" => "6.83",
   "test" => {
     "TESTS" => "t/01_base/*.t t/02_behavior/*.t t/03_subclasses/*.t t/04_plugins/01_ctcp/*.t t/04_plugins/02_connector/*.t t/04_plugins/03_botaddressed/*.t t/04_plugins/04_bottraffic/*.t t/04_plugins/05_isupport/*.t t/04_plugins/06_plugman/*.t t/04_plugins/07_console/*.t t/04_plugins/08_proxy/*.t t/04_plugins/09_nickreclaim/*.t t/04_plugins/10_followtail/*.t t/04_plugins/11_cycleempty/*.t t/04_plugins/12_autojoin/*.t t/04_plugins/13_botcommand/*.t t/04_plugins/14_logger/*.t t/04_plugins/15_nickservid/*.t t/04_plugins/16_whois/*.t t/04_plugins/17_dcc/*.t t/05_regression/*.t"
   }
 );
 
+
+unless ( eval { ExtUtils::MakeMaker->VERSION(6.63_03) } ) {
+  my $tr = delete $WriteMakefileArgs{TEST_REQUIRES};
+  my $br = $WriteMakefileArgs{BUILD_REQUIRES};
+  for my $mod ( keys %$tr ) {
+    if ( exists $br->{$mod} ) {
+      $br->{$mod} = $tr->{$mod} if $tr->{$mod} > $br->{$mod};
+    }
+    else {
+      $br->{$mod} = $tr->{$mod};
+    }
+  }
+}
 
 unless ( eval { ExtUtils::MakeMaker->VERSION(6.56) } ) {
   my $br = delete $WriteMakefileArgs{BUILD_REQUIRES};

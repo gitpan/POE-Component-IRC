@@ -3,7 +3,7 @@ BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
 {
-  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.82';
+  $POE::Component::IRC::Plugin::NickServID::VERSION = '6.83';
 }
 
 use strict;
@@ -66,6 +66,18 @@ sub S_notice {
     return PCI_EAT_NONE;
 }
 
+# ERR_NICKNAMEINUSE
+sub S_433 {
+    my ($self, $irc) = splice @_, 0, 2;
+    my $offending = ${ $_[2] }->[0];
+    my $reason    = ${ $_[2] }->[1];
+
+    if ($irc->nick_name() eq $offending && $reason eq "Nickname is registered to someone else") {
+        $irc->yield(nickserv => "IDENTIFY $self->{Password}");
+    }
+
+    return PCI_EAT_NONE;
+}
 1;
 
 =encoding utf8
