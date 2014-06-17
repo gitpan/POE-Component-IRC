@@ -2,11 +2,8 @@ package POE::Component::IRC::Plugin::BotCommand;
 BEGIN {
   $POE::Component::IRC::Plugin::BotCommand::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::BotCommand::VERSION = '6.83';
-}
 # vim: set expandtab ts=4 sw=4 ai:
-
+$POE::Component::IRC::Plugin::BotCommand::VERSION = '6.84';
 use strict;
 use warnings FATAL => 'all';
 use Carp;

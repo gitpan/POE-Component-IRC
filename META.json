@@ -2,10 +2,10 @@
    "abstract" : "A fully event-driven IRC client module",
    "author" : [
       "Chris Williams <chris@bingosnet.co.uk>",
-      "Hinrik \u00c3\u0096rn Sigur\u00c3\u00b0sson <hinrik.sig@gmail.com>"
+      "Hinrik Örn Sigurðsson <hinrik.sig@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Dist::Zilla version 4.300034, CPAN::Meta::Converter version 2.130880",
+   "generated_by" : "Dist::Zilla version 5.019, CPAN::Meta::Converter version 2.141520",
    "license" : [
       "perl_5"
    ],
@@ -76,7 +76,7 @@
          "web" : "http://github.com/bingos/poe-component-irc"
       }
    },
-   "version" : "6.83",
+   "version" : "6.84",
    "x_authority" : "cpan:HINRIK"
 }
 

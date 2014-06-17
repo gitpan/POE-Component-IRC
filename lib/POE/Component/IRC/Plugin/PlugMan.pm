@@ -2,10 +2,7 @@ package POE::Component::IRC::Plugin::PlugMan;
 BEGIN {
   $POE::Component::IRC::Plugin::PlugMan::AUTHORITY = 'cpan:HINRIK';
 }
-{
-  $POE::Component::IRC::Plugin::PlugMan::VERSION = '6.83';
-}
-
+$POE::Component::IRC::Plugin::PlugMan::VERSION = '6.84';
 use strict;
 use warnings FATAL => 'all';
 use Carp;
@@ -137,9 +134,10 @@ sub load {
 
         eval "require $plugin";
         if ($@) {
+            my $error = $@;
             delete $INC{$module};
             $self->_unload_subs($plugin);
-            die "$@\n";
+            die $error;
         }
 
         $object = $plugin->new( @_ );
