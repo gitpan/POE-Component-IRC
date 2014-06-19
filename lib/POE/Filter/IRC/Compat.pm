@@ -2,7 +2,7 @@ package POE::Filter::IRC::Compat;
 BEGIN {
   $POE::Filter::IRC::Compat::AUTHORITY = 'cpan:HINRIK';
 }
-$POE::Filter::IRC::Compat::VERSION = '6.84';
+$POE::Filter::IRC::Compat::VERSION = '6.85';
 use strict;
 use warnings FATAL => 'all';
 use Carp;
