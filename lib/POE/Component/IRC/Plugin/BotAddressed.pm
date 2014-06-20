@@ -2,7 +2,7 @@ package POE::Component::IRC::Plugin::BotAddressed;
 BEGIN {
   $POE::Component::IRC::Plugin::BotAddressed::AUTHORITY = 'cpan:HINRIK';
 }
-$POE::Component::IRC::Plugin::BotAddressed::VERSION = '6.85';
+$POE::Component::IRC::Plugin::BotAddressed::VERSION = '6.86';
 use strict;
 use warnings FATAL => 'all';
 use Carp;
