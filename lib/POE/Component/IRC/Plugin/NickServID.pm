@@ -2,7 +2,7 @@ package POE::Component::IRC::Plugin::NickServID;
 BEGIN {
   $POE::Component::IRC::Plugin::NickServID::AUTHORITY = 'cpan:HINRIK';
 }
-$POE::Component::IRC::Plugin::NickServID::VERSION = '6.86';
+$POE::Component::IRC::Plugin::NickServID::VERSION = '6.87';
 use strict;
 use warnings FATAL => 'all';
 use Carp;

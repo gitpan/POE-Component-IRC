@@ -42,5 +42,5 @@ resources:
   homepage: http://metacpan.org/release/POE-Component-IRC
   license: http://dev.perl.org/licenses/
   repository: git://github.com/bingos/poe-component-irc.git
-version: '6.86'
+version: '6.87'
 x_authority: cpan:HINRIK
