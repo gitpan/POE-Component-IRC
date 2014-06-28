@@ -2,7 +2,7 @@ package POE::Component::IRC::Plugin::FollowTail;
 BEGIN {
   $POE::Component::IRC::Plugin::FollowTail::AUTHORITY = 'cpan:HINRIK';
 }
-$POE::Component::IRC::Plugin::FollowTail::VERSION = '6.87';
+$POE::Component::IRC::Plugin::FollowTail::VERSION = '6.88';
 use strict;
 use warnings FATAL => 'all';
 use Carp;

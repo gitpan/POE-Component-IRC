@@ -2,7 +2,7 @@ package POE::Component::IRC::Plugin::Proxy;
 BEGIN {
   $POE::Component::IRC::Plugin::Proxy::AUTHORITY = 'cpan:HINRIK';
 }
-$POE::Component::IRC::Plugin::Proxy::VERSION = '6.87';
+$POE::Component::IRC::Plugin::Proxy::VERSION = '6.88';
 use strict;
 use warnings FATAL => 'all';
 use Carp;

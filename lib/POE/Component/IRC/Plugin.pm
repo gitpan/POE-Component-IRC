@@ -2,7 +2,7 @@ package POE::Component::IRC::Plugin;
 BEGIN {
   $POE::Component::IRC::Plugin::AUTHORITY = 'cpan:HINRIK';
 }
-$POE::Component::IRC::Plugin::VERSION = '6.87';
+$POE::Component::IRC::Plugin::VERSION = '6.88';
 use strict;
 use warnings FATAL => 'all';
 
